@@ -1,4 +1,5 @@
 import { Legalizacion } from '@/types/legalizaciones';
+import { supabase } from './supabase';
 
 // Ensure TLS certificate verification is bypassed for self-signed SAP SSL in development/internal network
 if (typeof process !== 'undefined') {
@@ -190,6 +191,8 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       }
     }
 
+    const cardCodeMap: Record<string, string> = {};
+
     for (const linea of legalizacion.lineas) {
       const detCode = currentDetNum.toString().padStart(10, '0');
       
@@ -215,9 +218,15 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
         }
       }
 
+      if (linea.proveedorNit) {
+        cardCodeMap[linea.proveedorNit] = realCardCode;
+      }
+
       // En el frontend, el usuario selecciona el Centro de Costos (ProfitCenter) en el dropdown 'concepto' (ej: 'GV-CAOBR - COSTA ATLANTICA OBRAS')
       const lineProfitCode = (linea.concepto || '').split(' - ')[0].trim();
       const acctCode = (linea.cuentaTitulo || '').split(' - ')[0].trim();
+
+      const isSoporte = linea.tipoDocumento === 'Documento Soporte';
 
       const detPayload = {
         Code: detCode,
@@ -226,13 +235,13 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
         U_Fecha: new Date().toISOString().split('T')[0],
         U_CardCode: realCardCode,
         U_CardName: realCardName,
-        U_ProfitCode: lineProfitCode || realProfitCode, // Centro de Costo de la línea, o fallback al del encabezado
-        U_CodeConcepto: acctCode, // El concepto en SAP Addon es igual a la cuenta
-        U_IdDocumento: linea.facturaNumero || 'ND',
-        U_AcctCode: acctCode,
-        U_VlrAntIVA: linea.valorSubtotal,
-        U_VlrGasto: linea.valorSubtotal,
-        U_VlrTotal: linea.valorTotal || linea.valorSubtotal,
+        U_ProfitCode: isSoporte ? undefined : (lineProfitCode || realProfitCode),
+        U_CodeConcepto: isSoporte ? 'importar saldo' : acctCode,
+        U_IdDocumento: isSoporte ? undefined : (linea.facturaNumero || 'ND'),
+        U_AcctCode: isSoporte ? undefined : acctCode,
+        U_VlrAntIVA: isSoporte ? undefined : linea.valorSubtotal,
+        U_VlrGasto: isSoporte ? undefined : linea.valorSubtotal,
+        U_VlrTotal: isSoporte ? undefined : (linea.valorTotal || linea.valorSubtotal),
       };
 
       const resDet = await fetch(`${baseUrl}/U_HBT_LEGDET`, {
@@ -258,32 +267,62 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
     const draftsErrors: string[] = [];
 
     if (lineasSoporte.length > 0) {
-      // Agrupar líneas por NIT de Proveedor
+      // Agrupar líneas por CardCode de Proveedor
       const lineasPorProveedor = lineasSoporte.reduce((acc, linea) => {
         const nit = linea.proveedorNit?.trim() || 'PROV-GENERAL';
-        if (!acc[nit]) acc[nit] = [];
-        acc[nit].push(linea);
+        const cardCode = cardCodeMap[nit] || nit;
+        if (!acc[cardCode]) acc[cardCode] = [];
+        acc[cardCode].push(linea);
         return acc;
       }, {} as Record<string, typeof lineasSoporte>);
 
       // Crear un Draft por cada Proveedor
-      for (const [nit, lineasProv] of Object.entries(lineasPorProveedor)) {
+      for (const [cardCode, lineasProv] of Object.entries(lineasPorProveedor)) {
+        const resolvedDocumentLines = [];
+        let lineIdx = 0;
+
+        for (const l of lineasProv) {
+          const rawCode = (l.cuentaTitulo || '').split(' - ')[0].trim();
+          const codeNum = parseInt(rawCode, 10);
+          const lineProfitCode = (l.concepto || '').split(' - ')[0].trim();
+          
+          let itemCode = 'ZZCC01-0005-000-0000'; // Default / Fallback Item Code
+          let taxCode = 'I_LEG_T0'; // Default / Fallback Tax Code
+          
+          if (!isNaN(codeNum)) {
+            try {
+              const { data, error } = await supabase
+                .from('Articulos')
+                .select('ItemCode, TaxCode')
+                .eq('AcctCode', codeNum)
+                .limit(1);
+              if (!error && data && data.length > 0) {
+                itemCode = data[0].ItemCode || itemCode;
+                taxCode = data[0].TaxCode || taxCode;
+              }
+            } catch (err) {
+              console.error('Error fetching item code from Supabase Articulos:', err);
+            }
+          }
+
+          resolvedDocumentLines.push({
+            LineNum: lineIdx++,
+            ItemCode: itemCode,
+            Quantity: 1,
+            UnitPrice: l.valorSubtotal,
+            TaxCode: taxCode,
+            CostingCode: lineProfitCode || realProfitCode || undefined,
+            U_CentroCostos: lineProfitCode || realProfitCode || undefined,
+          });
+        }
+
         const payloadDrafts = {
           DocObjectCode: 'oPurchaseInvoices',
-          DocType: 'dDocument_Service',
-          CardCode: nit, // Using the NIT entered in the form
+          DocType: 'dDocument_Items',
+          CardCode: cardCode, // Using the resolved CardCode
           DocDate: legalizacion.fecha,
           Comments: `Borrador Legalización ${legalizacion.codigo} - UDO DocEntry: ${udoData.DocEntry}`,
-          DocumentLines: lineasProv.map((l, idx) => {
-            const rawCode = (l.cuentaTitulo || '').split(' - ')[0].trim();
-            return {
-              LineNum: idx,
-              ItemDescription: l.concepto || l.cuentaTitulo,
-              AccountCode: rawCode || undefined,
-              UnitPrice: l.valorSubtotal,
-              TaxCode: l.valorIva > 0 ? 'IVA_19' : 'EXE',
-            };
-          }),
+          DocumentLines: resolvedDocumentLines,
         };
 
         const resDrafts = await fetch(`${baseUrl}/Drafts`, {
@@ -305,7 +344,8 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
         if (resDrafts.ok) {
           draftsResults.push(draftsData.DocEntry);
         } else {
-          draftsErrors.push(`Fallo al crear Factura Preliminar para NIT ${nit}: ${draftsData?.error?.message?.value || resDrafts.status}`);
+          const nitOrig = lineasProv[0]?.proveedorNit || cardCode;
+          draftsErrors.push(`Fallo al crear Factura Preliminar para NIT ${nitOrig} (${cardCode}): ${draftsData?.error?.message?.value || resDrafts.status}`);
         }
       }
     }
