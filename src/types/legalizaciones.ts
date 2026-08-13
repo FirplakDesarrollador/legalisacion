@@ -62,6 +62,14 @@ export interface LineaGasto {
   soporteFile?: File;
 }
 
+export interface ResponsableTarjetaCredito {
+  id: number;
+  tarjeta_codigo: string;
+  tarjeta_nombre: string;
+  responsable_nombre: string;
+  responsable_email: string;
+}
+
 export interface Legalizacion {
   id: string;
   codigo: string;
@@ -107,3 +115,5 @@ export interface CajaMenor {
   created_at: string;
   updated_at: string;
 }
+
+export type TarjetaCredito = Legalizacion;

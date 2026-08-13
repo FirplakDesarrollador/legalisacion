@@ -269,6 +269,48 @@ export async function fetchProveedoresFromSupabase(): Promise<Proveedor[]> {
   }
 }
 
+const FALLBACK_TARJETAS_RESPONSABLES = [
+  {"id":999,"tarjeta_codigo":"TEST","tarjeta_nombre":"Tarjeta de Pruebas","responsable_nombre":"Mateo Benavides","responsable_email":"mateo.benavides@firplak.com"},
+  {"id":1,"tarjeta_codigo":"3680","tarjeta_nombre":"Tc Mario Bermudez","responsable_nombre":"Luis Escobar Borjas","responsable_email":"luis.escobar@firplak.com"},
+  {"id":2,"tarjeta_codigo":"2354","tarjeta_nombre":"Alejandro Isaza","responsable_nombre":"Alejandro Isaza","responsable_email":"alejandro.isaza@firplak.com"},
+  {"id":3,"tarjeta_codigo":"9463","tarjeta_nombre":"Isabel Isaza","responsable_nombre":"Isabel Isaza","responsable_email":"isabel.isaza@firplak.com"},
+  {"id":4,"tarjeta_codigo":"9314","tarjeta_nombre":"Ismael Correa","responsable_nombre":"Ismael Correa Restrepo","responsable_email":"ismael.correa@firplak.com"},
+  {"id":5,"tarjeta_codigo":"4769","tarjeta_nombre":"Luis Escobar","responsable_nombre":"Luis Escobar Borjas","responsable_email":"luis.escobar@firplak.com"},
+  {"id":6,"tarjeta_codigo":"1735","tarjeta_nombre":"Tc Martha Giraldo","responsable_nombre":"Luis Escobar Borjas","responsable_email":"luis.escobar@firplak.com"},
+  {"id":7,"tarjeta_codigo":"9837","tarjeta_nombre":"Tc Victor Munera","responsable_nombre":"Luis Escobar Borjas","responsable_email":"luis.escobar@firplak.com"},
+  {"id":8,"tarjeta_codigo":"1526","tarjeta_nombre":"Tc Monica Zuluaga","responsable_nombre":"Luis Escobar Borjas","responsable_email":"luis.escobar@firplak.com"},
+  {"id":9,"tarjeta_codigo":"9876","tarjeta_nombre":"TC Luis Carlos Isaza","responsable_nombre":"Maria Nohemy Agudelo Zapata","responsable_email":"nohemy.agudelo@firplak.com"},
+  {"id":10,"tarjeta_codigo":"1959","tarjeta_nombre":"TC Laura Duque","responsable_nombre":"Laura Isabel Duque Lopez","responsable_email":"coordinacionfinanciera@firplak.com"},
+  {"id":11,"tarjeta_codigo":"8443","tarjeta_nombre":"Gabriel Molina","responsable_nombre":"Gabriel Molina Isaza","responsable_email":"gabriel.molina@FIRPLAK.COM"},
+  {"id":12,"tarjeta_codigo":"8180","tarjeta_nombre":"Edgar Aguilar","responsable_nombre":"Edgar Javier Aguilar Rosero","responsable_email":"edgar.aguilar@firplak.com"},
+  {"id":13,"tarjeta_codigo":"6284","tarjeta_nombre":"Tc Juan Esteban Marín","responsable_nombre":"Juan Esteban Marín Gañan","responsable_email":"juan.marin@firplak.com"},
+  {"id":14,"tarjeta_codigo":"9679","tarjeta_nombre":"Tc Pablo Montoya","responsable_nombre":"Pablo Montoya Robledo","responsable_email":"pablo.montoya@firplak.com"},
+  {"id":15,"tarjeta_codigo":"9472","tarjeta_nombre":"Tc Fabio Tobar","responsable_nombre":"Isabel Cristina Jaramillo Castro","responsable_email":"isabel.jaramillo@firplak.com"},
+  {"id":16,"tarjeta_codigo":"1597","tarjeta_nombre":"Ismael Correa","responsable_nombre":"Ismael Correa Restrepo","responsable_email":"ismael.correa@firplak.com"},
+  {"id":17,"tarjeta_codigo":"4962","tarjeta_nombre":"Luis Carlos Isaza","responsable_nombre":"Maria Nohemy Agudelo Zapata","responsable_email":"nohemy.agudelo@firplak.com"},
+  {"id":18,"tarjeta_codigo":"2108","tarjeta_nombre":"Tc Isabel Isaza R","responsable_nombre":"Isabel Isaza","responsable_email":"isabel.isaza@firplak.com"},
+  {"id":19,"tarjeta_codigo":"0732","tarjeta_nombre":"TC Omar Cepero","responsable_nombre":"Omar Cepero","responsable_email":"omar.cepero@firplak.com"},
+  {"id":20,"tarjeta_codigo":"3870","tarjeta_nombre":"Tc Héctor Chinchilla","responsable_nombre":"Héctor Jose Chinchilla Trigos","responsable_email":"hector.chinchilla@firplak.com"},
+  {"id":21,"tarjeta_codigo":"1738","tarjeta_nombre":"Tc Alejandro Isaza","responsable_nombre":"Alejandro Isaza","responsable_email":"alejandro.isaza@firplak.com"},
+  {"id":22,"tarjeta_codigo":"2196","tarjeta_nombre":"Tc Alejandro Calle","responsable_nombre":"Luis Escobar Borjas","responsable_email":"luis.escobar@firplak.com"},
+  {"id":23,"tarjeta_codigo":"5336","tarjeta_nombre":"Tc Maria Camila","responsable_nombre":"Maria Camila Jiménez Ochoa","responsable_email":"camila.jimenez@firplak.com"},
+  {"id":24,"tarjeta_codigo":"1404","tarjeta_nombre":"Tc Pablo Carrizosa","responsable_nombre":"Pablo Carrizosa","responsable_email":"pablo.carrizosa@firplak.com"}
+];
+
+export async function fetchResponsablesTarjetasCredito(): Promise<any[]> {
+  try {
+    const { data, error } = await supabase.from('tarjetas_credito_responsables').select('*').order('id', { ascending: true });
+    if (error) {
+      console.warn("Table tarjetas_credito_responsables not found or error, using fallback.", error.message);
+      return FALLBACK_TARJETAS_RESPONSABLES;
+    }
+    if (data && data.length > 0) return data;
+  } catch (err) {
+    console.warn("Error fetching tarjetas_credito_responsables, using fallback.", err);
+  }
+  return FALLBACK_TARJETAS_RESPONSABLES;
+}
+
 function getFallbackResponsables(): ResponsableCaja[] {
   return [
     { id: 1, nombre: 'Carlos Mier', email: 'edgar.aguilar@firplak.com', centro_costo: 'Logistica', cargo: 'Aprobador: Edgar Javier Aguilar Rosero ($800.000)' },
@@ -348,7 +390,7 @@ export function getLocalLegalizaciones(): Legalizacion[] {
 export async function fetchLegalizacionesFromSupabase(): Promise<Legalizacion[]> {
   try {
     const { data, error } = await supabase
-      .from('legalizaciones')
+      .from('legalizaciones cajas menores')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -359,6 +401,39 @@ export async function fetchLegalizacionesFromSupabase(): Promise<Legalizacion[]>
 
     // Return real data (may be empty array if no records yet)
     return (data || []) as Legalizacion[];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchLegalizacionesTarjetasCreditoFromSupabase(): Promise<Legalizacion[]> {
+  try {
+    const { data, error } = await supabase
+      .from('legalizaciones_tarjetas_credito')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Error al cargar legalizaciones tarjetas de credito:', error);
+      return [];
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      codigo: row.codigo,
+      fecha: row.fecha,
+      usuarioNombre: row.usuario_nombre,
+      usuarioEmail: row.usuario_email,
+      centroCosto: row.centro_costo,
+      motivo: row.motivo,
+      estado: row.estado,
+      anticipoRecibido: row.anticipo_recibido,
+      totalGastos: row.total_gastos,
+      saldoDiferencia: row.saldo_diferencia,
+      lineas: row.lineas || [],
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    })) as Legalizacion[];
   } catch {
     return [];
   }
@@ -380,7 +455,7 @@ export function saveLocalLegalizacion(leg: Legalizacion): Legalizacion[] {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   }
 
-  supabase.from('legalizaciones').upsert([leg]).then(({ error }) => {
+  supabase.from('legalizaciones cajas menores').upsert([leg]).then(({ error }) => {
     if (error) console.log('Info: Supabase table legalizaciones is managed locally.');
   });
 
@@ -403,6 +478,60 @@ export function updateLegalizacionStatus(id: string, nuevoEstado: Legalizacion['
 
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  }
+  return updated;
+}
+
+const TARJETAS_STORAGE_KEY = 'app_tarjetas_credito_data_v1';
+
+export function getLocalTarjetasCredito(): Legalizacion[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(TARJETAS_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(TARJETAS_STORAGE_KEY, JSON.stringify([]));
+      return [];
+    }
+    return JSON.parse(raw) as Legalizacion[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalTarjetaCredito(tarjeta: Legalizacion): Legalizacion[] {
+  const current = getLocalTarjetasCredito();
+  const existingIdx = current.findIndex(item => item.id === tarjeta.id);
+  let updated: Legalizacion[];
+
+  if (existingIdx >= 0) {
+    updated = [...current];
+    updated[existingIdx] = { ...tarjeta, updated_at: new Date().toISOString() };
+  } else {
+    updated = [{ ...tarjeta, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...current];
+  }
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(TARJETAS_STORAGE_KEY, JSON.stringify(updated));
+  }
+  return updated;
+}
+
+export function updateTarjetaCreditoStatus(id: string, nuevoEstado: Legalizacion['estado'], observaciones?: string): Legalizacion[] {
+  const current = getLocalTarjetasCredito();
+  const updated = current.map(item => {
+    if (item.id === id) {
+      return {
+        ...item,
+        estado: nuevoEstado,
+        observacionesAprobacion: observaciones || item.observacionesAprobacion,
+        updated_at: new Date().toISOString()
+      };
+    }
+    return item;
+  });
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(TARJETAS_STORAGE_KEY, JSON.stringify(updated));
   }
   return updated;
 }

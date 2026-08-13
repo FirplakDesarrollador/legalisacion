@@ -5,15 +5,15 @@ import { ShieldCheck, CheckCircle2, Calculator, Plus, Trash2, Database, Send, Us
 import {
   fetchCuentasFromSupabase,
   fetchProveedoresFromSupabase,
-  fetchResponsablesFromSupabase,
+  fetchResponsablesTarjetasCredito,
   fetchCentrosCostoFromSupabase,
-  saveLocalLegalizacion,
+  saveLocalTarjetaCredito,
   supabase
 } from '@/lib/supabase';
-import { CuentaContable, Proveedor, LineaGasto, Legalizacion, ResponsableCaja, CentroCosto } from '@/types/legalizaciones';
+import { CuentaContable, Proveedor, LineaGasto, TarjetaCredito, ResponsableTarjetaCredito, CentroCosto } from '@/types/legalizaciones';
 
-export default function FormularioPublicoPage() {
-  const [responsables, setResponsables] = useState<ResponsableCaja[]>([]);
+export default function FormularioTarjetasCreditoPage() {
+  const [responsables, setResponsables] = useState<ResponsableTarjetaCredito[]>([]);
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [centros, setCentros] = useState<CentroCosto[]>([]);
@@ -52,7 +52,7 @@ export default function FormularioPublicoPage() {
     async function loadData() {
       try {
         const [rData, cData, pData, centrosData] = await Promise.all([
-          fetchResponsablesFromSupabase(),
+          fetchResponsablesTarjetasCredito(),
           fetchCuentasFromSupabase(),
           fetchProveedoresFromSupabase(),
           fetchCentrosCostoFromSupabase(),
@@ -65,9 +65,8 @@ export default function FormularioPublicoPage() {
         if (rData.length > 0) {
           const first = rData[0];
           setSelectedResponsableId(first.id);
-          setUsuarioNombre(first.nombre);
-          setUsuarioEmail(first.email);
-          if (first.centro_costo) setCentroCosto(first.centro_costo);
+          setUsuarioNombre(first.responsable_nombre);
+          setUsuarioEmail(first.responsable_email);
         }
 
         if (cData.length > 0) {
@@ -92,9 +91,8 @@ export default function FormularioPublicoPage() {
     setSelectedResponsableId(idVal);
     const resp = responsables.find((r) => r.id === idVal);
     if (resp) {
-      setUsuarioNombre(resp.nombre);
-      setUsuarioEmail(resp.email);
-      if (resp.centro_costo) setCentroCosto(resp.centro_costo);
+      setUsuarioNombre(resp.responsable_nombre);
+      setUsuarioEmail(resp.responsable_email);
     }
   };
 
@@ -186,12 +184,10 @@ export default function FormularioPublicoPage() {
     }
 
     const randomNum = Math.floor(100 + Math.random() * 900);
-    const codigo = `LEG-PUB-${randomNum}`;
+    const codigo = `TC-PUB-${randomNum}`;
 
-    const cleanLineas = lineas.map(({ soporteFile, ...rest }) => rest);
-
-    const nuevaLeg: Legalizacion = {
-      id: `leg-pub-${Date.now()}`,
+    const nuevaLeg: TarjetaCredito = {
+      id: `tc-pub-${Date.now()}`,
       codigo,
       fecha,
       usuarioNombre,
@@ -202,25 +198,25 @@ export default function FormularioPublicoPage() {
       anticipoRecibido,
       totalGastos,
       saldoDiferencia,
-      lineas: cleanLineas,
+      lineas,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
 
     // Save to Supabase (primary) and local storage (backup)
     try {
-      const { error } = await supabase.from('legalizaciones cajas menores').insert([{
+      const { error } = await supabase.from('legalizaciones_tarjetas_credito').insert([{
         id: nuevaLeg.id,
         codigo: nuevaLeg.codigo,
         fecha: nuevaLeg.fecha,
-        usuarioNombre: nuevaLeg.usuarioNombre,
-        usuarioEmail: nuevaLeg.usuarioEmail,
-        centroCosto: nuevaLeg.centroCosto,
+        usuario_nombre: nuevaLeg.usuarioNombre,
+        usuario_email: nuevaLeg.usuarioEmail,
+        centro_costo: nuevaLeg.centroCosto,
         motivo: nuevaLeg.motivo,
         estado: nuevaLeg.estado,
-        anticipoRecibido: nuevaLeg.anticipoRecibido,
-        totalGastos: nuevaLeg.totalGastos,
-        saldoDiferencia: nuevaLeg.saldoDiferencia,
+        anticipo_recibido: nuevaLeg.anticipoRecibido,
+        total_gastos: nuevaLeg.totalGastos,
+        saldo_diferencia: nuevaLeg.saldoDiferencia,
         lineas: nuevaLeg.lineas,
         created_at: nuevaLeg.created_at,
         updated_at: nuevaLeg.updated_at,
@@ -232,24 +228,7 @@ export default function FormularioPublicoPage() {
       console.error('Error de red al guardar:', e);
     }
 
-    // Trigger Power Automate Flow for approval notification via local API proxy (avoids CORS blocks)
-    try {
-      const link = `${window.location.origin}/formulario-publico/${nuevaLeg.id}`;
-      await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          correo: usuarioEmail,
-          titulo: 'Aprobación de caja menor',
-          contenido: `Tienes esta legalización pendiente por aprobar de ${usuarioNombre} por valor de ${formatCOP(totalGastos)}.`,
-          link: link
-        })
-      });
-    } catch (flowErr) {
-      console.error('Error enviando notificación al proxy:', flowErr);
-    }
-
-    saveLocalLegalizacion(nuevaLeg);
+    saveLocalTarjetaCredito(nuevaLeg);
     setLastCodigo(codigo);
     setSubmitted(true);
   };
@@ -269,9 +248,9 @@ export default function FormularioPublicoPage() {
             </div>
             <div>
               <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                Legalisa <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">Formulario Público Sin Login</span>
+                Legalisa <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">Formulario Tarjetas de Crédito</span>
               </h1>
-              <p className="text-xs text-slate-500">Registro de Viáticos y Legalización de Gastos Corporativos</p>
+              <p className="text-xs text-slate-500">Legalización de Tarjetas de Crédito</p>
             </div>
           </div>
 
@@ -322,7 +301,7 @@ export default function FormularioPublicoPage() {
               <div className="p-5 rounded-2xl bg-blue-50/80 border border-blue-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-blue-700" /> 1. ¿Quién es el Responsable / Custodio de la Caja Menor? *
+                    <UserCheck className="w-4 h-4 text-blue-700" /> 1. Seleccione la Tarjeta de Crédito *
                   </label>
                 </div>
 
@@ -333,17 +312,17 @@ export default function FormularioPublicoPage() {
                   className="w-full p-3 bg-white border border-blue-300 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-sm"
                 >
                   <option value="" disabled>
-                    -- Seleccione el Responsable de la Caja Menor --
+                    -- Seleccione la Tarjeta de Crédito --
                   </option>
                   {responsables.map((resp) => (
                     <option key={resp.id} value={resp.id}>
-                      {resp.nombre} - {resp.centro_costo || 'General'} [{resp.cargo || 'Custodio'}]
+                      {resp.tarjeta_codigo} - {resp.tarjeta_nombre} (Aprueba: {resp.responsable_nombre})
                     </option>
                   ))}
                 </select>
 
                 <p className="text-[11px] text-blue-800">
-                  Seleccione el funcionario a cargo del fondo fijo de caja menor para asignar la legalización.
+                  Seleccione la tarjeta de crédito utilizada para esta legalización.
                 </p>
               </div>
 
@@ -435,7 +414,7 @@ export default function FormularioPublicoPage() {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                        <div className="sm:col-span-3">
+                        <div className="sm:col-span-2">
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase)</label>
                           <select
                             value={linea.cuentaId || ''}
@@ -458,17 +437,17 @@ export default function FormularioPublicoPage() {
                             ))}
                           </select>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Valor ($ COP)</label>
-                            <input
-                              type="number"
-                              min={0}
-                              value={linea.valorSubtotal || ''}
-                              onChange={(e) => handleUpdateLinea(linea.id, 'valorSubtotal', e.target.value)}
-                              className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
-                            />
-                          </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Subtotal ($ COP)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={linea.valorSubtotal || ''}
+                            onChange={(e) => handleUpdateLinea(linea.id, 'valorSubtotal', e.target.value)}
+                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 justify-end">
                           {lineas.length > 1 && (
                             <button
                               type="button"
@@ -490,36 +469,9 @@ export default function FormularioPublicoPage() {
                         <input
                           type="file"
                           accept=".pdf,image/*"
-                          onChange={async (e) => {
+                          onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              handleUpdateLinea(linea.id, 'soporteFile', file);
-                              handleUpdateLinea(linea.id, 'soporteUrl', 'uploading');
-                              
-                              const fileExt = file.name.split('.').pop();
-                              const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-                              const filePath = `comprobantes/${fileName}`;
-                              
-                              try {
-                                const { data: uploadData, error: uploadError } = await supabase.storage
-                                  .from('soportes')
-                                  .upload(filePath, file);
-                                  
-                                if (!uploadError) {
-                                  const { data: urlData } = supabase.storage
-                                    .from('soportes')
-                                    .getPublicUrl(filePath);
-                                  handleUpdateLinea(linea.id, 'soporteUrl', urlData.publicUrl);
-                                } else {
-                                  console.error('Error uploading file:', uploadError);
-                                  handleUpdateLinea(linea.id, 'soporteUrl', '');
-                                  alert('Error al subir el archivo: ' + uploadError.message);
-                                }
-                              } catch (err: any) {
-                                console.error('Error de red al subir:', err);
-                                handleUpdateLinea(linea.id, 'soporteUrl', '');
-                              }
-                            }
+                            if (file) handleUpdateLinea(linea.id, 'soporteFile', file);
                           }}
                           className="block w-full text-xs text-slate-500
                             file:mr-4 file:py-1.5 file:px-4
@@ -529,18 +481,6 @@ export default function FormularioPublicoPage() {
                             hover:file:bg-blue-200
                             cursor-pointer transition-colors"
                         />
-                        {linea.soporteUrl === 'uploading' && (
-                          <div className="mt-1.5 flex items-center gap-1.5 text-blue-700 font-bold text-[10px]">
-                            <div className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                            <span>Subiendo soporte a Supabase Storage...</span>
-                          </div>
-                        )}
-                        {linea.soporteUrl && linea.soporteUrl !== 'uploading' && (
-                          <div className="mt-1.5 flex items-center gap-1.5 text-emerald-700 font-bold text-[10px]">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>✓ Soporte cargado correctamente y listo</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                   ))}
