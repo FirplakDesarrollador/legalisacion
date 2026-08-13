@@ -43,13 +43,23 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
     }
   };
 
-  const handleAction = (nuevoEstado: TarjetaCredito['estado']) => {
+  const handleAction = async (nuevoEstado: TarjetaCredito['estado']) => {
     setIsSubmitting(true);
-    setTimeout(() => {
-      onUpdateStatus(tarjetaCredito.id, nuevoEstado, observaciones);
-      setIsSubmitting(false);
-      onClose();
-    }, 300);
+    if (nuevoEstado === 'aprobado') {
+      await handleEnviarSAP();
+      // wait a bit for user to see the success message before closing
+      setTimeout(() => {
+        onUpdateStatus(tarjetaCredito.id, nuevoEstado, observaciones);
+        setIsSubmitting(false);
+        onClose();
+      }, 1500);
+    } else {
+      setTimeout(() => {
+        onUpdateStatus(tarjetaCredito.id, nuevoEstado, observaciones);
+        setIsSubmitting(false);
+        onClose();
+      }, 300);
+    }
   };
 
   const handleEnviarSAP = async () => {
@@ -105,26 +115,13 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-6">
-          {/* SAP Service Layer Draft Trigger Banner */}
-          <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                <Database className="w-4 h-4" />
-              </div>
-              <div>
-                <h4 className="font-bold text-blue-900">Integración SAP Business One (Service Layer)</h4>
-                <p className="text-[11px] text-blue-700">Compañía: Firplak_SA &bull; Objeto: OK1_LEG (Borrador)</p>
-              </div>
+          {/* SAP Service Layer Draft Output */}
+          {sapSyncing && (
+            <div className="p-3.5 rounded-2xl text-[11px] bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              Enviando automáticamente a SAP...
             </div>
-            <button
-              onClick={handleEnviarSAP}
-              disabled={sapSyncing}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all"
-            >
-              <Send className="w-3.5 h-3.5" />
-              {sapSyncing ? 'Enviando a SAP...' : 'Enviar Borrador a SAP B1'}
-            </button>
-          </div>
+          )}
 
           {sapResult && (
             <div
@@ -241,6 +238,49 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
               </table>
             </div>
           </div>
+
+          {/* Gallery of Attachments */}
+          {tarjetaCredito.lineas.some(l => l.soporteUrl) && (
+            <div className="p-5 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-600" /> Soportes y Documentos Adjuntos
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {tarjetaCredito.lineas.filter(l => l.soporteUrl).map((linea, index) => {
+                  const isImg = linea.soporteUrl?.match(/\.(jpeg|jpg|gif|png)$/i) || linea.soporteUrl?.startsWith('data:image/');
+                  return (
+                    <div key={linea.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <p className="font-bold text-slate-900 text-[11px] truncate">{linea.concepto || `Gasto #${index + 1}`}</p>
+                        <p className="text-[10px] text-slate-500 font-mono">Proveedor NIT: {linea.proveedorNit || 'N/A'}</p>
+                      </div>
+                      {isImg ? (
+                        <div className="w-full aspect-[4/3] rounded-lg border border-slate-200 overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow relative group">
+                          <img
+                            src={linea.soporteUrl}
+                            alt={`Soporte ${linea.concepto}`}
+                            className="w-full h-full object-cover cursor-zoom-in"
+                            onClick={() => window.open(linea.soporteUrl, '_blank')}
+                            title="Click para ampliar"
+                          />
+                        </div>
+                      ) : (
+                        <a
+                          href={linea.soporteUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 border-dashed rounded-lg hover:border-blue-500 hover:bg-blue-50/25 transition-colors gap-2 text-center cursor-pointer group"
+                        >
+                          <FileText className="w-8 h-8 text-blue-600 group-hover:scale-105 transition-transform" />
+                          <span className="font-bold text-blue-600 text-[10px] group-hover:underline">Ver Documento Soporte</span>
+                        </a>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Observations & Approval trail */}
           {tarjetaCredito.observacionesAprobacion && (

@@ -228,6 +228,27 @@ export default function FormularioTarjetasCreditoPage() {
       console.error('Error de red al guardar:', e);
     }
 
+    // Enviar notificación a Power Automate
+    try {
+      const webhookUrl = "https://8c18912a4169ec67aa9b39bdfb7cc3.10.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/fb27e082be7e4a6486938b6c7b81f2c6/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=alJWDIinaFwxmT_PTghi-bwfBaSMoOdBlX0x5MS2V5E";
+      const payload = {
+        correo: nuevaLeg.usuarioEmail,
+        titulo: `Nueva Legalización de Tarjeta de Crédito: ${nuevaLeg.codigo}`,
+        contenido: `El usuario ${nuevaLeg.usuarioNombre} ha registrado la legalización de tarjeta de crédito ${nuevaLeg.codigo} por valor de $${nuevaLeg.totalGastos.toLocaleString('es-CO')} COP.`,
+        link: `${window.location.origin}/formulario-tarjetas-credito/${nuevaLeg.id}`
+      };
+      
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      console.error('Error enviando notificación:', e);
+    }
+
     saveLocalTarjetaCredito(nuevaLeg);
     setLastCodigo(codigo);
     setSubmitted(true);
@@ -469,9 +490,36 @@ export default function FormularioTarjetasCreditoPage() {
                         <input
                           type="file"
                           accept=".pdf,image/*"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
-                            if (file) handleUpdateLinea(linea.id, 'soporteFile', file);
+                            if (file) {
+                              handleUpdateLinea(linea.id, 'soporteFile', file);
+                              handleUpdateLinea(linea.id, 'soporteUrl', 'uploading');
+                              
+                              const fileExt = file.name.split('.').pop();
+                              const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+                              const filePath = `comprobantes/${fileName}`;
+                              
+                              try {
+                                const { data: uploadData, error: uploadError } = await supabase.storage
+                                  .from('soportes')
+                                  .upload(filePath, file);
+                                  
+                                if (!uploadError) {
+                                  const { data: urlData } = supabase.storage
+                                    .from('soportes')
+                                    .getPublicUrl(filePath);
+                                  handleUpdateLinea(linea.id, 'soporteUrl', urlData.publicUrl);
+                                } else {
+                                  console.error('Error uploading file:', uploadError);
+                                  handleUpdateLinea(linea.id, 'soporteUrl', '');
+                                  alert('Error al subir el archivo: ' + uploadError.message);
+                                }
+                              } catch (err: any) {
+                                console.error('Error de red al subir:', err);
+                                handleUpdateLinea(linea.id, 'soporteUrl', '');
+                              }
+                            }
                           }}
                           className="block w-full text-xs text-slate-500
                             file:mr-4 file:py-1.5 file:px-4
@@ -481,6 +529,18 @@ export default function FormularioTarjetasCreditoPage() {
                             hover:file:bg-blue-200
                             cursor-pointer transition-colors"
                         />
+                        {linea.soporteUrl === 'uploading' && (
+                          <div className="mt-1.5 flex items-center gap-1.5 text-blue-700 font-bold text-[10px]">
+                            <div className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            <span>Subiendo soporte a Supabase Storage...</span>
+                          </div>
+                        )}
+                        {linea.soporteUrl && linea.soporteUrl !== 'uploading' && (
+                          <div className="mt-1.5 flex items-center gap-1.5 text-emerald-700 font-bold text-[10px]">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Soporte adjunto correctamente</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

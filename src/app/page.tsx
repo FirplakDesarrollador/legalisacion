@@ -91,6 +91,22 @@ export default function Home() {
     localStorage.setItem('legalisa_active_user', JSON.stringify(userObj));
   };
 
+  // Setup deep linking for Tarjetas de Crédito
+  useEffect(() => {
+    if (typeof window !== 'undefined' && tarjetasCredito.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const tcId = params.get('tc_id');
+      if (tcId) {
+        const found = tarjetasCredito.find(tc => tc.id === tcId || tc.codigo === tcId);
+        if (found && !selectedTarjetaCredito) {
+          setActiveTab('cajas_menores');
+          setSelectedTarjetaCredito(found);
+        }
+      }
+    }
+  }, [tarjetasCredito, selectedTarjetaCredito]);
+
+  // Logout handler
   const handleLogout = () => {
     supabase.auth.signOut().catch(() => {});
     localStorage.removeItem('legalisa_active_user');
@@ -246,7 +262,7 @@ export default function Home() {
             <TarjetasCreditoList
               tarjetasCredito={tarjetasCredito}
               onSelectTarjetaCredito={setSelectedTarjetaCredito}
-              onOpenNuevaModal={() => setIsNuevaTarjetaModalOpen(true)}
+              onOpenNuevaModal={() => window.open('/formulario-tarjetas-credito', '_blank')}
               onUpdateStatus={(id, st) => handleUpdateStatusTarjeta(id, st)}
             />
           )}

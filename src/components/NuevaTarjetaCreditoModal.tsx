@@ -139,8 +139,8 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
               <FileText className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-base font-bold">Registrar Nueva Legalización</h2>
-              <p className="text-xs text-blue-100">Complete los datos de la comisión y adjunte comprobantes</p>
+              <h2 className="text-base font-bold">Registrar Nueva Tarjeta de Crédito</h2>
+              <p className="text-xs text-blue-100">Registre los gastos de su tarjeta corporativa y adjunte comprobantes</p>
             </div>
           </div>
           <button
