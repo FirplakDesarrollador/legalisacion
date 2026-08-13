@@ -2,18 +2,18 @@
 
 import React, { useState } from 'react';
 import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search } from 'lucide-react';
-import { Legalizacion } from '@/types/legalizaciones';
+import { TarjetaCredito } from '@/types/tarjetasCredito';
 
-interface LegalizacionesListProps {
-  legalizaciones: Legalizacion[];
-  onSelectLegalizacion: (leg: Legalizacion) => void;
+interface TarjetasCreditoListProps {
+  tarjetasCredito: TarjetaCredito[];
+  onSelectTarjetaCredito: (leg: TarjetaCredito) => void;
   onOpenNuevaModal: () => void;
-  onUpdateStatus: (id: string, estado: Legalizacion['estado']) => void;
+  onUpdateStatus: (id: string, estado: TarjetaCredito['estado']) => void;
 }
 
-export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
-  legalizaciones,
-  onSelectLegalizacion,
+export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
+  tarjetasCredito,
+  onSelectTarjetaCredito,
   onOpenNuevaModal,
   onUpdateStatus,
 }) => {
@@ -28,7 +28,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
     }).format(num);
   };
 
-  const filtered = legalizaciones.filter((l) => {
+  const filtered = tarjetasCredito.filter((l) => {
     const matchesTab = activeTab === 'todas' ? true : l.estado === activeTab;
     const term = searchTerm.toLowerCase();
     const matchesSearch =
@@ -39,7 +39,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
     return matchesTab && matchesSearch;
   });
 
-  const getStatusPill = (estado: Legalizacion['estado']) => {
+  const getStatusPill = (estado: TarjetaCredito['estado']) => {
     switch (estado) {
       case 'aprobado':
         return (
@@ -75,10 +75,10 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
         {/* Status Tabs */}
         <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto">
           {[
-            { id: 'todas', label: 'Todas', count: legalizaciones.length },
-            { id: 'pendiente', label: 'Pendientes', count: legalizaciones.filter((l) => l.estado === 'pendiente').length },
-            { id: 'aprobado', label: 'Aprobadas', count: legalizaciones.filter((l) => l.estado === 'aprobado').length },
-            { id: 'rechazado', label: 'Rechazadas', count: legalizaciones.filter((l) => l.estado === 'rechazado').length },
+            { id: 'todas', label: 'Todas', count: tarjetasCredito.length },
+            { id: 'pendiente', label: 'Pendientes', count: tarjetasCredito.filter((l) => l.estado === 'pendiente').length },
+            { id: 'aprobado', label: 'Aprobadas', count: tarjetasCredito.filter((l) => l.estado === 'aprobado').length },
+            { id: 'rechazado', label: 'Rechazadas', count: tarjetasCredito.filter((l) => l.estado === 'rechazado').length },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -137,7 +137,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-8 text-center text-slate-400">
-                  No hay cajas menores para mostrar en este estado.
+                  No hay tarjetas de crédito para mostrar en este estado.
                 </td>
               </tr>
             ) : (
@@ -170,7 +170,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
                   <td className="py-3.5 px-4">
                     <div className="flex items-center justify-center gap-1.5">
                       <button
-                        onClick={() => onSelectLegalizacion(leg)}
+                        onClick={() => onSelectTarjetaCredito(leg)}
                         className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
                         title="Ver Detalle"
                       >

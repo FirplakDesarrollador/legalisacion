@@ -28,20 +28,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const menuItems = [
     {
       id: 'legalizaciones' as TabType,
-      label: 'Legalizaciones',
+      label: 'Cajas Menores',
       icon: SlidersHorizontal,
       badge: counts.legalizaciones,
     },
     {
       id: 'cajas_menores' as TabType,
-      label: 'Cajas Menores',
+      label: 'Tarjetas de credito',
       icon: Wallet,
       badge: counts.cajasMenores,
     },
   ];
 
   const handleCopyFormLink = () => {
-    const url = `${window.location.origin}/formulario-publico`;
+    const isTC = activeTab === 'cajas_menores'; // 'cajas_menores' id corresponds to Tarjetas de Credito
+    const url = `${window.location.origin}${isTC ? '/formulario-tarjetas-credito' : '/formulario-publico'}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -50,35 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className="w-64 bg-slate-50 border-r border-slate-200 p-4 flex flex-col justify-between shrink-0 min-h-[calc(100vh-65px)]">
       <div className="space-y-6">
-        {/* Quick Action Buttons */}
-        <div className="space-y-2">
-          <button
-            onClick={onOpenNuevaModal}
-            className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-600/20 active:scale-[0.98] transition-all"
-          >
-            <PlusCircle className="w-4 h-4 stroke-[2.5]" />
-            <span>Nueva Legalización</span>
-          </button>
 
-          {/* Copy Public Form Button */}
-          <button
-            onClick={handleCopyFormLink}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold text-xs rounded-xl shadow-sm transition-all"
-            title="Copiar enlace del formulario público sin login"
-          >
-            {copied ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-emerald-700 font-bold">¡Enlace Copiado!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5 text-blue-600" />
-                <span>Copiar Formulario</span>
-              </>
-            )}
-          </button>
-        </div>
 
         {/* Navigation Section */}
         <div>
@@ -122,21 +95,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Public Form Info Box */}
         <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200 shadow-sm text-slate-700 text-xs space-y-2">
-          <div className="flex items-center justify-between text-blue-900 font-bold">
-            <span className="text-[11px] flex items-center gap-1.5">
-              Formulario Público
-            </span>
-            <a
-              href="/formulario-publico"
-              target="_blank"
-              rel="noreferrer"
-              className="text-blue-600 hover:underline flex items-center gap-0.5 text-[10px]"
-            >
-              Abrir <ExternalLink className="w-3 h-3" />
-            </a>
+          <div className="text-blue-900 font-bold text-[11px] mb-1">
+            Formularios Públicos
           </div>
-          <p className="text-[10px] text-slate-600 leading-relaxed">
-            Formulario accesible para cualquier usuario <strong>sin necesidad de iniciar sesión</strong>.
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] flex items-center gap-1.5">Cajas Menores</span>
+              <a href="/formulario-publico" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5 text-[10px]">
+                Abrir <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] flex items-center gap-1.5">Tarjetas de Crédito</span>
+              <a href="/formulario-tarjetas-credito" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5 text-[10px]">
+                Abrir <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+          <p className="text-[9px] text-slate-600 leading-relaxed mt-2">
+            Accesibles para cualquier usuario sin necesidad de iniciar sesión.
           </p>
         </div>
       </div>

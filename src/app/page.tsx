@@ -7,9 +7,11 @@ import { KpiStats } from '@/components/KpiStats';
 import { LegalizacionesList } from '@/components/LegalizacionesList';
 import { LegalizacionDetailModal } from '@/components/LegalizacionDetailModal';
 import { NuevaLegalizacionModal } from '@/components/NuevaLegalizacionModal';
+import { TarjetasCreditoList } from '@/components/TarjetasCreditoList';
+import { TarjetaCreditoDetailModal } from '@/components/TarjetaCreditoDetailModal';
+import { NuevaTarjetaCreditoModal } from '@/components/NuevaTarjetaCreditoModal';
 import { ProveedoresTable } from '@/components/ProveedoresTable';
 import { CuentasTable } from '@/components/CuentasTable';
-import { CajasMenoresView } from '@/components/CajasMenoresView';
 import { ReportesView } from '@/components/ReportesView';
 import { LoginView } from '@/components/LoginView';
 import {
@@ -21,13 +23,17 @@ import {
   getLocalLegalizaciones,
   saveLocalLegalizacion,
   updateLegalizacionStatus,
+  getLocalTarjetasCredito,
+  saveLocalTarjetaCredito,
+  updateTarjetaCreditoStatus,
+  fetchLegalizacionesTarjetasCreditoFromSupabase,
   getLocalCajasMenores,
   saveLocalCajaMenor,
   agregarMovimientoCaja,
   HealthCheckResult,
   supabase,
 } from '@/lib/supabase';
-import { Legalizacion, CuentaContable, Proveedor, CajaMenor, MovimientoCaja } from '@/types/legalizaciones';
+import { Legalizacion, CuentaContable, Proveedor, CajaMenor, MovimientoCaja, TarjetaCredito } from '@/types/legalizaciones';
 
 export default function Home() {
   // Auth state
@@ -41,7 +47,7 @@ export default function Home() {
 
   // Data states
   const [legalizaciones, setLegalizaciones] = useState<Legalizacion[]>([]);
-  const [cajasMenores, setCajasMenores] = useState<CajaMenor[]>([]);
+  const [tarjetasCredito, setTarjetasCredito] = useState<TarjetaCredito[]>([]);
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loadingSupabase, setLoadingSupabase] = useState(true);
@@ -49,6 +55,9 @@ export default function Home() {
   // Modals state
   const [isNuevaModalOpen, setIsNuevaModalOpen] = useState(false);
   const [selectedLegalizacion, setSelectedLegalizacion] = useState<Legalizacion | null>(null);
+  
+  const [isNuevaTarjetaModalOpen, setIsNuevaTarjetaModalOpen] = useState(false);
+  const [selectedTarjetaCredito, setSelectedTarjetaCredito] = useState<TarjetaCredito | null>(null);
 
   // Check active Supabase session on mount
   useEffect(() => {
@@ -91,19 +100,19 @@ export default function Home() {
   const loadSupabaseData = useCallback(async () => {
     setLoadingSupabase(true);
     try {
-      const [hResult, cData, pData, cajasData, legData] = await Promise.all([
+      const [hResult, cData, pData, tcData, legData] = await Promise.all([
         checkSupabaseHealth(),
         fetchCuentasFromSupabase(),
         fetchProveedoresFromSupabase(),
-        fetchCajasMenoresFromSupabase(),
+        fetchLegalizacionesTarjetasCreditoFromSupabase(),
         fetchLegalizacionesFromSupabase(),
       ]);
 
       setHealth(hResult);
       setCuentas(cData);
       setProveedores(pData);
-      if (cajasData && cajasData.length > 0) {
-        setCajasMenores(cajasData);
+      if (tcData && tcData.length > 0) {
+        setTarjetasCredito(tcData);
       }
       if (legData && legData.length > 0) {
         setLegalizaciones(legData);
@@ -117,7 +126,7 @@ export default function Home() {
 
   useEffect(() => {
     if (currentUser) {
-      setCajasMenores(getLocalCajasMenores());
+      setTarjetasCredito(getLocalTarjetasCredito());
       loadSupabaseData();
     }
   }, [currentUser, loadSupabaseData]);
@@ -136,14 +145,18 @@ export default function Home() {
     }
   };
 
-  const handleSaveCaja = (nueva: CajaMenor) => {
-    const updated = saveLocalCajaMenor(nueva);
-    setCajasMenores(updated);
+  const handleSaveNuevaTarjeta = (nueva: TarjetaCredito) => {
+    const updated = saveLocalTarjetaCredito(nueva);
+    setTarjetasCredito(updated);
+    setActiveTab('cajas_menores');
   };
 
-  const handleAgregarMovimientoCaja = (cajaId: string, mov: MovimientoCaja) => {
-    const updated = agregarMovimientoCaja(cajaId, mov);
-    setCajasMenores(updated);
+  const handleUpdateStatusTarjeta = (id: string, nuevoEstado: TarjetaCredito['estado'], observaciones?: string) => {
+    const updated = updateTarjetaCreditoStatus(id, nuevoEstado, observaciones);
+    setTarjetasCredito(updated);
+    if (selectedTarjetaCredito && selectedTarjetaCredito.id === id) {
+      setSelectedTarjetaCredito((prev) => (prev ? { ...prev, estado: nuevoEstado, observacionesAprobacion: observaciones } : null));
+    }
   };
 
   if (checkingAuth) {
@@ -182,7 +195,7 @@ export default function Home() {
           onOpenNuevaModal={() => setIsNuevaModalOpen(true)}
           counts={{
             legalizaciones: legalizaciones.length,
-            cajasMenores: cajasMenores.length,
+            cajasMenores: tarjetasCredito.length,
             cuentas: cuentas.length,
             proveedores: proveedores.length,
           }}
@@ -201,7 +214,7 @@ export default function Home() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Últimas Legalizaciones Registradas
+                    Últimas Cajas Menores Registradas
                   </h2>
                   <button
                     onClick={() => setActiveTab('legalizaciones')}
@@ -230,12 +243,11 @@ export default function Home() {
           )}
 
           {activeTab === 'cajas_menores' && (
-            <CajasMenoresView
-              cajas={cajasMenores}
-              cuentas={cuentas}
-              proveedores={proveedores}
-              onSaveCaja={handleSaveCaja}
-              onAgregarMovimiento={handleAgregarMovimientoCaja}
+            <TarjetasCreditoList
+              tarjetasCredito={tarjetasCredito}
+              onSelectTarjetaCredito={setSelectedTarjetaCredito}
+              onOpenNuevaModal={() => setIsNuevaTarjetaModalOpen(true)}
+              onUpdateStatus={(id, st) => handleUpdateStatusTarjeta(id, st)}
             />
           )}
 
@@ -277,6 +289,20 @@ export default function Home() {
         legalizacion={selectedLegalizacion}
         onClose={() => setSelectedLegalizacion(null)}
         onUpdateStatus={handleUpdateStatus}
+      />
+
+      <NuevaTarjetaCreditoModal
+        isOpen={isNuevaTarjetaModalOpen}
+        onClose={() => setIsNuevaTarjetaModalOpen(false)}
+        cuentas={cuentas}
+        proveedores={proveedores}
+        onSave={handleSaveNuevaTarjeta}
+      />
+
+      <TarjetaCreditoDetailModal
+        tarjetaCredito={selectedTarjetaCredito}
+        onClose={() => setSelectedTarjetaCredito(null)}
+        onUpdateStatus={handleUpdateStatusTarjeta}
       />
     </div>
   );

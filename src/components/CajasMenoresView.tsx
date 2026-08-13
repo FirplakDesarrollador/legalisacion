@@ -135,9 +135,9 @@ export const CajasMenoresView: React.FC<CajasMenoresViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
         <div>
           <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Wallet className="w-5 h-5 text-blue-600" /> Control & Arqueo de Cajas Menores
+            <Wallet className="w-5 h-5 text-blue-600" /> Control & Arqueo de Tarjetas de credito
           </h2>
-          <p className="text-xs text-slate-500">Administración descentralizada de fondos fijos de caja menor en efectivo</p>
+          <p className="text-xs text-slate-500">Administración descentralizada de fondos fijos de tarjeta de credito</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -161,7 +161,7 @@ export const CajasMenoresView: React.FC<CajasMenoresViewProps> = ({
             onClick={() => setIsNuevaCajaOpen(true)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-600/20 flex items-center gap-2 transition-all"
           >
-            <PlusCircle className="w-4 h-4 stroke-[2.5]" /> Crear Nueva Caja Menor
+            <PlusCircle className="w-4 h-4 stroke-[2.5]" /> Crear Nueva Tarjeta de credito
           </button>
         </div>
       </div>
@@ -171,7 +171,7 @@ export const CajasMenoresView: React.FC<CajasMenoresViewProps> = ({
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
           <p className="text-xs text-slate-500 font-semibold">Total Fondos Asignados</p>
           <h3 className="text-xl font-bold font-mono text-slate-900 mt-1">{formatCOP(totalAsignado)}</h3>
-          <p className="text-[10px] text-slate-400 mt-1">{cajas.length} cajas menores activas</p>
+          <p className="text-[10px] text-slate-400 mt-1">{cajas.length} tarjetas de credito activas</p>
         </div>
 
         <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
@@ -278,7 +278,7 @@ export const CajasMenoresView: React.FC<CajasMenoresViewProps> = ({
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="px-6 py-4 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex items-center justify-between">
               <h3 className="text-sm font-bold flex items-center gap-2">
-                <Wallet className="w-4 h-4" /> Crear Nueva Caja Menor
+                <Wallet className="w-4 h-4" /> Crear Nueva Tarjeta de credito
               </h3>
               <button onClick={() => setIsNuevaCajaOpen(false)} className="text-white/80 hover:text-white">
                 <X className="w-5 h-5" />
@@ -287,7 +287,7 @@ export const CajasMenoresView: React.FC<CajasMenoresViewProps> = ({
 
             <form onSubmit={handleCreateCaja} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Nombre de la Caja Menor</label>
+                <label className="block font-semibold text-slate-700 mb-1">Nombre de la Tarjeta de credito</label>
                 <input
                   type="text"
                   required
