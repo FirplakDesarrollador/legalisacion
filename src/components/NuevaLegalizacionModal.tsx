@@ -173,6 +173,25 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
       updated_at: new Date().toISOString(),
     };
 
+    // Trigger Power Automate Flow for approval notification
+    try {
+      const link = typeof window !== 'undefined' ? `${window.location.origin}/formulario-publico/${nuevaLeg.id}` : '';
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          correo: usuarioEmail,
+          titulo: 'Aprobación de caja menor',
+          contenido: `Tienes esta legalización pendiente por aprobar de ${usuarioNombre} por valor de ${formatCOP(totalGastos)}.`,
+          link: link
+        })
+      }).catch((flowErr) => {
+        console.error('Error enviando notificación a Power Automate:', flowErr);
+      });
+    } catch (err) {
+      console.error('Error al preparar notificación:', err);
+    }
+
     onSave(nuevaLeg);
     onClose();
   };

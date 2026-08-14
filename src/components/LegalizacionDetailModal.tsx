@@ -45,6 +45,23 @@ export const LegalizacionDetailModal: React.FC<LegalizacionDetailModalProps> = (
 
   const handleAction = (nuevoEstado: Legalizacion['estado']) => {
     setIsSubmitting(true);
+
+    try {
+      const link = typeof window !== 'undefined' ? `${window.location.origin}/formulario-publico/${legalizacion.id}` : '';
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          correo: legalizacion.usuarioEmail,
+          titulo: `Legalización ${legalizacion.codigo} - ${nuevoEstado === 'aprobado' ? 'Aprobada' : 'Rechazada'}`,
+          contenido: `Tu legalización de caja menor ${legalizacion.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
+          link: link,
+        }),
+      }).catch((e) => console.error('Error enviando notificación de estado:', e));
+    } catch (e) {
+      console.error(e);
+    }
+
     setTimeout(() => {
       onUpdateStatus(legalizacion.id, nuevoEstado, observaciones);
       setIsSubmitting(false);
