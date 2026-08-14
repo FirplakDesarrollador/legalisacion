@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Plus, Trash2, CheckCircle2, FileText, Calculator } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, Paperclip, ExternalLink } from 'lucide-react';
 import { TarjetaCredito, LineaGasto, CuentaContable, Proveedor } from '@/types/tarjetasCredito';
+import { supabase } from '@/lib/supabase';
 
 interface NuevaTarjetaCreditoModalProps {
   isOpen: boolean;
@@ -85,10 +86,11 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
           }
         }
 
-        if (field === 'valorSubtotal' || field === 'valorIva') {
-          const sub = field === 'valorSubtotal' ? Number(value) : lin.valorSubtotal;
-          const iva = field === 'valorIva' ? Number(value) : lin.valorIva;
-          updated.valorTotal = sub + iva;
+        if (field === 'valorSubtotal') {
+          const val = Number(value) || 0;
+          updated.valorSubtotal = val;
+          updated.valorIva = 0;
+          updated.valorTotal = val;
         }
 
         return updated;
@@ -293,25 +295,17 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Subtotal ($ COP)</label>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Valor del Gasto ($ COP)</label>
                       <input
                         type="number"
+                        placeholder="Ej. 150000"
                         value={linea.valorSubtotal || ''}
                         onChange={(e) => handleUpdateLinea(linea.id, 'valorSubtotal', e.target.value)}
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
+                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono font-bold text-xs"
                         min={0}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">IVA ($ COP)</label>
-                      <input
-                        type="number"
-                        value={linea.valorIva || ''}
-                        onChange={(e) => handleUpdateLinea(linea.id, 'valorIva', e.target.value)}
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
-                        min={0}
+                        required
                       />
                     </div>
                     <div className="flex items-center gap-2">
@@ -332,6 +326,80 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
                         </button>
                       )}
                     </div>
+                  </div>
+
+                  {/* File Upload Row */}
+                  <div className="mt-2 border-t border-slate-200/70 pt-2.5">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] font-bold text-slate-600 flex items-center gap-1.5">
+                        <Paperclip className="w-3.5 h-3.5 text-blue-600" />
+                        Adjuntar Documento / Soporte ({linea.tipoDocumento || 'Factura'})
+                      </label>
+                      {linea.soporteUrl && linea.soporteUrl !== 'uploading' && (
+                        <a
+                          href={linea.soporteUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-blue-600 hover:underline flex items-center gap-1 font-semibold"
+                        >
+                          <ExternalLink className="w-3 h-3" /> Ver Adjunto
+                        </a>
+                      )}
+                    </div>
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleUpdateLinea(linea.id, 'soporteFile', file);
+                          handleUpdateLinea(linea.id, 'soporteUrl', 'uploading');
+                          
+                          const fileExt = file.name.split('.').pop();
+                          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+                          const filePath = `comprobantes/${fileName}`;
+                          
+                          try {
+                            const { data: uploadData, error: uploadError } = await supabase.storage
+                              .from('soportes')
+                              .upload(filePath, file);
+                              
+                            if (!uploadError) {
+                              const { data: urlData } = supabase.storage
+                                .from('soportes')
+                                .getPublicUrl(filePath);
+                              handleUpdateLinea(linea.id, 'soporteUrl', urlData.publicUrl);
+                            } else {
+                              console.error('Error uploading file:', uploadError);
+                              handleUpdateLinea(linea.id, 'soporteUrl', '');
+                              alert('Error al subir el archivo: ' + uploadError.message);
+                            }
+                          } catch (err: any) {
+                            console.error('Error de red al subir:', err);
+                            handleUpdateLinea(linea.id, 'soporteUrl', '');
+                          }
+                        }
+                      }}
+                      className="block w-full text-xs text-slate-500
+                        file:mr-4 file:py-1 file:px-3
+                        file:rounded-lg file:border-0
+                        file:text-xs file:font-bold
+                        file:bg-blue-50 file:text-blue-700
+                        hover:file:bg-blue-100
+                        cursor-pointer transition-colors"
+                    />
+                    {linea.soporteUrl === 'uploading' && (
+                      <div className="mt-1 flex items-center gap-1.5 text-blue-700 font-bold text-[10px]">
+                        <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <span>Subiendo documento a Supabase Storage...</span>
+                      </div>
+                    )}
+                    {linea.soporteUrl && linea.soporteUrl !== 'uploading' && (
+                      <div className="mt-1 flex items-center gap-1.5 text-emerald-700 font-bold text-[10px]">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>✓ Documento guardado correctamente</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
