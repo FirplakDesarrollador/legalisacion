@@ -424,6 +424,8 @@ export async function fetchLegalizacionesTarjetasCreditoFromSupabase(): Promise<
       fecha: row.fecha,
       usuarioNombre: row.usuario_nombre,
       usuarioEmail: row.usuario_email,
+      tarjeta_codigo: row.tarjeta_codigo || (row.motivo?.match(/\[TC:\s*([^\]]+)\]/)?.[1] || ''),
+      tc_en_sap: row.tc_en_sap,
       centroCosto: row.centro_costo,
       motivo: row.motivo,
       estado: row.estado,
@@ -432,11 +434,49 @@ export async function fetchLegalizacionesTarjetasCreditoFromSupabase(): Promise<
       saldoDiferencia: row.saldo_diferencia,
       lineas: row.lineas || [],
       created_at: row.created_at,
-      updated_at: row.updated_at
-    })) as Legalizacion[];
+      updated_at: row.updated_at,
+      fechaAprobacion: (row.estado === 'aprobado' || row.estado === 'pagado') ? (row.fecha_aprobacion || row.updated_at) : undefined,
+      gestionContable: row.gestion_contable || 'Por procesar',
+      fechaProcesado: row.fecha_procesado || (row.gestion_contable === 'Procesado' ? row.updated_at : undefined),
+      aprobadorNombre: row.aprobador_nombre,
+      aprobadorEmail: row.aprobador_email,
+      sapDocEntry: row.sap_doc_entry,
+    })) as any[];
   } catch {
     return [];
   }
+}
+
+export async function fetchTarjetasCreditoResponsablesFromSupabase(): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from('tarjetas_credito_responsables')
+      .select('*');
+    if (error) return [];
+    return data || [];
+  } catch {
+    return [];
+  }
+}
+
+export function updateTarjetaCreditoGestionContable(id: string, gestion: 'Por procesar' | 'Procesado', fechaProcesado?: string | null): Legalizacion[] {
+  const current = getLocalTarjetasCredito();
+  const updated = current.map(item => {
+    if (item.id === id) {
+      return {
+        ...item,
+        gestionContable: gestion,
+        fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? new Date().toISOString() : undefined),
+        updated_at: new Date().toISOString()
+      };
+    }
+    return item;
+  });
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(TARJETAS_STORAGE_KEY, JSON.stringify(updated));
+  }
+  return updated;
 }
 
 export function saveLocalLegalizacion(leg: Legalizacion): Legalizacion[] {
@@ -466,11 +506,13 @@ export function updateLegalizacionStatus(id: string, nuevoEstado: Legalizacion['
   const current = getLocalLegalizaciones();
   const updated = current.map(item => {
     if (item.id === id) {
+      const now = new Date().toISOString();
       return {
         ...item,
         estado: nuevoEstado,
         observacionesAprobacion: observaciones || item.observacionesAprobacion,
-        updated_at: new Date().toISOString()
+        fechaAprobacion: nuevoEstado === 'aprobado' ? now : item.fechaAprobacion,
+        updated_at: now
       };
     }
     return item;
@@ -520,11 +562,13 @@ export function updateTarjetaCreditoStatus(id: string, nuevoEstado: Legalizacion
   const current = getLocalTarjetasCredito();
   const updated = current.map(item => {
     if (item.id === id) {
+      const now = new Date().toISOString();
       return {
         ...item,
         estado: nuevoEstado,
         observacionesAprobacion: observaciones || item.observacionesAprobacion,
-        updated_at: new Date().toISOString()
+        fechaAprobacion: nuevoEstado === 'aprobado' ? now : item.fechaAprobacion,
+        updated_at: now
       };
     }
     return item;

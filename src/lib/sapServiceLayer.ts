@@ -116,30 +116,89 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       realProfitCode = (legalizacion.centroCosto && legalizacion.centroCosto.length <= 8) ? legalizacion.centroCosto : null;
     }
 
-    // 1.8 Buscar CardCode del Solicitante (Empleado o Proveedor)
-    let headerCardCode = 'EM1007813694-01'; // Fallback a Renata
-    try {
-      if (legalizacion.usuarioNombre) {
-        // Separamos nombre y apellido para una búsqueda más flexible (ej: "Marcela Gomez" -> "MARCELA" y "GOMEZ")
-        const parts = legalizacion.usuarioNombre.toUpperCase().split(' ').filter(p => p.length > 2);
-        let nameFilter = parts.map(p => `contains(CardName, '${p}')`).join(' and ');
-        if (!nameFilter) nameFilter = `contains(CardName, '${legalizacion.usuarioNombre.toUpperCase()}')`;
-        
-        const filterStr = `(${nameFilter}) and (startswith(CardCode, 'EM') or startswith(CardCode, 'AC'))`;
-        const resBP = await fetch(`${baseUrl}/BusinessPartners?$filter=${filterStr}`, {
-          headers: { Cookie: session.cookieHeader },
-        });
-        if (resBP.ok) {
-          const dataBP = await resBP.json();
-          // Priorizamos los de tipo Empleado (EM) si hay varios
-          if (dataBP.value && dataBP.value.length > 0) {
-            const emp = dataBP.value.find((b: any) => b.CardCode.startsWith('EM'));
-            headerCardCode = emp ? emp.CardCode : dataBP.value[0].CardCode;
+    // 1.8 Buscar CardCode del Encabezado (Código SN)
+    const isTarjetaCredito =
+      legalizacion.codigo?.startsWith('TC-') ||
+      Boolean((legalizacion as any).tarjeta_codigo) ||
+      Boolean((legalizacion as any).tc_en_sap) ||
+      legalizacion.motivo?.includes('Tarjeta') ||
+      legalizacion.motivo?.includes('[TC:');
+
+    let headerCardCode = '';
+    let headerCardName = legalizacion.usuarioNombre;
+
+    if (isTarjetaCredito) {
+      // Para Tarjetas de Crédito: El Código SN DEBE SER OBLIGATORIAMENTE el tc_en_sap de la tarjeta
+      headerCardCode = ((legalizacion as any).tc_en_sap || '').trim();
+
+      if (!headerCardCode) {
+        try {
+          const { data: respTC } = await supabase
+            .from('tarjetas_credito_responsables')
+            .select('*');
+
+          if (respTC && respTC.length > 0) {
+            // 1. Buscar por tarjeta_codigo si está en motivo o en el objeto (ej: [TC: 9876])
+            let match = respTC.find(
+              (r: any) =>
+                ((legalizacion as any).tarjeta_codigo && r.tarjeta_codigo === (legalizacion as any).tarjeta_codigo) ||
+                (legalizacion.motivo && r.tarjeta_codigo && legalizacion.motivo.includes(r.tarjeta_codigo))
+            );
+
+            // 2. Si no, buscar por email o nombre
+            if (!match) {
+              match = respTC.find(
+                (r: any) =>
+                  (legalizacion.usuarioEmail && r.responsable_email?.toLowerCase() === legalizacion.usuarioEmail.toLowerCase()) ||
+                  (legalizacion.usuarioNombre && r.responsable_nombre?.toLowerCase() === legalizacion.usuarioNombre.toLowerCase())
+              );
+            }
+
+            if (match) {
+              headerCardCode = (match.tc_en_sap || match['TC en SAP'] || '').trim();
+              if (match.tarjeta_nombre) {
+                headerCardName = match.tarjeta_nombre;
+              }
+            }
           }
+        } catch (err) {
+          console.warn('Error consultando tarjetas_credito_responsables para CardCode:', err);
         }
       }
-    } catch(e) {
-      console.error('Error buscando BP del Solicitante:', e);
+
+      if (!headerCardCode) {
+        return {
+          success: false,
+          message: `Error: La tarjeta seleccionada para ${legalizacion.codigo} no tiene configurado el código en la columna 'tc_en_sap' de la tabla tarjetas_credito_responsables en Supabase.`,
+        };
+      }
+    } else {
+      // Para Cajas Menores: Buscar CardCode del Empleado o Proveedor
+      headerCardCode = (legalizacion as any).usuarioNit || '';
+      if (!headerCardCode) {
+        headerCardCode = 'EM1007813694-01'; // Fallback a Renata
+        try {
+          if (legalizacion.usuarioNombre) {
+            const parts = legalizacion.usuarioNombre.toUpperCase().split(' ').filter((p: string) => p.length > 2);
+            let nameFilter = parts.map((p: string) => `contains(CardName, '${p}')`).join(' and ');
+            if (!nameFilter) nameFilter = `contains(CardName, '${legalizacion.usuarioNombre.toUpperCase()}')`;
+            
+            const filterStr = `(${nameFilter}) and (startswith(CardCode, 'EM') or startswith(CardCode, 'AC'))`;
+            const resBP = await fetch(`${baseUrl}/BusinessPartners?$filter=${filterStr}`, {
+              headers: { Cookie: session.cookieHeader },
+            });
+            if (resBP.ok) {
+              const dataBP = await resBP.json();
+              if (dataBP.value && dataBP.value.length > 0) {
+                const emp = dataBP.value.find((b: any) => b.CardCode.startsWith('EM'));
+                headerCardCode = emp ? emp.CardCode : dataBP.value[0].CardCode;
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Error buscando BP del Solicitante:', e);
+        }
+      }
     }
 
     // 2. Payload for Heinsohn U_HBT_LEGENC (Encabezado)
@@ -149,8 +208,8 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       U_Currency: '$',
       U_Fecha: new Date().toISOString().split('T')[0],
       U_Estado: 1, // 1 = Borrador
-      U_CardCode: (legalizacion as any).usuarioNit || headerCardCode, 
-      U_CardName: legalizacion.usuarioNombre,
+      U_CardCode: headerCardCode, 
+      U_CardName: headerCardName,
       U_ProfitCode: realProfitCode, // Dimensión 1 en encabezado, truncado o validado
       U_Comentario: `Borrador Legalización ${legalizacion.codigo} - ${legalizacion.motivo}`,
       U_TipoContabi: 'Comun',

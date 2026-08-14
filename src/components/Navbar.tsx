@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Database, Search, Bell, ShieldCheck, UserCheck, RefreshCw, LogOut } from 'lucide-react';
+import { Database, Search, Bell, ShieldCheck, UserCheck, RefreshCw, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { HealthCheckResult } from '@/lib/supabase';
 
 interface NavbarProps {
@@ -11,6 +11,8 @@ interface NavbarProps {
   onSearchChange: (val: string) => void;
   currentUser: { email: string; name: string; role: string } | null;
   onLogout: () => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -20,11 +22,32 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSearchChange,
   currentUser,
   onLogout,
+  isSidebarOpen = true,
+  onToggleSidebar,
 }) => {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-3.5 bg-white border-b border-slate-200 shadow-sm text-slate-800">
       {/* Brand & Supabase Status */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className={`p-2 rounded-xl border transition-all flex items-center gap-1.5 text-xs font-bold ${
+              isSidebarOpen
+                ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 shadow-xs'
+            }`}
+            title={isSidebarOpen ? 'Ocultar menú lateral' : 'Mostrar menú lateral'}
+          >
+            {isSidebarOpen ? (
+              <PanelLeftClose className="w-4 h-4 text-slate-600" />
+            ) : (
+              <PanelLeftOpen className="w-4 h-4 text-blue-600" />
+            )}
+            <span className="hidden md:inline">{isSidebarOpen ? 'Ocultar Menú' : 'Ver Menú'}</span>
+          </button>
+        )}
+
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-600/20 text-white">
             <ShieldCheck className="w-6 h-6 stroke-[2.5]" />

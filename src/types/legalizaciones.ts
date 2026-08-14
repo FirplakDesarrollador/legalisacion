@@ -68,6 +68,8 @@ export interface ResponsableTarjetaCredito {
   tarjeta_nombre: string;
   responsable_nombre: string;
   responsable_email: string;
+  tc_en_sap?: string;
+  "TC en SAP"?: string;
 }
 
 export interface Legalizacion {
@@ -76,6 +78,8 @@ export interface Legalizacion {
   fecha: string;
   usuarioNombre: string;
   usuarioEmail: string;
+  usuarioNit?: string;
+  tc_en_sap?: string;
   centroCosto: string;
   motivo: string;
   estado: 'borrador' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado';
@@ -85,7 +89,17 @@ export interface Legalizacion {
   lineas: LineaGasto[];
   created_at: string;
   updated_at: string;
+  fechaAprobacion?: string;
+  gestionContable?: 'Por procesar' | 'Procesado';
+  fechaProcesado?: string;
+  aprobadorNombre?: string;
+  aprobadorEmail?: string;
+  sapDocEntry?: number;
   observacionesAprobacion?: string;
+}
+
+export interface TarjetaCredito extends Legalizacion {
+  tarjeta_codigo?: string;
 }
 
 export interface MovimientoCaja {
@@ -115,5 +129,3 @@ export interface CajaMenor {
   created_at: string;
   updated_at: string;
 }
-
-export type TarjetaCredito = Legalizacion;

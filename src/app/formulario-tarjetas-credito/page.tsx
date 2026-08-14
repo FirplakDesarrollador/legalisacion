@@ -23,6 +23,8 @@ export default function FormularioTarjetasCreditoPage() {
 
   // Primary question: Responsable de Caja Menor (Supabase dropdown)
   const [selectedResponsableId, setSelectedResponsableId] = useState<number | ''>('');
+  const [tarjetaCodigo, setTarjetaCodigo] = useState('');
+  const [tcEnSap, setTcEnSap] = useState('');
 
   // Form states
   const [usuarioNombre, setUsuarioNombre] = useState('');
@@ -67,6 +69,9 @@ export default function FormularioTarjetasCreditoPage() {
           setSelectedResponsableId(first.id);
           setUsuarioNombre(first.responsable_nombre);
           setUsuarioEmail(first.responsable_email);
+          setTarjetaCodigo(first.tarjeta_codigo || '');
+          setTcEnSap(first.tc_en_sap || first['TC en SAP'] || '');
+          setMotivo(`[TC: ${first.tarjeta_codigo}] ${first.tarjeta_nombre}`);
         }
 
         if (cData.length > 0) {
@@ -93,6 +98,9 @@ export default function FormularioTarjetasCreditoPage() {
     if (resp) {
       setUsuarioNombre(resp.responsable_nombre);
       setUsuarioEmail(resp.responsable_email);
+      setTarjetaCodigo(resp.tarjeta_codigo || '');
+      setTcEnSap(resp.tc_en_sap || resp['TC en SAP'] || '');
+      setMotivo(`[TC: ${resp.tarjeta_codigo}] ${resp.tarjeta_nombre}`);
     }
   };
 
@@ -192,6 +200,8 @@ export default function FormularioTarjetasCreditoPage() {
       fecha,
       usuarioNombre,
       usuarioEmail,
+      tarjeta_codigo: tarjetaCodigo,
+      tc_en_sap: tcEnSap,
       centroCosto,
       motivo,
       estado: 'pendiente',
@@ -205,12 +215,16 @@ export default function FormularioTarjetasCreditoPage() {
 
     // Save to Supabase (primary) and local storage (backup)
     try {
-      const { error } = await supabase.from('legalizaciones_tarjetas_credito').insert([{
+      const insertPayload = {
         id: nuevaLeg.id,
         codigo: nuevaLeg.codigo,
         fecha: nuevaLeg.fecha,
         usuario_nombre: nuevaLeg.usuarioNombre,
         usuario_email: nuevaLeg.usuarioEmail,
+        tarjeta_codigo: tarjetaCodigo || null,
+        tc_en_sap: tcEnSap || null,
+        aprobador_nombre: (responsables.find((r) => r.id === selectedResponsableId)?.responsable_nombre) || nuevaLeg.usuarioNombre,
+        aprobador_email: (responsables.find((r) => r.id === selectedResponsableId)?.responsable_email) || nuevaLeg.usuarioEmail,
         centro_costo: nuevaLeg.centroCosto,
         motivo: nuevaLeg.motivo,
         estado: nuevaLeg.estado,
@@ -218,32 +232,30 @@ export default function FormularioTarjetasCreditoPage() {
         total_gastos: nuevaLeg.totalGastos,
         saldo_diferencia: nuevaLeg.saldoDiferencia,
         lineas: nuevaLeg.lineas,
+        gestion_contable: 'Por procesar',
         created_at: nuevaLeg.created_at,
         updated_at: nuevaLeg.updated_at,
-      }]);
+      };
+      const { error } = await supabase.from('legalizaciones_tarjetas_credito').insert([insertPayload]);
       if (error) {
-        console.error('Error guardando en Supabase:', error);
+        console.error('Error guardando en Supabase:', error.message || error);
       }
-    } catch (e) {
-      console.error('Error de red al guardar:', e);
+    } catch (e: any) {
+      console.error('Error de red al guardar:', e.message || e);
     }
 
-    // Enviar notificación a Power Automate
+    // Enviar notificación a Power Automate vía API proxy
     try {
-      const webhookUrl = "https://8c18912a4169ec67aa9b39bdfb7cc3.10.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/fb27e082be7e4a6486938b6c7b81f2c6/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=alJWDIinaFwxmT_PTghi-bwfBaSMoOdBlX0x5MS2V5E";
-      const payload = {
-        correo: nuevaLeg.usuarioEmail,
-        titulo: `Nueva Legalización de Tarjeta de Crédito: ${nuevaLeg.codigo}`,
-        contenido: `El usuario ${nuevaLeg.usuarioNombre} ha registrado la legalización de tarjeta de crédito ${nuevaLeg.codigo} por valor de $${nuevaLeg.totalGastos.toLocaleString('es-CO')} COP.`,
-        link: `${window.location.origin}/formulario-tarjetas-credito/${nuevaLeg.id}`
-      };
-      
-      await fetch(webhookUrl, {
+      const link = `${window.location.origin}/formulario-tarjetas-credito/${nuevaLeg.id}`;
+      await fetch('/api/notify', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          correo: nuevaLeg.usuarioEmail,
+          titulo: `Nueva Legalización de Tarjeta de Crédito: ${nuevaLeg.codigo}`,
+          contenido: `El usuario ${nuevaLeg.usuarioNombre} ha registrado la legalización de tarjeta de crédito ${nuevaLeg.codigo} por valor de $${nuevaLeg.totalGastos.toLocaleString('es-CO')} COP.`,
+          link: link
+        })
       });
     } catch (e) {
       console.error('Error enviando notificación:', e);

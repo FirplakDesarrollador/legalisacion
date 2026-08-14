@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Wallet, PlusCircle, SlidersHorizontal, Copy, ExternalLink, Check } from 'lucide-react';
+import { Wallet, PlusCircle, SlidersHorizontal, Copy, ExternalLink, Check, PanelLeftClose } from 'lucide-react';
 
 export type TabType = 'cajas_menores' | 'dashboard' | 'legalizaciones' | 'cuentas' | 'proveedores' | 'reportes';
 
@@ -15,6 +15,8 @@ interface SidebarProps {
     cuentas: number;
     proveedores: number;
   };
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -22,8 +24,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   onOpenNuevaModal,
   counts,
+  isOpen = true,
+  onToggle,
 }) => {
   const [copied, setCopied] = useState(false);
+
+  if (!isOpen) {
+    return null;
+  }
 
   const menuItems = [
     {
@@ -49,15 +57,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-64 bg-slate-50 border-r border-slate-200 p-4 flex flex-col justify-between shrink-0 min-h-[calc(100vh-65px)]">
+    <aside className="w-64 bg-slate-50 border-r border-slate-200 p-4 flex flex-col justify-between shrink-0 min-h-[calc(100vh-65px)] transition-all">
       <div className="space-y-6">
-
 
         {/* Navigation Section */}
         <div>
-          <p className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Menú Principal
-          </p>
+          <div className="flex items-center justify-between px-3 mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Menú Principal
+            </p>
+            {onToggle && (
+              <button
+                onClick={onToggle}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-200/60 transition-colors"
+                title="Ocultar menú lateral"
+              >
+                <PanelLeftClose className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
           <nav className="space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon;

@@ -80,13 +80,19 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
     if (!legalizacion) return;
     setIsSubmitting(true);
     try {
+      const nowIso = new Date().toISOString();
+      const updateFields: any = {
+        estado: nuevoEstado,
+        observaciones_aprobacion: observaciones,
+        updated_at: nowIso,
+      };
+      if (nuevoEstado === 'aprobado') {
+        updateFields.fecha_aprobacion = nowIso;
+      }
+
       const { error } = await supabase
         .from('legalizaciones_tarjetas_credito')
-        .update({
-          estado: nuevoEstado,
-          observaciones_aprobacion: observaciones,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateFields)
         .eq('id', id);
 
       if (error) {
@@ -96,6 +102,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
           ...legalizacion,
           estado: nuevoEstado,
           observacionesAprobacion: observaciones,
+          fechaAprobacion: nuevoEstado === 'aprobado' ? nowIso : legalizacion.fechaAprobacion,
         };
         setLegalizacion(updatedLeg);
 
@@ -127,6 +134,15 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
         message: data.message || (data.success ? 'Borrador creado en SAP Service Layer' : 'Error al conectar con SAP'),
         docEntry: data.docEntry,
       });
+
+      if (data.success && data.docEntry) {
+        try {
+          await supabase
+            .from('legalizaciones_tarjetas_credito')
+            .update({ sap_doc_entry: data.docEntry, updated_at: new Date().toISOString() })
+            .eq('id', legData.id);
+        } catch (e) {}
+      }
     } catch (err: any) {
       setSapResult({
         success: false,

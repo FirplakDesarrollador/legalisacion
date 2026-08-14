@@ -58,6 +58,7 @@ export default function Home() {
   
   const [isNuevaTarjetaModalOpen, setIsNuevaTarjetaModalOpen] = useState(false);
   const [selectedTarjetaCredito, setSelectedTarjetaCredito] = useState<TarjetaCredito | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Check active Supabase session on mount
   useEffect(() => {
@@ -200,15 +201,19 @@ export default function Home() {
         onSearchChange={setSearchTerm}
         currentUser={currentUser}
         onLogout={handleLogout}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
       />
 
       {/* Main Layout Area */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-w-0">
         {/* Left Sidebar */}
         <Sidebar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
           onOpenNuevaModal={() => setIsNuevaModalOpen(true)}
+          isOpen={isSidebarOpen}
+          onToggle={() => setIsSidebarOpen((prev) => !prev)}
           counts={{
             legalizaciones: legalizaciones.length,
             cajasMenores: tarjetasCredito.length,
@@ -218,7 +223,7 @@ export default function Home() {
         />
 
         {/* Dynamic Main Workspace */}
-        <main className="flex-1 p-6 overflow-y-auto max-w-7xl">
+        <main className="flex-1 p-6 overflow-y-auto w-full min-w-0">
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <KpiStats

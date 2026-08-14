@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2 } from 'lucide-react';
 import { TarjetaCredito } from '@/types/tarjetasCredito';
+import { supabase, updateTarjetaCreditoGestionContable, fetchTarjetasCreditoResponsablesFromSupabase } from '@/lib/supabase';
 
 interface TarjetasCreditoListProps {
   tarjetasCredito: TarjetaCredito[];
@@ -19,6 +20,97 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'todas' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<{ [id: string]: { success: boolean; message: string; docEntry?: number } }>({});
+  const [localGestion, setLocalGestion] = useState<{ [id: string]: 'Por procesar' | 'Procesado' }>({});
+  const [localFechaProcesado, setLocalFechaProcesado] = useState<{ [id: string]: string | null }>({});
+  const [responsables, setResponsables] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadResp() {
+      const data = await fetchTarjetasCreditoResponsablesFromSupabase();
+      setResponsables(data);
+    }
+    loadResp();
+  }, []);
+
+  const getAprobador = (leg: TarjetaCredito) => {
+    if (leg.aprobadorNombre) return { nombre: leg.aprobadorNombre, email: leg.aprobadorEmail };
+    const match = responsables.find(
+      (r) =>
+        (leg.tarjeta_codigo && r.tarjeta_codigo === leg.tarjeta_codigo) ||
+        (leg.motivo && r.tarjeta_codigo && leg.motivo.includes(r.tarjeta_codigo)) ||
+        (leg.tc_en_sap && r.tc_en_sap === leg.tc_en_sap)
+    );
+    if (match) {
+      return { nombre: match.responsable_nombre, email: match.responsable_email };
+    }
+    return { nombre: '—', email: '' };
+  };
+
+  const handleGestionChange = async (id: string, nuevoValor: 'Por procesar' | 'Procesado') => {
+    const nowIso = nuevoValor === 'Procesado' ? new Date().toISOString() : null;
+    setLocalGestion((prev) => ({ ...prev, [id]: nuevoValor }));
+    setLocalFechaProcesado((prev) => ({ ...prev, [id]: nowIso }));
+    updateTarjetaCreditoGestionContable(id, nuevoValor, nowIso);
+
+    try {
+      await supabase
+        .from('legalizaciones_tarjetas_credito')
+        .update({
+          gestion_contable: nuevoValor,
+          fecha_procesado: nowIso,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+    } catch (e) {
+      console.warn('Nota: Supabase gestion_contable guardado en almacenamiento local.');
+    }
+  };
+
+  const handleEnviarSAP = async (leg: TarjetaCredito) => {
+    setSyncingId(leg.id);
+    try {
+      const res = await fetch('/api/sap/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leg),
+      });
+      const data = await res.json();
+      setSyncStatus((prev) => ({
+        ...prev,
+        [leg.id]: {
+          success: data.success,
+          message: data.message || (data.success ? 'Borrador creado en SAP' : 'Error en SAP'),
+          docEntry: data.docEntry,
+        },
+      }));
+      if (data.success) {
+        alert(`✅ Borrador creado exitosamente en SAP para ${leg.codigo} (DocEntry: ${data.docEntry || 'OK'})`);
+        if (data.docEntry) {
+          try {
+            await supabase
+              .from('legalizaciones_tarjetas_credito')
+              .update({ sap_doc_entry: data.docEntry, updated_at: new Date().toISOString() })
+              .eq('id', leg.id);
+          } catch (e) {}
+        }
+      } else {
+        alert(`❌ Error al enviar a SAP: ${data.message}`);
+      }
+    } catch (err: any) {
+      setSyncStatus((prev) => ({
+        ...prev,
+        [leg.id]: {
+          success: false,
+          message: err.message || 'Error de conexión',
+        },
+      }));
+      alert(`❌ Error de conexión con SAP: ${err.message}`);
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const formatCOP = (num: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -26,6 +118,35 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
       currency: 'COP',
       maximumFractionDigits: 0,
     }).format(num);
+  };
+
+  const formatFecha = (isoString?: string) => {
+    if (!isoString) return '—';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return isoString.split('T')[0] || isoString;
+      return d.toLocaleDateString('es-CO', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return isoString;
+    }
+  };
+
+  const formatHora = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString('es-CO', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
+    }
   };
 
   const filtered = tarjetasCredito.filter((l) => {
@@ -55,14 +176,14 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
         );
       case 'pagado':
         return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 w-fit">
-            <CheckCircle2 className="w-3 h-3 text-blue-600" /> Liquidada
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1 w-fit">
+            <CheckCircle2 className="w-3 h-3 text-indigo-600" /> Pagada
           </span>
         );
       default:
         return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1 w-fit">
-            <Clock className="w-3 h-3 text-amber-600 animate-pulse" /> Pendiente
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 w-fit">
+            <Clock className="w-3 h-3 text-amber-600" /> Pendiente
           </span>
         );
     }
@@ -71,9 +192,9 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
   return (
     <div className="space-y-4">
       {/* Top Filter Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
-        {/* Status Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
+        {/* Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
           {[
             { id: 'todas', label: 'Todas', count: tarjetasCredito.length },
             { id: 'pendiente', label: 'Pendientes', count: tarjetasCredito.filter((l) => l.estado === 'pendiente').length },
@@ -119,54 +240,32 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
       </div>
 
       {/* Main Table */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-        <table className="w-full text-left text-xs text-slate-700">
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-x-auto custom-scrollbar shadow-sm">
+        <table className="w-full min-w-[1250px] text-left text-xs text-slate-700 whitespace-nowrap">
           <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
             <tr>
-              <th className="py-3.5 px-4">Código / Fecha</th>
-              <th className="py-3.5 px-4">Solicitante</th>
-              <th className="py-3.5 px-4">Motivo / Centro Costo</th>
-              <th className="py-3.5 px-4 text-right">Anticipo</th>
-              <th className="py-3.5 px-4 text-right">Total Gastos</th>
-              <th className="py-3.5 px-4 text-right">Saldo Neto</th>
-              <th className="py-3.5 px-4">Estado</th>
               <th className="py-3.5 px-4 text-center">Acciones</th>
+              <th className="py-3.5 px-4">Solicitante</th>
+              <th className="py-3.5 px-4">Tarjeta de Crédito</th>
+              <th className="py-3.5 px-4 text-right">Total Gastos</th>
+              <th className="py-3.5 px-4">Estado</th>
+              <th className="py-3.5 px-4">Gestión Contable</th>
+              <th className="py-3.5 px-4">Aprobador</th>
+              <th className="py-3.5 px-4">Fecha de Aprobación</th>
+              <th className="py-3.5 px-4">Fecha de Procesado</th>
+              <th className="py-3.5 px-4">Borrador / Fecha Creación</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-slate-400">
+                <td colSpan={10} className="py-8 text-center text-slate-400">
                   No hay tarjetas de crédito para mostrar en este estado.
                 </td>
               </tr>
             ) : (
               filtered.map((leg) => (
                 <tr key={leg.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <p className="font-bold text-blue-900 font-mono">{leg.codigo}</p>
-                    <p className="text-[10px] text-slate-400">{leg.fecha}</p>
-                  </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-900">
-                    {leg.usuarioNombre}
-                    <p className="text-[10px] text-slate-500 font-normal">{leg.usuarioEmail}</p>
-                  </td>
-                  <td className="py-3.5 px-4 max-w-xs">
-                    <p className="truncate font-medium text-slate-800">{leg.motivo}</p>
-                    <p className="text-[10px] text-blue-600 truncate font-semibold">{leg.centroCosto}</p>
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-mono text-slate-500">
-                    {formatCOP(leg.anticipoRecibido)}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
-                    {formatCOP(leg.totalGastos)}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-mono font-bold">
-                    <span className={leg.saldoDiferencia >= 0 ? 'text-emerald-600' : 'text-blue-600'}>
-                      {formatCOP(leg.saldoDiferencia)}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4">{getStatusPill(leg.estado)}</td>
                   <td className="py-3.5 px-4">
                     <div className="flex items-center justify-center gap-1.5">
                       <button
@@ -176,6 +275,21 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
+
+                      {/* Botón Enviar a SAP */}
+                      <button
+                        onClick={() => handleEnviarSAP(leg)}
+                        disabled={syncingId === leg.id}
+                        className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors disabled:opacity-50 flex items-center gap-1"
+                        title="Enviar borrador a SAP Service Layer"
+                      >
+                        {syncingId === leg.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+
                       {leg.estado === 'pendiente' && (
                         <>
                           <button
@@ -195,6 +309,87 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
                         </>
                       )}
                     </div>
+                  </td>
+                  <td className="py-3.5 px-4 font-semibold text-slate-900">
+                    {leg.usuarioNombre}
+                    <p className="text-[10px] text-slate-500 font-normal">{leg.usuarioEmail}</p>
+                  </td>
+                  <td className="py-3.5 px-4 max-w-xs">
+                    <p className="font-semibold text-slate-900 truncate">{leg.motivo || 'Tarjeta de Crédito'}</p>
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
+                    {formatCOP(leg.totalGastos)}
+                  </td>
+                  <td className="py-3.5 px-4">{getStatusPill(leg.estado)}</td>
+                  <td className="py-3.5 px-4">
+                    <select
+                      value={localGestion[leg.id] ?? leg.gestionContable ?? 'Por procesar'}
+                      onChange={(e) => handleGestionChange(leg.id, e.target.value as 'Por procesar' | 'Procesado')}
+                      className={`text-[11px] font-bold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none focus:ring-2 shadow-xs ${
+                        (localGestion[leg.id] ?? leg.gestionContable ?? 'Por procesar') === 'Procesado'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-500 hover:bg-emerald-100'
+                          : 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-500 hover:bg-amber-100'
+                      }`}
+                    >
+                      <option value="Por procesar">⏳ Por procesar</option>
+                      <option value="Procesado">✅ Procesado</option>
+                    </select>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    {(() => {
+                      const ap = getAprobador(leg);
+                      return (
+                        <div>
+                          <p className="font-semibold text-slate-900">{ap.nombre}</p>
+                          {ap.email && <p className="text-[10px] text-slate-500 font-normal">{ap.email}</p>}
+                        </div>
+                      );
+                    })()}
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-700">
+                    {leg.estado === 'aprobado' || leg.estado === 'pagado' ? (
+                      <div>
+                        <p className="font-semibold text-emerald-800">
+                          {formatFecha(leg.fechaAprobacion || leg.updated_at)}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {formatHora(leg.fechaAprobacion || leg.updated_at)}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 text-[11px] font-mono">—</span>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-700">
+                    {((localGestion[leg.id] ?? leg.gestionContable) === 'Procesado') ? (
+                      <div>
+                        <p className="font-semibold text-blue-900">
+                          {formatFecha(localFechaProcesado[leg.id] ?? leg.fechaProcesado ?? leg.updated_at)}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {formatHora(localFechaProcesado[leg.id] ?? leg.fechaProcesado ?? leg.updated_at)}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 text-[11px] font-mono">—</span>
+                    )}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    {(() => {
+                      const docEntry = syncStatus[leg.id]?.docEntry || leg.sapDocEntry;
+                      return (
+                        <div>
+                          {docEntry ? (
+                            <p className="font-bold text-indigo-900 font-mono">
+                              Borrador #{docEntry}
+                            </p>
+                          ) : null}
+                          <p className="text-[10px] text-slate-500">
+                            {formatFecha(leg.created_at || leg.fecha)} {formatHora(leg.created_at)}
+                          </p>
+                        </div>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))

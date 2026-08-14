@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2 } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
 
 interface LegalizacionesListProps {
@@ -19,6 +19,44 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'todas' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<{ [id: string]: { success: boolean; message: string; docEntry?: number } }>({});
+
+  const handleEnviarSAP = async (leg: Legalizacion) => {
+    setSyncingId(leg.id);
+    try {
+      const res = await fetch('/api/sap/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leg),
+      });
+      const data = await res.json();
+      setSyncStatus((prev) => ({
+        ...prev,
+        [leg.id]: {
+          success: data.success,
+          message: data.message || (data.success ? 'Borrador creado en SAP' : 'Error en SAP'),
+          docEntry: data.docEntry,
+        },
+      }));
+      if (data.success) {
+        alert(`✅ Borrador creado exitosamente en SAP para ${leg.codigo} (DocEntry: ${data.docEntry || 'OK'})`);
+      } else {
+        alert(`❌ Error al enviar a SAP: ${data.message}`);
+      }
+    } catch (err: any) {
+      setSyncStatus((prev) => ({
+        ...prev,
+        [leg.id]: {
+          success: false,
+          message: err.message || 'Error de conexión',
+        },
+      }));
+      alert(`❌ Error de conexión con SAP: ${err.message}`);
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const formatCOP = (num: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -119,8 +157,8 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
       </div>
 
       {/* Main Table */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-        <table className="w-full text-left text-xs text-slate-700">
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-x-auto custom-scrollbar shadow-sm">
+        <table className="w-full min-w-[1150px] text-left text-xs text-slate-700 whitespace-nowrap">
           <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
             <tr>
               <th className="py-3.5 px-4">Código / Fecha</th>
@@ -176,6 +214,21 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
+
+                      {/* Botón Enviar a SAP */}
+                      <button
+                        onClick={() => handleEnviarSAP(leg)}
+                        disabled={syncingId === leg.id}
+                        className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors disabled:opacity-50 flex items-center gap-1"
+                        title="Enviar borrador a SAP Service Layer"
+                      >
+                        {syncingId === leg.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                        ) : (
+                          <Send className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+
                       {leg.estado === 'pendiente' && (
                         <>
                           <button
