@@ -18,11 +18,21 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     async function loadLegalizacion() {
       try {
-        const { data, error } = await supabase
-          .from('legalizaciones')
+        let { data, error } = await supabase
+          .from('legalizaciones cajas menores')
           .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle();
+
+        if (!data) {
+          const resByCode = await supabase
+            .from('legalizaciones cajas menores')
+            .select('*')
+            .eq('codigo', id)
+            .maybeSingle();
+          data = resByCode.data;
+          error = resByCode.error;
+        }
 
         if (error || !data) {
           setErrorMsg('No se encontró la legalización solicitada o fue eliminada.');
@@ -64,13 +74,13 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
     setIsSubmitting(true);
     try {
       const { error } = await supabase
-        .from('legalizaciones')
+        .from('legalizaciones cajas menores')
         .update({
           estado: nuevoEstado,
           observacionesAprobacion: observaciones,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', id);
+        .eq('id', legalizacion.id);
 
       if (error) {
         alert('Error al actualizar el estado: ' + error.message);
