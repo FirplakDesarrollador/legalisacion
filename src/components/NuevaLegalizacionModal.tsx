@@ -20,6 +20,8 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
   proveedores,
   onSave,
 }) => {
+  if (!isOpen) return null;
+
   const [responsables, setResponsables] = useState<ResponsableCaja[]>([]);
   const [selectedResponsableId, setSelectedResponsableId] = useState<number | ''>('');
 
@@ -165,7 +167,12 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex items-center justify-between">
