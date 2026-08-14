@@ -111,6 +111,10 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
         if (lin.id !== id) return lin;
         const updated = { ...lin, [field]: value };
 
+        if (field === 'tipoDocumento' && value === 'Documento Soporte') {
+          updated.facturaNumero = '';
+        }
+
         if (field === 'cuentaId') {
           const selectedCuenta = cuentas.find((c) => c.id === Number(value));
           if (selectedCuenta) {
@@ -297,7 +301,37 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                         className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
                       />
                     </div>
-                    <div className="sm:col-span-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Tipo Doc.</label>
+                      <select
+                        value={linea.tipoDocumento || 'Factura'}
+                        onChange={(e) => handleUpdateLinea(linea.id, 'tipoDocumento', e.target.value)}
+                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold focus:outline-none focus:border-blue-600"
+                      >
+                        <option value="Factura">Factura</option>
+                        <option value="Documento Soporte">Documento Soporte</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">N° Factura</label>
+                      {linea.tipoDocumento === 'Documento Soporte' ? (
+                        <input
+                          type="text"
+                          disabled
+                          value="Inhabilitado (Doc. Soporte)"
+                          className="w-full p-1.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-400 font-mono italic cursor-not-allowed text-[11px]"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="Ej. FE-1092"
+                          value={linea.facturaNumero}
+                          onChange={(e) => handleUpdateLinea(linea.id, 'facturaNumero', e.target.value)}
+                          className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
+                        />
+                      )}
+                    </div>
+                    <div>
                       <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase)</label>
                       <select
                         value={linea.cuentaId || ''}
@@ -310,16 +344,6 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                           </option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">N° Factura / Soporte</label>
-                      <input
-                        type="text"
-                        placeholder="Ej. FE-1092"
-                        value={linea.facturaNumero}
-                        onChange={(e) => handleUpdateLinea(linea.id, 'facturaNumero', e.target.value)}
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
-                      />
                     </div>
                   </div>
 
