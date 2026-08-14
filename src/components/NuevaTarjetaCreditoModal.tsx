@@ -33,14 +33,15 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
     {
       id: 'lin-init-1',
       fecha: new Date().toISOString().split('T')[0],
-      concepto: 'Gastos de Alimentación en Comisión',
-      cuentaId: cuentas[0]?.id || 1,
-      cuentaTitulo: cuentas[0]?.Título || '51100505 - JUNTA DIRECTIVA',
-      proveedorNombre: proveedores[0]?.razon_social || 'NARVAEZ ARIZA EDUARDO ANIBAL',
-      facturaNumero: 'FAC-001',
-      valorSubtotal: 150000,
-      valorIva: 28500,
-      valorTotal: 178500,
+      concepto: '',
+      cuentaId: null,
+      cuentaTitulo: '',
+      proveedorNombre: '',
+      tipoDocumento: 'Factura',
+      facturaNumero: '',
+      valorSubtotal: 0,
+      valorIva: 0,
+      valorTotal: 0,
     },
   ]);
 
@@ -53,14 +54,14 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
   };
 
   const handleAddLinea = () => {
-    const defaultCuenta = cuentas[0];
     const newLine: LineaGasto = {
       id: `lin-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
       fecha: new Date().toISOString().split('T')[0],
       concepto: '',
-      cuentaId: defaultCuenta ? defaultCuenta.id : 1,
-      cuentaTitulo: defaultCuenta ? defaultCuenta.Título : '51100505 - GENERAL',
-      proveedorNombre: proveedores[0]?.razon_social || 'Proveedor Genérico',
+      cuentaId: null,
+      cuentaTitulo: '',
+      proveedorNombre: '',
+      tipoDocumento: 'Factura',
       facturaNumero: '',
       valorSubtotal: 0,
       valorIva: 0,
@@ -285,7 +286,9 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
                         value={linea.cuentaId || ''}
                         onChange={(e) => handleUpdateLinea(linea.id, 'cuentaId', e.target.value)}
                         className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-blue-900 font-mono font-semibold"
+                        required
                       >
+                        <option value="" disabled>-- Seleccione Cuenta Contable --</option>
                         {cuentas.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.Título} ({c.categoria})
@@ -300,7 +303,7 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
                       <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Valor del Gasto ($ COP)</label>
                       <input
                         type="number"
-                        placeholder="Ej. 150000"
+                        placeholder="0"
                         value={linea.valorSubtotal || ''}
                         onChange={(e) => handleUpdateLinea(linea.id, 'valorSubtotal', e.target.value)}
                         className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono font-bold text-xs"
