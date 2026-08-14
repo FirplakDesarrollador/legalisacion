@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, UserCheck, Paperclip, ExternalLink } from 'lucide-react';
-import { Legalizacion, LineaGasto, CuentaContable, Proveedor, ResponsableCaja } from '@/types/legalizaciones';
-import { fetchResponsablesFromSupabase, supabase } from '@/lib/supabase';
+import { Legalizacion, LineaGasto, CuentaContable, Proveedor, ResponsableCaja, CentroCosto } from '@/types/legalizaciones';
+import { fetchResponsablesFromSupabase, fetchCentrosCostoFromSupabase, supabase } from '@/lib/supabase';
 
 interface NuevaLegalizacionModalProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
   if (!isOpen) return null;
 
   const [responsables, setResponsables] = useState<ResponsableCaja[]>([]);
+  const [centros, setCentros] = useState<CentroCosto[]>([]);
   const [selectedResponsableId, setSelectedResponsableId] = useState<number | ''>('');
 
   const [usuarioNombre, setUsuarioNombre] = useState('');
@@ -35,8 +36,12 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
   useEffect(() => {
     async function loadCajas() {
       try {
-        const data = await fetchResponsablesFromSupabase();
+        const [data, centrosData] = await Promise.all([
+          fetchResponsablesFromSupabase(),
+          fetchCentrosCostoFromSupabase(),
+        ]);
         setResponsables(data);
+        setCentros(centrosData);
         if (data.length > 0) {
           const first = data[0];
           setSelectedResponsableId(first.id);
@@ -293,7 +298,7 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                   key={linea.id}
                   className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Fecha Gasto</label>
                       <input
@@ -301,6 +306,7 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                         value={linea.fecha}
                         onChange={(e) => handleUpdateLinea(linea.id, 'fecha', e.target.value)}
                         className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
+                        required
                       />
                     </div>
                     <div>
@@ -333,8 +339,30 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                         />
                       )}
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase)</label>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Centro de Costos *</label>
+                      <select
+                        required
+                        value={linea.concepto || ''}
+                        onChange={(e) => {
+                          handleUpdateLinea(linea.id, 'concepto', e.target.value);
+                          handleUpdateLinea(linea.id, 'cuentaId', null);
+                        }}
+                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold focus:outline-none focus:border-blue-600"
+                      >
+                        <option value="" disabled>-- Seleccione Centro de Costo --</option>
+                        {centros.map((c) => (
+                          <option key={c.id} value={`${c.codigo} - ${c.Título}`}>
+                            {c.codigo} - {c.Título}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase) *</label>
                       <select
                         value={linea.cuentaId || ''}
                         onChange={(e) => handleUpdateLinea(linea.id, 'cuentaId', e.target.value)}
@@ -342,7 +370,15 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                         required
                       >
                         <option value="" disabled>-- Seleccione Cuenta Contable --</option>
-                        {cuentas.map((c) => (
+                        {cuentas.filter((c) => {
+                          if (!linea.concepto) return true;
+                          const cc = linea.concepto.toUpperCase();
+                          if (cc.startsWith('GA')) return c.Título.startsWith('51');
+                          if (cc.startsWith('GV')) return c.Título.startsWith('52');
+                          if (cc.startsWith('IP')) return c.Título.startsWith('73');
+                          if (cc.startsWith('MO')) return c.Título.startsWith('72');
+                          return true;
+                        }).map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.Título} ({c.categoria})
                           </option>
