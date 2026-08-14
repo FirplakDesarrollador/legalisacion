@@ -33,6 +33,10 @@ export interface ResponsableCaja {
   email: string;
   centro_costo?: string;
   cargo?: string;
+  montoAprobado?: number;
+  montoAprobadoStr?: string;
+  aprobadorNombre?: string;
+  aprobadorEmail?: string;
   created_at?: string;
 }
 

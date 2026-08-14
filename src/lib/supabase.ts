@@ -146,12 +146,10 @@ export async function fetchResponsablesFromSupabase(): Promise<ResponsableCaja[]
     const { data, error } = await supabase
       .from('Cajas_menores')
       .select('*');
-      
-    console.log("DEBUG CAJAS MENORES FETCH:", { data, error });
 
     if (!error && data && data.length > 0) {
-      return data.map((row: SupabaseCajaMenorRow, idx: number) => {
-        let aprobadorNombre = row.Aprobador;
+      return data.map((row: any, idx: number) => {
+        let aprobadorNombre = row.Aprobador || 'No Asignado';
         let aprobadorEmail = 'tesoreria@firplak.com';
         if (row.Aprobador && row.Aprobador.includes('#')) {
           const parts = row.Aprobador.split('#');
@@ -159,12 +157,19 @@ export async function fetchResponsablesFromSupabase(): Promise<ResponsableCaja[]
           aprobadorEmail = parts[1].trim();
         }
 
+        const rawMonto = row['Monto aprobado'] || '';
+        const cleanMonto = Number(String(rawMonto).replace(/\./g, '').replace(/,/g, '')) || 0;
+
         return {
           id: idx + 1,
           nombre: row.Responsable,
           email: aprobadorEmail,
           centro_costo: row.Area,
-          cargo: `Aprobador: ${aprobadorNombre} ($${row['Monto aprobado']})`
+          montoAprobado: cleanMonto,
+          montoAprobadoStr: row['Monto aprobado'],
+          aprobadorNombre,
+          aprobadorEmail,
+          cargo: `Aprobador: ${aprobadorNombre} ($${row['Monto aprobado'] || cleanMonto.toLocaleString()})`
         };
       });
     }

@@ -68,6 +68,7 @@ export default function FormularioPublicoPage() {
           setUsuarioNombre(first.nombre);
           setUsuarioEmail(first.email);
           if (first.centro_costo) setCentroCosto(first.centro_costo);
+          if (first.montoAprobado) setAnticipoRecibido(first.montoAprobado);
         }
 
         if (cData.length > 0) {
@@ -95,6 +96,7 @@ export default function FormularioPublicoPage() {
       setUsuarioNombre(resp.nombre);
       setUsuarioEmail(resp.email);
       if (resp.centro_costo) setCentroCosto(resp.centro_costo);
+      if (resp.montoAprobado) setAnticipoRecibido(resp.montoAprobado);
     }
   };
 

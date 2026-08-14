@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Plus, Trash2, CheckCircle2, FileText, Calculator } from 'lucide-react';
-import { Legalizacion, LineaGasto, CuentaContable, Proveedor } from '@/types/legalizaciones';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, UserCheck } from 'lucide-react';
+import { Legalizacion, LineaGasto, CuentaContable, Proveedor, ResponsableCaja } from '@/types/legalizaciones';
+import { fetchResponsablesFromSupabase } from '@/lib/supabase';
 
 interface NuevaLegalizacionModalProps {
   isOpen: boolean;
@@ -19,14 +20,48 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
   proveedores,
   onSave,
 }) => {
-  if (!isOpen) return null;
+  const [responsables, setResponsables] = useState<ResponsableCaja[]>([]);
+  const [selectedResponsableId, setSelectedResponsableId] = useState<number | ''>('');
 
-  const [usuarioNombre, setUsuarioNombre] = useState('Carlos Eduardo Mendoza');
-  const [usuarioEmail, setUsuarioEmail] = useState('carlos.mendoza@firplak.com');
-  const [centroCosto, setCentroCosto] = useState('1020 - Operaciones Comercial');
+  const [usuarioNombre, setUsuarioNombre] = useState('');
+  const [usuarioEmail, setUsuarioEmail] = useState('');
+  const [centroCosto, setCentroCosto] = useState('Logistica');
   const [motivo, setMotivo] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
-  const [anticipoRecibido, setAnticipoRecibido] = useState<number>(500000);
+  const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
+
+  useEffect(() => {
+    async function loadCajas() {
+      try {
+        const data = await fetchResponsablesFromSupabase();
+        setResponsables(data);
+        if (data.length > 0) {
+          const first = data[0];
+          setSelectedResponsableId(first.id);
+          setUsuarioNombre(first.nombre);
+          setUsuarioEmail(first.email);
+          if (first.centro_costo) setCentroCosto(first.centro_costo);
+          if (first.montoAprobado) setAnticipoRecibido(first.montoAprobado);
+        }
+      } catch (err) {
+        console.error('Error cargando cajas menores de Supabase:', err);
+      }
+    }
+    if (isOpen) {
+      loadCajas();
+    }
+  }, [isOpen]);
+
+  const handleResponsableSelect = (idVal: number) => {
+    setSelectedResponsableId(idVal);
+    const resp = responsables.find((r) => r.id === idVal);
+    if (resp) {
+      setUsuarioNombre(resp.nombre);
+      setUsuarioEmail(resp.email);
+      if (resp.centro_costo) setCentroCosto(resp.centro_costo);
+      if (resp.montoAprobado) setAnticipoRecibido(resp.montoAprobado);
+    }
+  };
 
   const [lineas, setLineas] = useState<LineaGasto[]>([
     {
@@ -153,6 +188,31 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+          {/* Selector de Caja Menor (Cajas_menores Supabase) */}
+          <div className="p-4 rounded-2xl bg-blue-50/80 border border-blue-200 space-y-2">
+            <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-blue-700" /> Seleccionar Caja Menor / Responsable *
+            </label>
+            <select
+              value={selectedResponsableId}
+              onChange={(e) => handleResponsableSelect(Number(e.target.value))}
+              className="w-full p-2.5 bg-white border border-blue-300 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-xs"
+              required
+            >
+              <option value="" disabled>-- Seleccione la Caja Menor --</option>
+              {responsables.map((resp) => (
+                <option key={resp.id} value={resp.id}>
+                  {resp.nombre} — {resp.centro_costo || 'Área General'} (Monto Aprobado: ${resp.montoAprobadoStr || resp.montoAprobado?.toLocaleString()})
+                </option>
+              ))}
+            </select>
+            {selectedResponsableId && (
+              <p className="text-[11px] text-blue-800 flex items-center gap-1.5">
+                <span className="font-semibold">Aprobador asignado:</span> {responsables.find((r) => r.id === selectedResponsableId)?.aprobadorNombre || 'Por asignar'} ({responsables.find((r) => r.id === selectedResponsableId)?.email})
+              </p>
+            )}
+          </div>
+
           {/* Header Inputs */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
             <div>
@@ -176,17 +236,14 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Centro de Costo</label>
-              <select
+              <label className="block text-slate-700 font-semibold mb-1">Centro de Costo / Área</label>
+              <input
+                type="text"
                 value={centroCosto}
                 onChange={(e) => setCentroCosto(e.target.value)}
                 className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600"
-              >
-                <option value="1020 - Operaciones Comercial">1020 - Operaciones Comercial</option>
-                <option value="2040 - Gestión Legal y Revisoría">2040 - Gestión Legal y Revisoría</option>
-                <option value="3010 - Dirección de Producción">3010 - Dirección de Producción</option>
-                <option value="4050 - Gestión Humana & Viáticos">4050 - Gestión Humana & Viáticos</option>
-              </select>
+                required
+              />
             </div>
 
             <div className="md:col-span-2">
@@ -195,13 +252,13 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                 type="text"
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Ej. Legalización de viáticos viaje Medellín - Clientes Corporativos"
+                placeholder="Ej. Legalización caja menor - Gastos operativos y viáticos"
                 className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600"
                 required
               />
             </div>
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Anticipo Recibido ($ COP)</label>
+              <label className="block text-slate-700 font-semibold mb-1">Anticipo Recibido / Fondo Fijo ($ COP)</label>
               <input
                 type="number"
                 value={anticipoRecibido}
