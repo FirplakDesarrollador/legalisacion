@@ -347,18 +347,7 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                    <div className="sm:col-span-2">
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Descripción del Gasto / Proveedor</label>
-                      <input
-                        type="text"
-                        placeholder="Ej. Hospedaje Hotel Tequendama"
-                        value={linea.concepto}
-                        onChange={(e) => handleUpdateLinea(linea.id, 'concepto', e.target.value)}
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
-                        required
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Subtotal ($ COP)</label>
                       <input
@@ -369,16 +358,22 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                         min={0}
                       />
                     </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">IVA ($ COP)</label>
+                      <input
+                        type="number"
+                        value={linea.valorIva || ''}
+                        onChange={(e) => handleUpdateLinea(linea.id, 'valorIva', e.target.value)}
+                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
+                        min={0}
+                      />
+                    </div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">IVA ($ COP)</label>
-                        <input
-                          type="number"
-                          value={linea.valorIva || ''}
-                          onChange={(e) => handleUpdateLinea(linea.id, 'valorIva', e.target.value)}
-                          className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
-                          min={0}
-                        />
+                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Total Línea ($ COP)</label>
+                        <div className="p-1.5 bg-slate-100 border border-slate-200 rounded-lg text-blue-900 font-mono font-bold text-xs">
+                          {formatCOP(linea.valorTotal)}
+                        </div>
                       </div>
                       {lineas.length > 1 && (
                         <button
