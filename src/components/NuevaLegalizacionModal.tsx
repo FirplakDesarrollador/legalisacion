@@ -174,8 +174,8 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
               <FileText className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="text-base font-bold">Registrar Nueva Legalización</h2>
-              <p className="text-xs text-blue-100">Complete los datos de la comisión y adjunte comprobantes</p>
+              <h2 className="text-base font-bold">Nueva Caja Menor</h2>
+              <p className="text-xs text-blue-100">Complete los datos de la caja menor y adjunte comprobantes</p>
             </div>
           </div>
           <button
@@ -214,23 +214,13 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
           </div>
 
           {/* Header Inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
             <div>
               <label className="block text-slate-700 font-semibold mb-1">Empleado Solicitante</label>
               <input
                 type="text"
                 value={usuarioNombre}
                 onChange={(e) => setUsuarioNombre(e.target.value)}
-                className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-slate-700 font-semibold mb-1">Correo Electrónico</label>
-              <input
-                type="email"
-                value={usuarioEmail}
-                onChange={(e) => setUsuarioEmail(e.target.value)}
                 className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600"
                 required
               />
@@ -246,7 +236,7 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-slate-700 font-semibold mb-1">Motivo / Concepto del Viaje o Gasto</label>
               <input
                 type="text"
