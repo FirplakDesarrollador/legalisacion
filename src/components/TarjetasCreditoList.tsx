@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2 } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus } from 'lucide-react';
 import { TarjetaCredito } from '@/types/tarjetasCredito';
 import { supabase, updateTarjetaCreditoGestionContable, fetchTarjetasCreditoResponsablesFromSupabase } from '@/lib/supabase';
 
@@ -230,6 +230,15 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
               className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 text-slate-900 placeholder-slate-400 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
             />
           </div>
+          <a
+            href="https://ingreso-provedores.vercel.app/registro?tipo=contado"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 shrink-0 transition-all"
+            title="Crear Proveedor de Contado"
+          >
+            <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" /> Crear proveedor de contado
+          </a>
           <button
             onClick={onOpenNuevaModal}
             className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 shrink-0 transition-all"
