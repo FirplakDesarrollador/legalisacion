@@ -298,33 +298,41 @@ export default function Home() {
       </div>
 
       {/* Modals */}
-      <NuevaLegalizacionModal
-        isOpen={isNuevaModalOpen}
-        onClose={() => setIsNuevaModalOpen(false)}
-        cuentas={cuentas}
-        proveedores={proveedores}
-        onSave={handleSaveNueva}
-      />
+      {isNuevaModalOpen && (
+        <NuevaLegalizacionModal
+          isOpen={isNuevaModalOpen}
+          onClose={() => setIsNuevaModalOpen(false)}
+          cuentas={cuentas}
+          proveedores={proveedores}
+          onSave={handleSaveNueva}
+        />
+      )}
 
-      <LegalizacionDetailModal
-        legalizacion={selectedLegalizacion}
-        onClose={() => setSelectedLegalizacion(null)}
-        onUpdateStatus={handleUpdateStatus}
-      />
+      {selectedLegalizacion && (
+        <LegalizacionDetailModal
+          legalizacion={selectedLegalizacion}
+          onClose={() => setSelectedLegalizacion(null)}
+          onUpdateStatus={handleUpdateStatus}
+        />
+      )}
 
-      <NuevaTarjetaCreditoModal
-        isOpen={isNuevaTarjetaModalOpen}
-        onClose={() => setIsNuevaTarjetaModalOpen(false)}
-        cuentas={cuentas}
-        proveedores={proveedores}
-        onSave={handleSaveNuevaTarjeta}
-      />
+      {isNuevaTarjetaModalOpen && (
+        <NuevaTarjetaCreditoModal
+          isOpen={isNuevaTarjetaModalOpen}
+          onClose={() => setIsNuevaTarjetaModalOpen(false)}
+          cuentas={cuentas}
+          proveedores={proveedores}
+          onSave={handleSaveNuevaTarjeta}
+        />
+      )}
 
-      <TarjetaCreditoDetailModal
-        tarjetaCredito={selectedTarjetaCredito}
-        onClose={() => setSelectedTarjetaCredito(null)}
-        onUpdateStatus={handleUpdateStatusTarjeta}
-      />
+      {selectedTarjetaCredito && (
+        <TarjetaCreditoDetailModal
+          tarjetaCredito={selectedTarjetaCredito}
+          onClose={() => setSelectedTarjetaCredito(null)}
+          onUpdateStatus={handleUpdateStatusTarjeta}
+        />
+      )}
     </div>
   );
 }
