@@ -133,6 +133,9 @@ export default function Home() {
       }
       if (legData && legData.length > 0) {
         setLegalizaciones(legData);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('app_legalizaciones_data_v1', JSON.stringify(legData));
+        }
       }
     } catch (err) {
       console.error('Error cargando datos Supabase:', err);
@@ -143,14 +146,18 @@ export default function Home() {
 
   useEffect(() => {
     if (currentUser) {
+      const localLegs = getLocalLegalizaciones();
+      if (localLegs && localLegs.length > 0) {
+        setLegalizaciones(localLegs);
+      }
       setTarjetasCredito(getLocalTarjetasCredito());
       loadSupabaseData();
     }
   }, [currentUser, loadSupabaseData]);
 
   const handleSaveNueva = (nueva: Legalizacion) => {
-    const updated = saveLocalLegalizacion(nueva);
-    setLegalizaciones(updated);
+    setLegalizaciones((prev) => [nueva, ...prev.filter((l) => l.id !== nueva.id)]);
+    saveLocalLegalizacion(nueva);
     setActiveTab('legalizaciones');
   };
 

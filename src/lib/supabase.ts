@@ -501,7 +501,7 @@ export function saveLocalLegalizacion(leg: Legalizacion): Legalizacion[] {
   }
 
   supabase.from('legalizaciones cajas menores').upsert([leg]).then(({ error }) => {
-    if (error) console.log('Info: Supabase table legalizaciones is managed locally.');
+    if (error) console.error('Error al guardar en legalizaciones cajas menores:', error);
   });
 
   return updated;
@@ -509,9 +509,9 @@ export function saveLocalLegalizacion(leg: Legalizacion): Legalizacion[] {
 
 export function updateLegalizacionStatus(id: string, nuevoEstado: Legalizacion['estado'], observaciones?: string): Legalizacion[] {
   const current = getLocalLegalizaciones();
+  const now = new Date().toISOString();
   const updated = current.map(item => {
     if (item.id === id) {
-      const now = new Date().toISOString();
       return {
         ...item,
         estado: nuevoEstado,
@@ -526,6 +526,15 @@ export function updateLegalizacionStatus(id: string, nuevoEstado: Legalizacion['
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   }
+
+  supabase.from('legalizaciones cajas menores').update({
+    estado: nuevoEstado,
+    observacionesAprobacion: observaciones,
+    updated_at: now
+  }).eq('id', id).then(({ error }) => {
+    if (error) console.error('Error al actualizar estado en Supabase:', error);
+  });
+
   return updated;
 }
 
