@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database, Receipt } from 'lucide-react';
+import { X, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
 
 interface GastoDetailModalProps {
@@ -17,8 +17,6 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
 }) => {
   const [observaciones, setObservaciones] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [sapSyncing, setSapSyncing] = useState(false);
-  const [sapResult, setSapResult] = useState<{ success: boolean; message: string; docEntry?: number } | null>(null);
 
   if (!gasto) return null;
 
@@ -43,8 +41,21 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
     }
   };
 
-  const handleAction = (nuevoEstado: Legalizacion['estado']) => {
+  const handleAction = async (nuevoEstado: Legalizacion['estado']) => {
     setIsSubmitting(true);
+
+    // Automatic SAP draft creation when approved
+    if (nuevoEstado === 'aprobado') {
+      try {
+        await fetch('/api/sap/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(gasto),
+        });
+      } catch (sapErr) {
+        console.error('Error al enviar borrador automático a SAP:', sapErr);
+      }
+    }
 
     try {
       const link = typeof window !== 'undefined' ? `${window.location.origin}/formulario-gastos/${gasto.id}` : '';
@@ -54,7 +65,7 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
         body: JSON.stringify({
           correo: gasto.usuarioEmail,
           titulo: `Legalización de Gastos ${gasto.codigo} - ${nuevoEstado === 'aprobado' ? 'Aprobada' : 'Rechazada'}`,
-          contenido: `Tu legalización de gastos ${gasto.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
+          contenido: `Tu legalización de gastos ${gasto.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada y enviada a SAP' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
           link: link,
         }),
       }).catch((e) => console.error('Error enviando notificación de estado:', e));
@@ -67,39 +78,6 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
       setIsSubmitting(false);
       onClose();
     }, 300);
-  };
-
-  const handleEnviarSAP = async () => {
-    setSapSyncing(true);
-    setSapResult(null);
-    try {
-      const res = await fetch('/api/sap/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(gasto),
-      });
-
-      const data = await res.json();
-      setSapResult({
-        success: data.success,
-        message: data.message || (data.success ? 'Borrador creado en SAP Service Layer' : 'Error al conectar con SAP'),
-        docEntry: data.docEntry,
-      });
-
-      if (data.success) {
-        alert(`✅ Borrador preliminar creado exitosamente en SAP con DocEntry #${data.docEntry || 'OK'}`);
-      } else {
-        alert(`❌ Error en SAP Service Layer: ${data.message}`);
-      }
-    } catch (err: any) {
-      setSapResult({
-        success: false,
-        message: err.message || 'Error de conexión con el backend',
-      });
-      alert(`❌ Error de conexión: ${err.message}`);
-    } finally {
-      setSapSyncing(false);
-    }
   };
 
   return (
@@ -137,8 +115,8 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
 
         {/* Content */}
         <div className="p-6 space-y-6 overflow-y-auto flex-1 text-xs">
-          {/* Main Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Main Info Cards (2 columns without general Centro de Costos) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
               <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Solicitante</span>
               <div className="flex items-center gap-2.5">
@@ -148,19 +126,6 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                 <div>
                   <p className="font-semibold text-slate-900">{gasto.usuarioNombre}</p>
                   <p className="text-[11px] text-slate-500">{gasto.usuarioEmail}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Centro de Costos</span>
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
-                  <Building className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">{gasto.centroCosto}</p>
-                  <p className="text-[11px] text-slate-500">Imputación Principal</p>
                 </div>
               </div>
             </div>
@@ -184,29 +149,6 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* SAP Integration Banner */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex flex-wrap items-center justify-between gap-4 shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-white/10 rounded-xl">
-                <Database className="w-5 h-5 text-indigo-300" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm">Integración SAP Business One</h4>
-                <p className="text-xs text-slate-300">
-                  Genera el borrador de Factura de Proveedores (Drafts) en el Service Layer de SAP.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleEnviarSAP}
-              disabled={sapSyncing}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold shadow-md transition-all flex items-center gap-2 disabled:opacity-50 text-xs"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>{sapSyncing ? 'Sincronizando con SAP...' : 'Crear Borrador en SAP'}</span>
-            </button>
           </div>
 
           {/* Lines Table */}

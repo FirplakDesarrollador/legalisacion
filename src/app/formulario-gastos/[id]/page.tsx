@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database, Receipt } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt } from 'lucide-react';
 import { supabase, getLocalLegalizacionesGastos } from '@/lib/supabase';
 import { Legalizacion } from '@/types/legalizaciones';
 
@@ -12,8 +12,6 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
   const [errorMsg, setErrorMsg] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [sapSyncing, setSapSyncing] = useState(false);
-  const [sapResult, setSapResult] = useState<{ success: boolean; message: string; docEntry?: number } | null>(null);
 
   useEffect(() => {
     async function loadLegalizacion() {
@@ -114,12 +112,32 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
   const handleAction = async (nuevoEstado: Legalizacion['estado']) => {
     if (!legalizacion) return;
     setIsSubmitting(true);
+    let createdDocEntry: number | undefined = undefined;
+
+    // Automatic SAP draft creation when approved
+    if (nuevoEstado === 'aprobado') {
+      try {
+        const res = await fetch('/api/sap/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(legalizacion),
+        });
+        const sapData = await res.json();
+        if (sapData.success && sapData.docEntry) {
+          createdDocEntry = sapData.docEntry;
+        }
+      } catch (sapErr) {
+        console.error('Error al enviar borrador automático a SAP:', sapErr);
+      }
+    }
+
     try {
       await supabase
         .from('legalizaciones_gastos')
         .update({
           estado: nuevoEstado,
           observaciones_aprobacion: observaciones,
+          sap_doc_entry: createdDocEntry || legalizacion.sapDocEntry,
           updated_at: new Date().toISOString(),
         })
         .eq('id', legalizacion.id);
@@ -128,6 +146,7 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
         ...legalizacion,
         estado: nuevoEstado,
         observacionesAprobacion: observaciones,
+        sapDocEntry: createdDocEntry || legalizacion.sapDocEntry,
       });
 
       // Notify
@@ -139,7 +158,7 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
           body: JSON.stringify({
             correo: legalizacion.usuarioEmail,
             titulo: `Legalización de Gastos ${legalizacion.codigo} - ${nuevoEstado === 'aprobado' ? 'Aprobada' : 'Rechazada'}`,
-            contenido: `Tu legalización de gastos ${legalizacion.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
+            contenido: `Tu legalización de gastos ${legalizacion.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada y enviada a SAP' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
             link: link,
           }),
         }).catch((e) => console.error('Error enviando notificación de estado:', e));
@@ -150,40 +169,6 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
       alert('Error al actualizar estado: ' + err.message);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleEnviarSAP = async () => {
-    if (!legalizacion) return;
-    setSapSyncing(true);
-    setSapResult(null);
-    try {
-      const res = await fetch('/api/sap/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(legalizacion),
-      });
-
-      const data = await res.json();
-      setSapResult({
-        success: data.success,
-        message: data.message || (data.success ? 'Borrador creado en SAP Service Layer' : 'Error al conectar con SAP'),
-        docEntry: data.docEntry,
-      });
-
-      if (data.success) {
-        alert(`✅ Borrador preliminar creado exitosamente en SAP con DocEntry #${data.docEntry || 'OK'}`);
-      } else {
-        alert(`❌ Error en SAP Service Layer: ${data.message}`);
-      }
-    } catch (err: any) {
-      setSapResult({
-        success: false,
-        message: err.message || 'Error de conexión con el backend',
-      });
-      alert(`❌ Error de conexión: ${err.message}`);
-    } finally {
-      setSapSyncing(false);
     }
   };
 
@@ -235,8 +220,8 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
 
         {/* Main Card */}
         <div className="bg-white text-slate-800 rounded-3xl shadow-2xl border border-slate-200 overflow-hidden p-6 sm:p-8 space-y-6 text-xs">
-          {/* Metadata Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Metadata Cards (2 columns without general Centro de Costos) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
               <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Solicitante</span>
               <div className="flex items-center gap-2.5">
@@ -246,19 +231,6 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
                 <div>
                   <p className="font-semibold text-slate-900">{legalizacion.usuarioNombre}</p>
                   <p className="text-[11px] text-slate-500">{legalizacion.usuarioEmail}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Centro de Costos</span>
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
-                  <Building className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-900">{legalizacion.centroCosto}</p>
-                  <p className="text-[11px] text-slate-500">Imputación Principal</p>
                 </div>
               </div>
             </div>
@@ -282,29 +254,6 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* SAP Integration Banner */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex flex-wrap items-center justify-between gap-4 shadow-md">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-white/10 rounded-xl">
-                <Database className="w-5 h-5 text-indigo-300" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm">Integración SAP Business One</h4>
-                <p className="text-xs text-slate-300">
-                  Genera el borrador de Factura de Proveedores (Drafts) en el Service Layer de SAP.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleEnviarSAP}
-              disabled={sapSyncing}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold shadow-md transition-all flex items-center gap-2 disabled:opacity-50 text-xs"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>{sapSyncing ? 'Sincronizando con SAP...' : 'Crear Borrador en SAP'}</span>
-            </button>
           </div>
 
           {/* Line Items Table */}

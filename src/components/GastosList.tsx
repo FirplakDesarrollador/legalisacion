@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Loader2, UserPlus, Receipt } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, UserPlus, Receipt } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
 
 interface GastosListProps {
@@ -19,44 +19,6 @@ export const GastosList: React.FC<GastosListProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'todas' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
-  const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<{ [id: string]: { success: boolean; message: string; docEntry?: number } }>({});
-
-  const handleEnviarSAP = async (gasto: Legalizacion) => {
-    setSyncingId(gasto.id);
-    try {
-      const res = await fetch('/api/sap/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(gasto),
-      });
-      const data = await res.json();
-      setSyncStatus((prev) => ({
-        ...prev,
-        [gasto.id]: {
-          success: data.success,
-          message: data.message || (data.success ? 'Borrador creado en SAP' : 'Error en SAP'),
-          docEntry: data.docEntry,
-        },
-      }));
-      if (data.success) {
-        alert(`✅ Borrador creado exitosamente en SAP para ${gasto.codigo} (DocEntry: ${data.docEntry || 'OK'})`);
-      } else {
-        alert(`❌ Error al enviar a SAP: ${data.message}`);
-      }
-    } catch (err: any) {
-      setSyncStatus((prev) => ({
-        ...prev,
-        [gasto.id]: {
-          success: false,
-          message: err.message || 'Error de conexión',
-        },
-      }));
-      alert(`❌ Error de conexión con SAP: ${err.message}`);
-    } finally {
-      setSyncingId(null);
-    }
-  };
 
   const formatCOP = (num: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -201,7 +163,7 @@ export const GastosList: React.FC<GastosListProps> = ({
                 </tr>
               ) : (
                 filtered.map((leg) => {
-                  const hasSap = leg.sapDocEntry || syncStatus[leg.id]?.docEntry;
+                  const hasSap = !!leg.sapDocEntry;
                   const dateStr = leg.created_at ? new Date(leg.created_at).toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit' }) : (leg.fecha || '-');
                   const timeStr = leg.created_at ? new Date(leg.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true }) : '';
 
@@ -217,32 +179,19 @@ export const GastosList: React.FC<GastosListProps> = ({
                             <Eye className="w-3.5 h-3.5" />
                           </button>
 
-                          <button
-                            onClick={() => handleEnviarSAP(leg)}
-                            disabled={syncingId === leg.id}
-                            className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors disabled:opacity-50 flex items-center gap-1"
-                            title="Enviar borrador a SAP Service Layer"
-                          >
-                            {syncingId === leg.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                            ) : (
-                              <Send className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-
                           {leg.estado === 'pendiente' && (
                             <>
                               <button
                                 onClick={() => onUpdateStatus(leg.id, 'aprobado')}
                                 className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors"
-                                title="Aprobar Rápido"
+                                title="Aprobar (Envía a SAP)"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => onUpdateStatus(leg.id, 'rechazado')}
                                 className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
-                                title="Rechazar Rápido"
+                                title="Rechazar"
                               >
                                 <XCircle className="w-3.5 h-3.5" />
                               </button>
@@ -286,7 +235,7 @@ export const GastosList: React.FC<GastosListProps> = ({
                         <div className="flex flex-col items-center justify-center">
                           {hasSap ? (
                             <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-[11px] mb-0.5">
-                              Doc: #{leg.sapDocEntry || syncStatus[leg.id]?.docEntry}
+                              Doc: #{leg.sapDocEntry}
                             </span>
                           ) : null}
                           <span className="text-[10px] text-slate-400 font-medium">

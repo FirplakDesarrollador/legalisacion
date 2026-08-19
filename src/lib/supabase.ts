@@ -821,19 +821,25 @@ export function updateLegalizacionGastoStatus(id: string, nuevoEstado: Legalizac
     localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify(updated));
   }
 
-  supabase.from('legalizaciones_gastos').update({
-    estado: nuevoEstado,
-    observaciones_aprobacion: observaciones,
-    updated_at: now
-  }).eq('id', id).then(({ error }) => {
-    if (error) {
-      supabase.from('legalizaciones gastos').update({
-        estado: nuevoEstado,
-        observacionesAprobacion: observaciones,
-        updated_at: now
-      }).eq('id', id).then(() => {});
+  if (nuevoEstado === 'aprobado') {
+    const approvedGasto = current.find(item => item.id === id);
+    if (approvedGasto) {
+      fetch('/api/sap/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(approvedGasto),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.docEntry) {
+            supabase.from('legalizaciones_gastos').update({
+              sap_doc_entry: data.docEntry
+            }).eq('id', id).then(() => {});
+          }
+        })
+        .catch(err => console.error('Error al generar borrador SAP automáticamente:', err));
     }
-  });
+  }
 
   return updated;
 }
