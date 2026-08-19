@@ -298,25 +298,6 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
                           <Send className="w-3.5 h-3.5" />
                         )}
                       </button>
-
-                      {leg.estado === 'pendiente' && (
-                        <>
-                          <button
-                            onClick={() => onUpdateStatus(leg.id, 'aprobado')}
-                            className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors"
-                            title="Aprobar Rápido"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => onUpdateStatus(leg.id, 'rechazado')}
-                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
-                            title="Rechazar Rápido"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      )}
                     </div>
                   </td>
                   <td className="py-3.5 px-4 font-semibold text-slate-900">
