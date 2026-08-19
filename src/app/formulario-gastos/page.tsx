@@ -420,17 +420,6 @@ export default function FormularioGastosPublicoPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Área / Centro de Costos General</label>
-                    <input
-                      type="text"
-                      placeholder="Ej. Comercial / Administrativo"
-                      value={centroCosto}
-                      onChange={(e) => setCentroCosto(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600"
-                    />
-                  </div>
-
-                  <div>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Anticipo Recibido ($ COP)</label>
                     <input
                       type="number"
@@ -442,7 +431,7 @@ export default function FormularioGastosPublicoPage() {
                     />
                   </div>
 
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Motivo del Gasto / Viaje *</label>
                     <input
                       type="text"

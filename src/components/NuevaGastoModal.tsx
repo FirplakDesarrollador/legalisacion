@@ -23,9 +23,9 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
   const [centros, setCentros] = useState<CentroCosto[]>([]);
   const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
   
-  const [usuarioNombre, setUsuarioNombre] = useState('Mateo Benavides Rios');
-  const [usuarioEmail, setUsuarioEmail] = useState('mateo.benavides@firplak.com');
-  const [centroCosto, setCentroCosto] = useState('Desarrollo TI');
+  const [usuarioNombre, setUsuarioNombre] = useState('');
+  const [usuarioEmail, setUsuarioEmail] = useState('');
+  const [centroCosto, setCentroCosto] = useState('');
   const [motivo, setMotivo] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
@@ -376,19 +376,6 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Área / Centro de Costos General
-                </label>
-                <input
-                  type="text"
-                  value={centroCosto}
-                  onChange={(e) => setCentroCosto(e.target.value)}
-                  placeholder="Ej. Operaciones Comercial"
-                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Anticipo Recibido ($ COP)
                 </label>
                 <input
@@ -401,7 +388,7 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
                 />
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Motivo / Justificación del Gasto *
                 </label>
