@@ -28,6 +28,7 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
   const [centroCosto, setCentroCosto] = useState('');
   const [motivo, setMotivo] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [recibioAnticipo, setRecibioAnticipo] = useState<'no' | 'si'>('no');
   const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
 
   // Dropdown states for search
@@ -376,19 +377,44 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  ¿Recibió Anticipo? *
+                </label>
+                <select
+                  value={recibioAnticipo}
+                  onChange={(e) => {
+                    const val = e.target.value as 'no' | 'si';
+                    setRecibioAnticipo(val);
+                    if (val === 'no') {
+                      setAnticipoRecibido(0);
+                    }
+                  }}
+                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:border-blue-600"
+                >
+                  <option value="no">No</option>
+                  <option value="si">Sí</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Anticipo Recibido ($ COP)
                 </label>
                 <input
                   type="number"
                   min={0}
-                  value={anticipoRecibido || ''}
+                  disabled={recibioAnticipo === 'no'}
+                  value={recibioAnticipo === 'no' ? '' : (anticipoRecibido || '')}
                   onChange={(e) => setAnticipoRecibido(Number(e.target.value) || 0)}
-                  placeholder="0"
-                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 font-mono font-bold focus:outline-none focus:border-blue-600"
+                  placeholder={recibioAnticipo === 'no' ? 'Inhabilitado ($ 0)' : '0'}
+                  className={`w-full p-2 border rounded-xl font-mono font-bold focus:outline-none ${
+                    recibioAnticipo === 'no'
+                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed italic text-[11px]'
+                      : 'bg-white border-slate-200 text-slate-900 focus:border-blue-600'
+                  }`}
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Motivo / Justificación del Gasto *
                 </label>
