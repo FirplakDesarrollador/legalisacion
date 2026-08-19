@@ -107,6 +107,8 @@ export default function FormularioGastosPublicoPage() {
       concepto: '',
       cuentaId: null,
       cuentaTitulo: '',
+      proveedorId: null,
+      proveedorNit: '',
       proveedorNombre: '',
       tipoDocumento: 'Factura',
       facturaNumero: '',
@@ -122,6 +124,17 @@ export default function FormularioGastosPublicoPage() {
       prev.map((lin) => {
         if (lin.id !== id) return lin;
         const updated = { ...lin, [field]: value };
+
+        if (field === 'proveedorNit') {
+          updated.proveedorNit = value;
+          const matchProv = proveedores.find(
+            (p) => (p.numero_identificacion || '').trim().toLowerCase() === (value || '').trim().toLowerCase()
+          );
+          if (matchProv) {
+            updated.proveedorNombre = matchProv.razon_social || '';
+            updated.proveedorId = matchProv.id;
+          }
+        }
 
         if (field === 'tipoDocumento' && value === 'Documento Soporte') {
           updated.facturaNumero = '';
@@ -546,6 +559,38 @@ export default function FormularioGastosPublicoPage() {
                               className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900"
                             />
                           )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">NIT del Proveedor *</label>
+                          <input
+                            type="text"
+                            required
+                            list={`prov-nit-public-${linea.id}`}
+                            placeholder="Ej. 900123456"
+                            value={linea.proveedorNit || ''}
+                            onChange={(e) => handleUpdateLinea(linea.id, 'proveedorNit', e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono font-semibold focus:outline-none focus:border-blue-600 text-xs"
+                          />
+                          <datalist id={`prov-nit-public-${linea.id}`}>
+                            {proveedores.map((p) => (
+                              <option key={p.id} value={p.numero_identificacion || ''}>
+                                {p.razon_social || ''}
+                              </option>
+                            ))}
+                          </datalist>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Razón Social / Nombre Proveedor</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. Almacenes Éxito S.A."
+                            value={linea.proveedorNombre || ''}
+                            onChange={(e) => handleUpdateLinea(linea.id, 'proveedorNombre', e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 text-xs"
+                          />
                         </div>
                       </div>
 
