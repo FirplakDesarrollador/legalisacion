@@ -144,7 +144,6 @@ export const GastosList: React.FC<GastosListProps> = ({
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[10px]">
               <tr>
                 <th className="py-3.5 px-4 text-center">Acciones</th>
-                <th className="py-3.5 px-4">Código / Fecha</th>
                 <th className="py-3.5 px-4">Solicitante</th>
                 <th className="py-3.5 px-4">Observaciones</th>
                 <th className="py-3.5 px-4 text-right">Anticipo</th>
@@ -157,7 +156,7 @@ export const GastosList: React.FC<GastosListProps> = ({
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
                     No hay legalizaciones de gastos para mostrar en este estado.
                   </td>
                 </tr>
@@ -200,13 +199,6 @@ export const GastosList: React.FC<GastosListProps> = ({
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-4">
-                        <p className="font-bold text-blue-900 font-mono">
-                          {leg.sapDocEntry ? `SAP #${leg.sapDocEntry}` : leg.codigo}
-                        </p>
-                        <p className="text-[10px] text-slate-400">{leg.fecha}</p>
-                      </td>
-
                       <td className="py-3.5 px-4 font-semibold text-slate-900">
                         {leg.usuarioNombre}
                         <p className="text-[10px] text-slate-500 font-normal">{leg.usuarioEmail}</p>
@@ -238,7 +230,11 @@ export const GastosList: React.FC<GastosListProps> = ({
                             <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded text-[11px] mb-0.5">
                               Doc: #{leg.sapDocEntry}
                             </span>
-                          ) : null}
+                          ) : (
+                            <span className="font-mono font-bold text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-[11px] mb-0.5">
+                              {leg.codigo}
+                            </span>
+                          )}
                           <span className="text-[10px] text-slate-400 font-medium">
                             {dateStr} {timeStr && `• ${timeStr}`}
                           </span>
