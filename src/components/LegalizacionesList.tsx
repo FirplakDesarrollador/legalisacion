@@ -170,6 +170,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
         <table className="w-full min-w-[1150px] text-left text-xs text-slate-700 whitespace-nowrap">
           <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
             <tr>
+              <th className="py-3.5 px-4 text-center">Acciones</th>
               <th className="py-3.5 px-4">Código / Fecha</th>
               <th className="py-3.5 px-4">Solicitante</th>
               <th className="py-3.5 px-4">Motivo / Centro Costo</th>
@@ -177,7 +178,6 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
               <th className="py-3.5 px-4 text-right">Total Gastos</th>
               <th className="py-3.5 px-4 text-right">Saldo Neto</th>
               <th className="py-3.5 px-4">Estado</th>
-              <th className="py-3.5 px-4 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -190,30 +190,6 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
             ) : (
               filtered.map((leg) => (
                 <tr key={leg.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <p className="font-bold text-blue-900 font-mono">{leg.codigo}</p>
-                    <p className="text-[10px] text-slate-400">{leg.fecha}</p>
-                  </td>
-                  <td className="py-3.5 px-4 font-semibold text-slate-900">
-                    {leg.usuarioNombre}
-                    <p className="text-[10px] text-slate-500 font-normal">{leg.usuarioEmail}</p>
-                  </td>
-                  <td className="py-3.5 px-4 max-w-xs">
-                    <p className="truncate font-medium text-slate-800">{leg.motivo}</p>
-                    <p className="text-[10px] text-blue-600 truncate font-semibold">{leg.centroCosto}</p>
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-mono text-slate-500">
-                    {formatCOP(leg.anticipoRecibido)}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
-                    {formatCOP(leg.totalGastos)}
-                  </td>
-                  <td className="py-3.5 px-4 text-right font-mono font-bold">
-                    <span className={leg.saldoDiferencia >= 0 ? 'text-emerald-600' : 'text-blue-600'}>
-                      {formatCOP(leg.saldoDiferencia)}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4">{getStatusPill(leg.estado)}</td>
                   <td className="py-3.5 px-4">
                     <div className="flex items-center justify-center gap-1.5">
                       <button
@@ -239,6 +215,30 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
                       </button>
                     </div>
                   </td>
+                  <td className="py-3.5 px-4">
+                    <p className="font-bold text-blue-900 font-mono">{leg.codigo}</p>
+                    <p className="text-[10px] text-slate-400">{leg.fecha}</p>
+                  </td>
+                  <td className="py-3.5 px-4 font-semibold text-slate-900">
+                    {leg.usuarioNombre}
+                    <p className="text-[10px] text-slate-500 font-normal">{leg.usuarioEmail}</p>
+                  </td>
+                  <td className="py-3.5 px-4 max-w-xs">
+                    <p className="truncate font-medium text-slate-800">{leg.motivo}</p>
+                    <p className="text-[10px] text-blue-600 truncate font-semibold">{leg.centroCosto}</p>
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-mono text-slate-500">
+                    {formatCOP(leg.anticipoRecibido)}
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
+                    {formatCOP(leg.totalGastos)}
+                  </td>
+                  <td className="py-3.5 px-4 text-right font-mono font-bold">
+                    <span className={leg.saldoDiferencia >= 0 ? 'text-emerald-600' : 'text-blue-600'}>
+                      {formatCOP(leg.saldoDiferencia)}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4">{getStatusPill(leg.estado)}</td>
                 </tr>
               ))
             )}

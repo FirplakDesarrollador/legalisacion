@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, UserPlus, Receipt } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, UserPlus, Receipt, Loader2, Send } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
+import { supabase } from '@/lib/supabase';
 
 interface GastosListProps {
   gastos: Legalizacion[];
@@ -21,6 +22,36 @@ export const GastosList: React.FC<GastosListProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'todas' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const handleEnviarSAP = async (leg: Legalizacion) => {
+    setSyncingId(leg.id);
+    try {
+      const res = await fetch('/api/sap/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leg),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.docEntry) {
+          supabase
+            .from('legalizaciones_gastos')
+            .update({ sap_doc_entry: data.docEntry })
+            .eq('id', leg.id)
+            .then(() => {});
+          leg.sapDocEntry = data.docEntry;
+        }
+        alert(`✅ Borrador de gasto creado exitosamente en SAP para ${leg.codigo} (DocEntry: ${data.docEntry || 'OK'})`);
+      } else {
+        alert(`❌ Error al enviar a SAP: ${data.message}`);
+      }
+    } catch (err: any) {
+      alert(`❌ Error de conexión con SAP: ${err.message}`);
+    } finally {
+      setSyncingId(null);
+    }
+  };
 
   const formatCOP = (num: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -213,24 +244,19 @@ export const GastosList: React.FC<GastosListProps> = ({
                             <Eye className="w-3.5 h-3.5" />
                           </button>
 
-                          {leg.estado === 'pendiente' && (
-                            <>
-                              <button
-                                onClick={() => onUpdateStatus(leg.id, 'aprobado')}
-                                className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors"
-                                title="Aprobar (Envía a SAP)"
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => onUpdateStatus(leg.id, 'rechazado')}
-                                className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
-                                title="Rechazar"
-                              >
-                                <XCircle className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
+                          {/* Botón Enviar a SAP */}
+                          <button
+                            onClick={() => handleEnviarSAP(leg)}
+                            disabled={syncingId === leg.id}
+                            className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors disabled:opacity-50 flex items-center gap-1"
+                            title="Enviar borrador a SAP Service Layer"
+                          >
+                            {syncingId === leg.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                            ) : (
+                              <Send className="w-3.5 h-3.5" />
+                            )}
+                          </button>
                         </div>
                       </td>
 
