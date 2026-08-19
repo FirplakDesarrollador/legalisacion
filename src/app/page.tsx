@@ -34,6 +34,7 @@ import {
   getLocalLegalizacionesGastos,
   saveLocalLegalizacionGasto,
   updateLegalizacionGastoStatus,
+  updateLegalizacionGastoGestionContable,
   getLocalCajasMenores,
   saveLocalCajaMenor,
   agregarMovimientoCaja,
@@ -226,6 +227,14 @@ export default function Home() {
     }
   };
 
+  const handleUpdateGastoGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado') => {
+    const updated = updateLegalizacionGastoGestionContable(id, gestion);
+    setGastos(updated);
+    if (selectedGasto && selectedGasto.id === id) {
+      setSelectedGasto((prev) => (prev ? { ...prev, gestionContable: gestion } : null));
+    }
+  };
+
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white text-xs">
@@ -333,6 +342,7 @@ export default function Home() {
               onSelectGasto={setSelectedGasto}
               onOpenNuevaModal={() => setIsNuevaGastoModalOpen(true)}
               onUpdateStatus={(id, st) => handleUpdateGastoStatus(id, st)}
+              onUpdateGestionContable={(id, g) => handleUpdateGastoGestionContable(id, g)}
             />
           )}
 

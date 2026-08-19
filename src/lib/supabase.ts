@@ -584,6 +584,8 @@ export async function fetchLegalizacionesGastosFromSupabase(): Promise<Legalizac
       saldoDiferencia: row.saldo_diferencia ?? row.saldoDiferencia ?? 0,
       observacionesAprobacion: row.observaciones_aprobacion || row.observacionesAprobacion,
       lineas: row.lineas || [],
+      gestionContable: row.gestion_contable || row.gestionContable || 'Por procesar',
+      fechaProcesado: row.fecha_procesado || row.fechaProcesado,
       created_at: row.created_at,
       updated_at: row.updated_at,
       fechaAprobacion: (row.estado === 'aprobado' || row.estado === 'pagado') ? (row.fecha_aprobacion || row.updated_at) : undefined,
@@ -790,11 +792,54 @@ export function saveLocalLegalizacionGasto(gasto: Legalizacion): Legalizacion[] 
     total_gastos: gasto.totalGastos,
     saldo_diferencia: gasto.saldoDiferencia,
     lineas: gasto.lineas,
+    gestion_contable: gasto.gestionContable || 'Por procesar',
+    fecha_procesado: gasto.fechaProcesado || null,
     created_at: gasto.created_at,
     updated_at: gasto.updated_at,
   }]).then(({ error }) => {
     if (error) {
       supabase.from('legalizaciones gastos').upsert([gasto]).then(() => {});
+    }
+  });
+
+  return updated;
+}
+
+export function updateLegalizacionGastoGestionContable(
+  id: string,
+  gestion: 'Por procesar' | 'Procesado',
+  fechaProcesado?: string | null
+): Legalizacion[] {
+  const current = getLocalLegalizacionesGastos();
+  const now = new Date().toISOString();
+  const updated = current.map(item => {
+    if (item.id === id) {
+      return {
+        ...item,
+        gestionContable: gestion,
+        fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? now : undefined),
+        updated_at: now
+      };
+    }
+    return item;
+  });
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify(updated));
+  }
+
+  // Update in Supabase
+  supabase.from('legalizaciones_gastos').update({
+    gestion_contable: gestion,
+    fecha_procesado: fechaProcesado !== undefined ? fechaProcesado : (gestion === 'Procesado' ? now : null),
+    updated_at: now
+  }).eq('id', id).then(({ error }) => {
+    if (error) {
+      supabase.from('legalizaciones gastos').update({
+        gestion_contable: gestion,
+        fecha_procesado: fechaProcesado !== undefined ? fechaProcesado : (gestion === 'Procesado' ? now : null),
+        updated_at: now
+      }).eq('id', id).then(() => {});
     }
   });
 

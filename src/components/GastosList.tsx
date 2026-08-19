@@ -9,6 +9,7 @@ interface GastosListProps {
   onSelectGasto: (gasto: Legalizacion) => void;
   onOpenNuevaModal: () => void;
   onUpdateStatus: (id: string, estado: Legalizacion['estado']) => void;
+  onUpdateGestionContable?: (id: string, gestion: 'Por procesar' | 'Procesado') => void;
 }
 
 export const GastosList: React.FC<GastosListProps> = ({
@@ -16,6 +17,7 @@ export const GastosList: React.FC<GastosListProps> = ({
   onSelectGasto,
   onOpenNuevaModal,
   onUpdateStatus,
+  onUpdateGestionContable,
 }) => {
   const [activeTab, setActiveTab] = useState<'todas' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
@@ -150,13 +152,14 @@ export const GastosList: React.FC<GastosListProps> = ({
                 <th className="py-3.5 px-4 text-right">Total Gastos</th>
                 <th className="py-3.5 px-4 text-right">Saldo Neto</th>
                 <th className="py-3.5 px-4">Estado</th>
+                <th className="py-3.5 px-4">Gestión Contable</th>
                 <th className="py-3.5 px-4 text-center">Borrador / Fecha Creación</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={9} className="py-8 text-center text-slate-400">
                     No hay legalizaciones de gastos para mostrar en este estado.
                   </td>
                 </tr>
@@ -223,6 +226,21 @@ export const GastosList: React.FC<GastosListProps> = ({
                       </td>
 
                       <td className="py-3.5 px-4">{getStatusPill(leg.estado)}</td>
+
+                      <td className="py-3.5 px-4">
+                        <select
+                          value={leg.gestionContable ?? 'Por procesar'}
+                          onChange={(e) => onUpdateGestionContable?.(leg.id, e.target.value as 'Por procesar' | 'Procesado')}
+                          className={`text-[11px] font-bold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none focus:ring-2 shadow-xs ${
+                            (leg.gestionContable ?? 'Por procesar') === 'Procesado'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-500 hover:bg-emerald-100'
+                              : 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-500 hover:bg-amber-100'
+                          }`}
+                        >
+                          <option value="Por procesar">⏳ Por procesar</option>
+                          <option value="Procesado">✅ Procesado</option>
+                        </select>
+                      </td>
 
                       <td className="py-3.5 px-4 text-center">
                         <div className="flex flex-col items-center justify-center">
