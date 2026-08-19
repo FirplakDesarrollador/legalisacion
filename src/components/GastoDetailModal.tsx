@@ -96,7 +96,9 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold tracking-tight">{gasto.codigo}</h2>
+                <h2 className="text-base font-bold tracking-tight">
+                  {gasto.sapDocEntry ? `SAP #${gasto.sapDocEntry}` : gasto.codigo}
+                </h2>
                 <span className="text-xs text-blue-200 font-normal">| {gasto.fecha}</span>
               </div>
               <p className="text-xs text-blue-100">{gasto.motivo || 'Legalización de Gastos'}</p>

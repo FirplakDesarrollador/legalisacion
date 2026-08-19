@@ -201,7 +201,9 @@ export const GastosList: React.FC<GastosListProps> = ({
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <p className="font-bold text-blue-900 font-mono">{leg.codigo}</p>
+                        <p className="font-bold text-blue-900 font-mono">
+                          {leg.sapDocEntry ? `SAP #${leg.sapDocEntry}` : leg.codigo}
+                        </p>
                         <p className="text-[10px] text-slate-400">{leg.fecha}</p>
                       </td>
 

@@ -183,12 +183,22 @@ export default function FormularioGastosPublicoPage() {
     }
 
     const cleanLineas = lineas.map(({ soporteFile, ...rest }) => rest);
-    const randomNum = Math.floor(100 + Math.random() * 900);
-    const codigo = `LEG-GST-${randomNum}`;
+    let assignedCodigo = `LEG-${Math.floor(100 + Math.random() * 900)}`;
+    try {
+      const numRes = await fetch('/api/sap/next-number');
+      if (numRes.ok) {
+        const numData = await numRes.json();
+        if (numData.codigo) {
+          assignedCodigo = numData.codigo;
+        }
+      }
+    } catch {
+      // fallback
+    }
 
     const nuevaLeg: Legalizacion = {
       id: `leg-gst-${Date.now()}`,
-      codigo,
+      codigo: assignedCodigo,
       fecha,
       usuarioNombre,
       usuarioEmail,
@@ -214,7 +224,7 @@ export default function FormularioGastosPublicoPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           correo: usuarioEmail,
-          titulo: `Aprobación de Legalización de Gastos - ${codigo}`,
+          titulo: `Aprobación de Legalización de Gastos - ${assignedCodigo}`,
           contenido: `Tienes esta legalización de gastos pendiente por aprobar de ${usuarioNombre} por valor de ${formatCOP(totalGastos)}.`,
           link: link,
         }),
@@ -223,7 +233,7 @@ export default function FormularioGastosPublicoPage() {
       console.error('Error enviando notificación al proxy:', flowErr);
     }
 
-    setLastCodigo(codigo);
+    setLastCodigo(assignedCodigo);
     setSubmitted(true);
   };
 

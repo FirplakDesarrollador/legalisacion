@@ -208,7 +208,7 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
             </div>
             <div>
               <h1 className="text-lg font-bold text-white tracking-tight">
-                Aprobación de Legalización de Gastos &bull; {legalizacion.codigo}
+                Aprobación de Legalización de Gastos &bull; {legalizacion.sapDocEntry ? `SAP #${legalizacion.sapDocEntry}` : legalizacion.codigo}
               </h1>
               <p className="text-xs text-slate-400">
                 Sistema Corporativo Firplak S.A.S &bull; Portal de Aprobación

@@ -163,7 +163,7 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
   const totalGastos = lineas.reduce((acc, l) => acc + (l.valorTotal || 0), 0);
   const saldoDiferencia = totalGastos - anticipoRecibido;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!usuarioNombre.trim()) {
       alert('Por favor ingrese el nombre del solicitante.');
@@ -174,10 +174,22 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
       return;
     }
 
-    const randomNum = Math.floor(100 + Math.random() * 900);
+    let assignedCodigo = `LEG-${Math.floor(100 + Math.random() * 900)}`;
+    try {
+      const numRes = await fetch('/api/sap/next-number');
+      if (numRes.ok) {
+        const numData = await numRes.json();
+        if (numData.codigo) {
+          assignedCodigo = numData.codigo;
+        }
+      }
+    } catch {
+      // fallback
+    }
+
     const nuevaLeg: Legalizacion = {
       id: `leg-gasto-${Date.now()}`,
-      codigo: `LEG-GST-${randomNum}`,
+      codigo: assignedCodigo,
       fecha,
       usuarioNombre,
       usuarioEmail,
