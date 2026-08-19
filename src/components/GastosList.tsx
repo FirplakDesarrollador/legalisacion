@@ -146,7 +146,7 @@ export const GastosList: React.FC<GastosListProps> = ({
                 <th className="py-3.5 px-4 text-center">Acciones</th>
                 <th className="py-3.5 px-4">Código / Fecha</th>
                 <th className="py-3.5 px-4">Solicitante</th>
-                <th className="py-3.5 px-4">Motivo / Centro Costo</th>
+                <th className="py-3.5 px-4">Observaciones</th>
                 <th className="py-3.5 px-4 text-right">Anticipo</th>
                 <th className="py-3.5 px-4 text-right">Total Gastos</th>
                 <th className="py-3.5 px-4 text-right">Saldo Neto</th>
@@ -214,7 +214,6 @@ export const GastosList: React.FC<GastosListProps> = ({
 
                       <td className="py-3.5 px-4 max-w-xs">
                         <p className="truncate font-medium text-slate-800">{leg.motivo || 'Legalización de Gastos'}</p>
-                        <p className="text-[10px] text-blue-600 truncate font-semibold">{leg.centroCosto}</p>
                       </td>
 
                       <td className="py-3.5 px-4 text-right font-mono text-slate-500">

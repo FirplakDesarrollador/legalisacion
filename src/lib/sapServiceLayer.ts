@@ -210,7 +210,7 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       U_Estado: 1, // 1 = Borrador
       U_CardCode: headerCardCode, 
       U_CardName: headerCardName,
-      U_ProfitCode: realProfitCode, // Dimensión 1 en encabezado, truncado o validado
+      U_ProfitCode: undefined, // No asignar Dimensión 1 en el encabezado
       U_Comentario: `Borrador Legalización ${legalizacion.codigo} - ${legalizacion.motivo}`,
       U_TipoContabi: 'Comun',
       U_DocRate: 1,
@@ -296,7 +296,7 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
         U_Fecha: new Date().toISOString().split('T')[0],
         U_CardCode: realCardCode,
         U_CardName: realCardName,
-        U_ProfitCode: isSoporte ? undefined : (lineProfitCode || realProfitCode),
+        U_ProfitCode: isSoporte ? undefined : (lineProfitCode || undefined),
         U_CodeConcepto: isSoporte ? 'importar saldo' : acctCode,
         U_IdDocumento: isSoporte ? undefined : (linea.facturaNumero || 'ND'),
         U_AcctCode: isSoporte ? undefined : acctCode,
@@ -372,8 +372,8 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
             Quantity: 1,
             UnitPrice: l.valorSubtotal,
             TaxCode: taxCode,
-            CostingCode: lineProfitCode || realProfitCode || undefined,
-            U_CentroCostos: lineProfitCode || realProfitCode || undefined,
+            CostingCode: lineProfitCode || undefined,
+            U_CentroCostos: lineProfitCode || undefined,
           });
         }
 
