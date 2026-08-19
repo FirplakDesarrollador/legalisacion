@@ -10,6 +10,9 @@ import { NuevaLegalizacionModal } from '@/components/NuevaLegalizacionModal';
 import { TarjetasCreditoList } from '@/components/TarjetasCreditoList';
 import { TarjetaCreditoDetailModal } from '@/components/TarjetaCreditoDetailModal';
 import { NuevaTarjetaCreditoModal } from '@/components/NuevaTarjetaCreditoModal';
+import { GastosList } from '@/components/GastosList';
+import { GastoDetailModal } from '@/components/GastoDetailModal';
+import { NuevaGastoModal } from '@/components/NuevaGastoModal';
 import { ProveedoresTable } from '@/components/ProveedoresTable';
 import { CuentasTable } from '@/components/CuentasTable';
 import { ReportesView } from '@/components/ReportesView';
@@ -27,6 +30,10 @@ import {
   saveLocalTarjetaCredito,
   updateTarjetaCreditoStatus,
   fetchLegalizacionesTarjetasCreditoFromSupabase,
+  fetchLegalizacionesGastosFromSupabase,
+  getLocalLegalizacionesGastos,
+  saveLocalLegalizacionGasto,
+  updateLegalizacionGastoStatus,
   getLocalCajasMenores,
   saveLocalCajaMenor,
   agregarMovimientoCaja,
@@ -48,6 +55,7 @@ export default function Home() {
   // Data states
   const [legalizaciones, setLegalizaciones] = useState<Legalizacion[]>([]);
   const [tarjetasCredito, setTarjetasCredito] = useState<TarjetaCredito[]>([]);
+  const [gastos, setGastos] = useState<Legalizacion[]>([]);
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [loadingSupabase, setLoadingSupabase] = useState(true);
@@ -58,6 +66,10 @@ export default function Home() {
   
   const [isNuevaTarjetaModalOpen, setIsNuevaTarjetaModalOpen] = useState(false);
   const [selectedTarjetaCredito, setSelectedTarjetaCredito] = useState<TarjetaCredito | null>(null);
+
+  const [isNuevaGastoModalOpen, setIsNuevaGastoModalOpen] = useState(false);
+  const [selectedGasto, setSelectedGasto] = useState<Legalizacion | null>(null);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Check active Supabase session on mount
@@ -92,20 +104,29 @@ export default function Home() {
     localStorage.setItem('legalisa_active_user', JSON.stringify(userObj));
   };
 
-  // Setup deep linking for Tarjetas de Crédito
+  // Setup deep linking for Tarjetas de Crédito and Gastos
   useEffect(() => {
-    if (typeof window !== 'undefined' && tarjetasCredito.length > 0) {
+    if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const tcId = params.get('tc_id');
-      if (tcId) {
+      if (tcId && tarjetasCredito.length > 0) {
         const found = tarjetasCredito.find(tc => tc.id === tcId || tc.codigo === tcId);
         if (found && !selectedTarjetaCredito) {
           setActiveTab('cajas_menores');
           setSelectedTarjetaCredito(found);
         }
       }
+
+      const gastoId = params.get('gasto_id');
+      if (gastoId && gastos.length > 0) {
+        const foundGasto = gastos.find(g => g.id === gastoId || g.codigo === gastoId);
+        if (foundGasto && !selectedGasto) {
+          setActiveTab('gastos');
+          setSelectedGasto(foundGasto);
+        }
+      }
     }
-  }, [tarjetasCredito, selectedTarjetaCredito]);
+  }, [tarjetasCredito, selectedTarjetaCredito, gastos, selectedGasto]);
 
   // Logout handler
   const handleLogout = () => {
@@ -117,12 +138,13 @@ export default function Home() {
   const loadSupabaseData = useCallback(async () => {
     setLoadingSupabase(true);
     try {
-      const [hResult, cData, pData, tcData, legData] = await Promise.all([
+      const [hResult, cData, pData, tcData, legData, gastosData] = await Promise.all([
         checkSupabaseHealth(),
         fetchCuentasFromSupabase(),
         fetchProveedoresFromSupabase(),
         fetchLegalizacionesTarjetasCreditoFromSupabase(),
         fetchLegalizacionesFromSupabase(),
+        fetchLegalizacionesGastosFromSupabase(),
       ]);
 
       setHealth(hResult);
@@ -135,6 +157,12 @@ export default function Home() {
         setLegalizaciones(legData);
         if (typeof window !== 'undefined') {
           localStorage.setItem('app_legalizaciones_data_v1', JSON.stringify(legData));
+        }
+      }
+      if (gastosData && gastosData.length > 0) {
+        setGastos(gastosData);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('app_legalizaciones_gastos_data_v1', JSON.stringify(gastosData));
         }
       }
     } catch (err) {
@@ -151,6 +179,7 @@ export default function Home() {
         setLegalizaciones(localLegs);
       }
       setTarjetasCredito(getLocalTarjetasCredito());
+      setGastos(getLocalLegalizacionesGastos());
       loadSupabaseData();
     }
   }, [currentUser, loadSupabaseData]);
@@ -180,6 +209,20 @@ export default function Home() {
     setTarjetasCredito(updated);
     if (selectedTarjetaCredito && selectedTarjetaCredito.id === id) {
       setSelectedTarjetaCredito((prev) => (prev ? { ...prev, estado: nuevoEstado, observacionesAprobacion: observaciones } : null));
+    }
+  };
+
+  const handleSaveNuevaGasto = (nueva: Legalizacion) => {
+    setGastos((prev) => [nueva, ...prev.filter((g) => g.id !== nueva.id)]);
+    saveLocalLegalizacionGasto(nueva);
+    setActiveTab('gastos');
+  };
+
+  const handleUpdateGastoStatus = (id: string, nuevoEstado: Legalizacion['estado'], observaciones?: string) => {
+    const updated = updateLegalizacionGastoStatus(id, nuevoEstado, observaciones);
+    setGastos(updated);
+    if (selectedGasto && selectedGasto.id === id) {
+      setSelectedGasto((prev) => (prev ? { ...prev, estado: nuevoEstado, observacionesAprobacion: observaciones } : null));
     }
   };
 
@@ -218,12 +261,17 @@ export default function Home() {
         <Sidebar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
-          onOpenNuevaModal={() => setIsNuevaModalOpen(true)}
+          onOpenNuevaModal={() => {
+            if (activeTab === 'gastos') setIsNuevaGastoModalOpen(true);
+            else if (activeTab === 'cajas_menores') setIsNuevaTarjetaModalOpen(true);
+            else setIsNuevaModalOpen(true);
+          }}
           isOpen={isSidebarOpen}
           onToggle={() => setIsSidebarOpen((prev) => !prev)}
           counts={{
             legalizaciones: legalizaciones.length,
             cajasMenores: tarjetasCredito.length,
+            gastos: gastos.length,
             cuentas: cuentas.length,
             proveedores: proveedores.length,
           }}
@@ -276,6 +324,15 @@ export default function Home() {
               onSelectTarjetaCredito={setSelectedTarjetaCredito}
               onOpenNuevaModal={() => window.open('/formulario-tarjetas-credito', '_blank')}
               onUpdateStatus={(id, st) => handleUpdateStatusTarjeta(id, st)}
+            />
+          )}
+
+          {activeTab === 'gastos' && (
+            <GastosList
+              gastos={gastos}
+              onSelectGasto={setSelectedGasto}
+              onOpenNuevaModal={() => setIsNuevaGastoModalOpen(true)}
+              onUpdateStatus={(id, st) => handleUpdateGastoStatus(id, st)}
             />
           )}
 
@@ -338,6 +395,24 @@ export default function Home() {
           tarjetaCredito={selectedTarjetaCredito}
           onClose={() => setSelectedTarjetaCredito(null)}
           onUpdateStatus={handleUpdateStatusTarjeta}
+        />
+      )}
+
+      {isNuevaGastoModalOpen && (
+        <NuevaGastoModal
+          isOpen={isNuevaGastoModalOpen}
+          onClose={() => setIsNuevaGastoModalOpen(false)}
+          cuentas={cuentas}
+          proveedores={proveedores}
+          onSave={handleSaveNuevaGasto}
+        />
+      )}
+
+      {selectedGasto && (
+        <GastoDetailModal
+          gasto={selectedGasto}
+          onClose={() => setSelectedGasto(null)}
+          onUpdateStatus={handleUpdateGastoStatus}
         />
       )}
     </div>

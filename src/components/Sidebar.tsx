@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Wallet, PlusCircle, SlidersHorizontal, Copy, ExternalLink, Check, PanelLeftClose } from 'lucide-react';
+import { Wallet, PlusCircle, SlidersHorizontal, Copy, ExternalLink, Check, PanelLeftClose, Receipt } from 'lucide-react';
 
-export type TabType = 'cajas_menores' | 'dashboard' | 'legalizaciones' | 'cuentas' | 'proveedores' | 'reportes';
+export type TabType = 'cajas_menores' | 'dashboard' | 'legalizaciones' | 'gastos' | 'cuentas' | 'proveedores' | 'reportes';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -12,6 +12,7 @@ interface SidebarProps {
   counts: {
     legalizaciones: number;
     cajasMenores: number;
+    gastos?: number;
     cuentas: number;
     proveedores: number;
   };
@@ -46,11 +47,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Wallet,
       badge: counts.cajasMenores,
     },
+    {
+      id: 'gastos' as TabType,
+      label: 'Legalizaciones de gastos',
+      icon: Receipt,
+      badge: counts.gastos ?? 0,
+    },
   ];
 
   const handleCopyFormLink = () => {
-    const isTC = activeTab === 'cajas_menores'; // 'cajas_menores' id corresponds to Tarjetas de Credito
-    const url = `${window.location.origin}${isTC ? '/formulario-tarjetas-credito' : '/formulario-publico'}`;
+    let path = '/formulario-publico';
+    if (activeTab === 'cajas_menores') path = '/formulario-tarjetas-credito';
+    if (activeTab === 'gastos') path = '/formulario-gastos';
+    const url = `${window.location.origin}${path}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -126,6 +135,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-[10px] flex items-center gap-1.5">Tarjetas de Crédito</span>
               <a href="/formulario-tarjetas-credito" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5 text-[10px]">
+                Abrir <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] flex items-center gap-1.5">Legalización de Gastos</span>
+              <a href="/formulario-gastos" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-0.5 text-[10px]">
                 Abrir <ExternalLink className="w-3 h-3" />
               </a>
             </div>

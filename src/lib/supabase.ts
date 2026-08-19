@@ -452,6 +452,61 @@ export async function fetchLegalizacionesTarjetasCreditoFromSupabase(): Promise<
   }
 }
 
+export async function fetchLegalizacionesGastosFromSupabase(): Promise<Legalizacion[]> {
+  try {
+    let { data, error } = await supabase
+      .from('legalizaciones_gastos')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      // Fallback if table name uses space
+      const res2 = await supabase
+        .from('legalizaciones gastos')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!res2.error && res2.data) {
+        data = res2.data;
+        error = null;
+      }
+    }
+
+    if (error) {
+      console.warn('Info: Tabla legalizaciones_gastos no encontrada en Supabase, usando local.');
+      return getLocalLegalizacionesGastos();
+    }
+
+    const parsed = (data || []).map((row: any) => ({
+      id: row.id,
+      codigo: row.codigo,
+      fecha: row.fecha,
+      usuarioNombre: row.usuario_nombre || row.usuarioNombre,
+      usuarioEmail: row.usuario_email || row.usuarioEmail,
+      centroCosto: row.centro_costo || row.centroCosto,
+      motivo: row.motivo,
+      estado: row.estado,
+      anticipoRecibido: row.anticipo_recibido ?? row.anticipoRecibido ?? 0,
+      totalGastos: row.total_gastos ?? row.totalGastos ?? 0,
+      saldoDiferencia: row.saldo_diferencia ?? row.saldoDiferencia ?? 0,
+      observacionesAprobacion: row.observaciones_aprobacion || row.observacionesAprobacion,
+      lineas: row.lineas || [],
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      fechaAprobacion: (row.estado === 'aprobado' || row.estado === 'pagado') ? (row.fecha_aprobacion || row.updated_at) : undefined,
+      aprobadorNombre: row.aprobador_nombre || row.aprobadorNombre,
+      aprobadorEmail: row.aprobador_email || row.aprobadorEmail,
+      sapDocEntry: row.sap_doc_entry || row.sapDocEntry,
+    })) as Legalizacion[];
+
+    if (typeof window !== 'undefined' && parsed.length > 0) {
+      localStorage.setItem('app_legalizaciones_gastos_data_v1', JSON.stringify(parsed));
+    }
+    return parsed;
+  } catch {
+    return getLocalLegalizacionesGastos();
+  }
+}
+
 export async function fetchTarjetasCreditoResponsablesFromSupabase(): Promise<any[]> {
   try {
     const { data, error } = await supabase
@@ -591,6 +646,101 @@ export function updateTarjetaCreditoStatus(id: string, nuevoEstado: Legalizacion
   if (typeof window !== 'undefined') {
     localStorage.setItem(TARJETAS_STORAGE_KEY, JSON.stringify(updated));
   }
+  return updated;
+}
+
+// Legalizaciones de Gastos Storage & Sync
+const GASTOS_STORAGE_KEY = 'app_legalizaciones_gastos_data_v1';
+
+export function getLocalLegalizacionesGastos(): Legalizacion[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(GASTOS_STORAGE_KEY);
+    if (!raw) {
+      localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify([]));
+      return [];
+    }
+    return JSON.parse(raw) as Legalizacion[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalLegalizacionGasto(gasto: Legalizacion): Legalizacion[] {
+  const current = getLocalLegalizacionesGastos();
+  const existingIdx = current.findIndex(item => item.id === gasto.id);
+  let updated: Legalizacion[];
+
+  if (existingIdx >= 0) {
+    updated = [...current];
+    updated[existingIdx] = { ...gasto, updated_at: new Date().toISOString() };
+  } else {
+    updated = [{ ...gasto, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, ...current];
+  }
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify(updated));
+  }
+
+  // Attempt save to Supabase tables
+  supabase.from('legalizaciones_gastos').upsert([{
+    id: gasto.id,
+    codigo: gasto.codigo,
+    fecha: gasto.fecha,
+    usuario_nombre: gasto.usuarioNombre,
+    usuario_email: gasto.usuarioEmail,
+    centro_costo: gasto.centroCosto,
+    motivo: gasto.motivo,
+    estado: gasto.estado,
+    anticipo_recibido: gasto.anticipoRecibido,
+    total_gastos: gasto.totalGastos,
+    saldo_diferencia: gasto.saldoDiferencia,
+    lineas: gasto.lineas,
+    created_at: gasto.created_at,
+    updated_at: gasto.updated_at,
+  }]).then(({ error }) => {
+    if (error) {
+      supabase.from('legalizaciones gastos').upsert([gasto]).then(() => {});
+    }
+  });
+
+  return updated;
+}
+
+export function updateLegalizacionGastoStatus(id: string, nuevoEstado: Legalizacion['estado'], observaciones?: string): Legalizacion[] {
+  const current = getLocalLegalizacionesGastos();
+  const now = new Date().toISOString();
+  const updated = current.map(item => {
+    if (item.id === id) {
+      return {
+        ...item,
+        estado: nuevoEstado,
+        observacionesAprobacion: observaciones || item.observacionesAprobacion,
+        fechaAprobacion: nuevoEstado === 'aprobado' ? now : item.fechaAprobacion,
+        updated_at: now
+      };
+    }
+    return item;
+  });
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify(updated));
+  }
+
+  supabase.from('legalizaciones_gastos').update({
+    estado: nuevoEstado,
+    observaciones_aprobacion: observaciones,
+    updated_at: now
+  }).eq('id', id).then(({ error }) => {
+    if (error) {
+      supabase.from('legalizaciones gastos').update({
+        estado: nuevoEstado,
+        observacionesAprobacion: observaciones,
+        updated_at: now
+      }).eq('id', id).then(() => {});
+    }
+  });
+
   return updated;
 }
 
