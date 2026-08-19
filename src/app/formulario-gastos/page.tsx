@@ -562,7 +562,7 @@ export default function FormularioGastosPublicoPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">NIT del Proveedor *</label>
                           <input
@@ -582,19 +582,7 @@ export default function FormularioGastosPublicoPage() {
                             ))}
                           </datalist>
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Razón Social / Nombre Proveedor</label>
-                          <input
-                            type="text"
-                            placeholder="Ej. Almacenes Éxito S.A."
-                            value={linea.proveedorNombre || ''}
-                            onChange={(e) => handleUpdateLinea(linea.id, 'proveedorNombre', e.target.value)}
-                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 text-xs"
-                          />
-                        </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Centro de Costos *</label>
                           <select
@@ -604,7 +592,7 @@ export default function FormularioGastosPublicoPage() {
                               handleUpdateLinea(linea.id, 'concepto', e.target.value);
                               handleUpdateLinea(linea.id, 'cuentaId', null);
                             }}
-                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold focus:outline-none focus:border-blue-600"
+                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold focus:outline-none focus:border-blue-600 text-xs"
                           >
                             <option value="" disabled>-- Seleccione Centro de Costo --</option>
                             {centros.map((c) => (
@@ -614,12 +602,13 @@ export default function FormularioGastosPublicoPage() {
                             ))}
                           </select>
                         </div>
+
                         <div>
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase) *</label>
                           <select
                             value={linea.cuentaId || ''}
                             onChange={(e) => handleUpdateLinea(linea.id, 'cuentaId', e.target.value)}
-                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-blue-900 font-mono font-semibold"
+                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-blue-900 font-mono font-semibold text-xs"
                             required
                           >
                             <option value="" disabled>-- Seleccione Cuenta Contable --</option>
