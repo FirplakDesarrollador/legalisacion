@@ -866,6 +866,23 @@ export function updateLegalizacionGastoStatus(id: string, nuevoEstado: Legalizac
     localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify(updated));
   }
 
+  // Update in Supabase
+  supabase.from('legalizaciones_gastos').update({
+    estado: nuevoEstado,
+    observaciones_aprobacion: observaciones || null,
+    fecha_aprobacion: nuevoEstado === 'aprobado' ? now : undefined,
+    updated_at: now
+  }).eq('id', id).then(({ error }) => {
+    if (error) {
+      supabase.from('legalizaciones gastos').update({
+        estado: nuevoEstado,
+        observaciones_aprobacion: observaciones || null,
+        fecha_aprobacion: nuevoEstado === 'aprobado' ? now : undefined,
+        updated_at: now
+      }).eq('id', id).then(() => {});
+    }
+  });
+
   if (nuevoEstado === 'aprobado') {
     const approvedGasto = current.find(item => item.id === id);
     if (approvedGasto) {

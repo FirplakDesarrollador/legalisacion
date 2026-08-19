@@ -30,6 +30,32 @@ export const GastosList: React.FC<GastosListProps> = ({
     }).format(num);
   };
 
+  const formatFecha = (iso?: string) => {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleDateString('es-CO', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return iso;
+    }
+  };
+
+  const formatHora = (iso?: string) => {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleTimeString('es-CO', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return '';
+    }
+  };
+
   const filtered = gastos.filter((l) => {
     const matchesTab = activeTab === 'todas' ? true : l.estado === activeTab;
     const term = searchTerm.toLowerCase();
@@ -70,68 +96,37 @@ export const GastosList: React.FC<GastosListProps> = ({
     }
   };
 
-  const counts = {
-    todas: gastos.length,
-    pendiente: gastos.filter((l) => l.estado === 'pendiente').length,
-    aprobado: gastos.filter((l) => l.estado === 'aprobado').length,
-    rechazado: gastos.filter((l) => l.estado === 'rechazado').length,
-  };
-
   return (
     <div className="space-y-4">
-      {/* Top Header Filters & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-          {(['todas', 'pendiente', 'aprobado', 'rechazado'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all flex items-center gap-1.5 ${
-                activeTab === tab
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-              }`}
-            >
-              <span>{tab === 'todas' ? 'Todas' : tab === 'pendiente' ? 'Pendientes' : tab === 'aprobado' ? 'Aprobadas' : 'Rechazadas'}</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  activeTab === tab ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
-                }`}
-              >
-                {counts[tab]}
-              </span>
-            </button>
-          ))}
+      {/* Header with Title & Action */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-600">
+            <Receipt className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+              Legalizaciones de Gastos
+            </h2>
+            <p className="text-xs text-slate-500">
+              Control de gastos de viaje, viáticos y representación con imputación contable
+            </p>
+          </div>
         </div>
 
-        {/* Search & Actions */}
-        <div className="flex items-center gap-2.5 flex-1 max-w-md justify-end">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Buscar por código o solicitante..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-            />
-          </div>
-
+        <div className="flex items-center gap-2">
           <a
             href="https://ingreso-provedores.vercel.app/registro?tipo=contado"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all shrink-0"
-            title="Crear proveedor de contado"
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Crear proveedor de contado</span>
           </a>
-
           <button
             onClick={onOpenNuevaModal}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-blue-600/20 transition-all shrink-0"
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
           >
             <PlusCircle className="w-3.5 h-3.5" />
             <span>Nueva</span>
@@ -139,10 +134,45 @@ export const GastosList: React.FC<GastosListProps> = ({
         </div>
       </div>
 
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto overflow-x-auto">
+          {(['todas', 'pendiente', 'aprobado', 'rechazado'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all whitespace-nowrap ${
+                activeTab === tab
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {tab === 'todas' ? 'Todas' : tab === 'pendiente' ? 'Pendientes' : tab === 'aprobado' ? 'Aprobadas' : 'Rechazadas'}{' '}
+              <span className={`text-[10px] ml-1 px-1.5 py-0.2 rounded-full ${
+                activeTab === tab ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {tab === 'todas' ? gastos.length : gastos.filter((l) => l.estado === tab).length}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Buscar por código, solicitante, motivo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 shadow-xs"
+          />
+        </div>
+      </div>
+
       {/* Main Table View */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs min-w-[1100px]">
+          <table className="w-full text-left text-xs min-w-[1250px]">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[10px]">
               <tr>
                 <th className="py-3.5 px-4 text-center">Acciones</th>
@@ -153,13 +183,15 @@ export const GastosList: React.FC<GastosListProps> = ({
                 <th className="py-3.5 px-4 text-right">Saldo Neto</th>
                 <th className="py-3.5 px-4">Estado</th>
                 <th className="py-3.5 px-4">Gestión Contable</th>
+                <th className="py-3.5 px-4">Fecha de Aprobación</th>
+                <th className="py-3.5 px-4">Fecha de Procesado</th>
                 <th className="py-3.5 px-4 text-center">Borrador / Fecha Creación</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
+                  <td colSpan={11} className="py-8 text-center text-slate-400">
                     No hay legalizaciones de gastos para mostrar en este estado.
                   </td>
                 </tr>
@@ -240,6 +272,36 @@ export const GastosList: React.FC<GastosListProps> = ({
                           <option value="Por procesar">⏳ Por procesar</option>
                           <option value="Procesado">✅ Procesado</option>
                         </select>
+                      </td>
+
+                      <td className="py-3.5 px-4 text-slate-700">
+                        {leg.estado === 'aprobado' || leg.estado === 'pagado' ? (
+                          <div>
+                            <p className="font-semibold text-emerald-800">
+                              {formatFecha(leg.fechaAprobacion || leg.updated_at)}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {formatHora(leg.fechaAprobacion || leg.updated_at)}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-[11px] font-mono">—</span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-slate-700">
+                        {leg.gestionContable === 'Procesado' && leg.fechaProcesado ? (
+                          <div>
+                            <p className="font-semibold text-blue-900">
+                              {formatFecha(leg.fechaProcesado)}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {formatHora(leg.fechaProcesado)}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-[11px] font-mono">—</span>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
