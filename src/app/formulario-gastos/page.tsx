@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle2, Calculator, Plus, Trash2, Database, Send, UserCheck, Paperclip, ExternalLink, Receipt } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ShieldCheck, CheckCircle2, Calculator, Plus, Trash2, Database, Send, UserCheck, Paperclip, ExternalLink, Receipt, ChevronDown, User, Mail } from 'lucide-react';
 import {
   fetchCuentasFromSupabase,
   fetchProveedoresFromSupabase,
   fetchCentrosCostoFromSupabase,
+  fetchOrganizationUsers,
+  OrganizationUser,
   saveLocalLegalizacionGasto,
   supabase
 } from '@/lib/supabase';
@@ -15,6 +17,7 @@ export default function FormularioGastosPublicoPage() {
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [centros, setCentros] = useState<CentroCosto[]>([]);
+  const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [lastCodigo, setLastCodigo] = useState('');
@@ -26,6 +29,15 @@ export default function FormularioGastosPublicoPage() {
   const [motivo, setMotivo] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
+
+  // Dropdowns search
+  const [showSolicitanteDropdown, setShowSolicitanteDropdown] = useState(false);
+  const [solicitanteSearch, setSolicitanteSearch] = useState('');
+  const solicitanteRef = useRef<HTMLDivElement>(null);
+
+  const [showAprobadorDropdown, setShowAprobadorDropdown] = useState(false);
+  const [aprobadorSearch, setAprobadorSearch] = useState('');
+  const aprobadorRef = useRef<HTMLDivElement>(null);
 
   const [lineas, setLineas] = useState<LineaGasto[]>([
     {
@@ -46,14 +58,16 @@ export default function FormularioGastosPublicoPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [cData, pData, centrosData] = await Promise.all([
+        const [cData, pData, centrosData, usersData] = await Promise.all([
           fetchCuentasFromSupabase(),
           fetchProveedoresFromSupabase(),
           fetchCentrosCostoFromSupabase(),
+          fetchOrganizationUsers(),
         ]);
         setCuentas(cData);
         setProveedores(pData);
         setCentros(centrosData);
+        setOrgUsers(usersData);
       } catch (err) {
         console.error('Error cargando catálogos de Supabase:', err);
       } finally {
@@ -61,6 +75,20 @@ export default function FormularioGastosPublicoPage() {
       }
     }
     loadData();
+  }, []);
+
+  // Click outside to close dropdowns
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (solicitanteRef.current && !solicitanteRef.current.contains(e.target as Node)) {
+        setShowSolicitanteDropdown(false);
+      }
+      if (aprobadorRef.current && !aprobadorRef.current.contains(e.target as Node)) {
+        setShowAprobadorDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const formatCOP = (num: number) => {
@@ -269,28 +297,114 @@ export default function FormularioGastosPublicoPage() {
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Nombre Completo *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ej. Juan Pérez"
-                      value={usuarioNombre}
-                      onChange={(e) => setUsuarioNombre(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
-                    />
+                  {/* Searchable Solicitante Field */}
+                  <div className="relative" ref={solicitanteRef}>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Nombre Completo (Microsoft M365) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        value={usuarioNombre}
+                        onFocus={() => {
+                          setShowSolicitanteDropdown(true);
+                          setSolicitanteSearch(usuarioNombre);
+                        }}
+                        onChange={(e) => {
+                          setUsuarioNombre(e.target.value);
+                          setSolicitanteSearch(e.target.value);
+                          setShowSolicitanteDropdown(true);
+                        }}
+                        placeholder="Escriba o seleccione solicitante..."
+                        className="w-full p-2.5 pr-8 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
+                      />
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+
+                    {showSolicitanteDropdown && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                        {orgUsers
+                          .filter((u) => {
+                            const term = (solicitanteSearch || usuarioNombre).toLowerCase();
+                            return u.nombre.toLowerCase().includes(term) || u.email.toLowerCase().includes(term);
+                          })
+                          .map((user) => (
+                            <div
+                              key={user.email}
+                              onClick={() => {
+                                setUsuarioNombre(user.nombre);
+                                if (!usuarioEmail) setUsuarioEmail(user.email);
+                                if (user.area && user.area !== 'General') setCentroCosto(user.area);
+                                setShowSolicitanteDropdown(false);
+                              }}
+                              className="p-2.5 hover:bg-blue-50 cursor-pointer transition-colors flex items-center gap-2.5 text-left"
+                            >
+                              <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                {user.nombre.charAt(0)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-slate-900 truncate text-xs">{user.nombre}</p>
+                                <p className="text-[10px] text-slate-500 truncate">{user.email} {user.area ? `• ${user.area}` : ''}</p>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Correo Electrónico *</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="ejemplo@firplak.com"
-                      value={usuarioEmail}
-                      onChange={(e) => setUsuarioEmail(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
-                    />
+                  {/* Searchable Aprobador / Correo Field */}
+                  <div className="relative" ref={aprobadorRef}>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Correo Electrónico (Aprobador/Solicitante) *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        required
+                        value={usuarioEmail}
+                        onFocus={() => {
+                          setShowAprobadorDropdown(true);
+                          setAprobadorSearch(usuarioEmail);
+                        }}
+                        onChange={(e) => {
+                          setUsuarioEmail(e.target.value);
+                          setAprobadorSearch(e.target.value);
+                          setShowAprobadorDropdown(true);
+                        }}
+                        placeholder="ejemplo@firplak.com"
+                        className="w-full p-2.5 pr-8 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
+                      />
+                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+
+                    {showAprobadorDropdown && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                        {orgUsers
+                          .filter((u) => {
+                            const term = (aprobadorSearch || usuarioEmail).toLowerCase();
+                            return u.nombre.toLowerCase().includes(term) || u.email.toLowerCase().includes(term);
+                          })
+                          .map((user) => (
+                            <div
+                              key={user.email}
+                              onClick={() => {
+                                setUsuarioEmail(user.email);
+                                setShowAprobadorDropdown(false);
+                              }}
+                              className="p-2.5 hover:bg-blue-50 cursor-pointer transition-colors flex items-center gap-2.5 text-left"
+                            >
+                              <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                {user.nombre.charAt(0)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-slate-900 truncate text-xs">{user.email}</p>
+                                <p className="text-[10px] text-slate-500 truncate">{user.nombre} {user.area ? `• ${user.area}` : ''}</p>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
 
                   <div>

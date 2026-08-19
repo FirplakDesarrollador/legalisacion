@@ -1,9 +1,7 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, Paperclip, ExternalLink, Receipt } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, Paperclip, ExternalLink, Receipt, User, Mail, ChevronDown, Search } from 'lucide-react';
 import { Legalizacion, LineaGasto, CuentaContable, Proveedor, CentroCosto } from '@/types/legalizaciones';
-import { fetchCentrosCostoFromSupabase, supabase } from '@/lib/supabase';
+import { fetchCentrosCostoFromSupabase, fetchOrganizationUsers, OrganizationUser, supabase } from '@/lib/supabase';
 
 interface NuevaGastoModalProps {
   isOpen: boolean;
@@ -23,6 +21,8 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
   if (!isOpen) return null;
 
   const [centros, setCentros] = useState<CentroCosto[]>([]);
+  const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
+  
   const [usuarioNombre, setUsuarioNombre] = useState('Mateo Benavides Rios');
   const [usuarioEmail, setUsuarioEmail] = useState('mateo.benavides@firplak.com');
   const [centroCosto, setCentroCosto] = useState('Desarrollo TI');
@@ -30,19 +30,46 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
 
+  // Dropdown states for search
+  const [showSolicitanteDropdown, setShowSolicitanteDropdown] = useState(false);
+  const [solicitanteSearch, setSolicitanteSearch] = useState('');
+  const solicitanteRef = useRef<HTMLDivElement>(null);
+
+  const [showAprobadorDropdown, setShowAprobadorDropdown] = useState(false);
+  const [aprobadorSearch, setAprobadorSearch] = useState('');
+  const aprobadorRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    async function loadCentros() {
+    async function loadData() {
       try {
-        const centrosData = await fetchCentrosCostoFromSupabase();
+        const [centrosData, usersData] = await Promise.all([
+          fetchCentrosCostoFromSupabase(),
+          fetchOrganizationUsers(),
+        ]);
         setCentros(centrosData);
+        setOrgUsers(usersData);
       } catch (err) {
-        console.error('Error cargando centros de costo:', err);
+        console.error('Error cargando datos para modal de gastos:', err);
       }
     }
     if (isOpen) {
-      loadCentros();
+      loadData();
     }
   }, [isOpen]);
+
+  // Click outside to close dropdowns
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (solicitanteRef.current && !solicitanteRef.current.contains(e.target as Node)) {
+        setShowSolicitanteDropdown(false);
+      }
+      if (aprobadorRef.current && !aprobadorRef.current.contains(e.target as Node)) {
+        setShowAprobadorDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const [lineas, setLineas] = useState<LineaGasto[]>([
     {
@@ -174,6 +201,16 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
     onClose();
   };
 
+  const filteredSolicitantes = orgUsers.filter((u) => {
+    const term = (solicitanteSearch || usuarioNombre).toLowerCase();
+    return u.nombre.toLowerCase().includes(term) || u.email.toLowerCase().includes(term);
+  });
+
+  const filteredAprobadores = orgUsers.filter((u) => {
+    const term = (aprobadorSearch || usuarioEmail).toLowerCase();
+    return u.nombre.toLowerCase().includes(term) || u.email.toLowerCase().includes(term);
+  });
+
   return (
     <div
       className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
@@ -210,32 +247,117 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
+              {/* Searchable Solicitante Field */}
+              <div className="relative" ref={solicitanteRef}>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Nombre del Solicitante *
+                  Nombre del Solicitante (Microsoft M365) *
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={usuarioNombre}
-                  onChange={(e) => setUsuarioNombre(e.target.value)}
-                  placeholder="Ej. Juan Pérez"
-                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={usuarioNombre}
+                    onFocus={() => {
+                      setShowSolicitanteDropdown(true);
+                      setSolicitanteSearch(usuarioNombre);
+                    }}
+                    onChange={(e) => {
+                      setUsuarioNombre(e.target.value);
+                      setSolicitanteSearch(e.target.value);
+                      setShowSolicitanteDropdown(true);
+                    }}
+                    placeholder="Escriba o seleccione solicitante..."
+                    className="w-full p-2 pr-7 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
+                  />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {showSolicitanteDropdown && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                    {filteredSolicitantes.length === 0 ? (
+                      <div className="p-3 text-slate-400 text-[11px] text-center">
+                        No se encontraron usuarios coincidentes
+                      </div>
+                    ) : (
+                      filteredSolicitantes.map((user) => (
+                        <div
+                          key={user.email}
+                          onClick={() => {
+                            setUsuarioNombre(user.nombre);
+                            if (user.area && user.area !== 'General') {
+                              setCentroCosto(user.area);
+                            }
+                            setShowSolicitanteDropdown(false);
+                          }}
+                          className="p-2.5 hover:bg-blue-50 cursor-pointer transition-colors flex items-center gap-2.5 text-left"
+                        >
+                          <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                            {user.nombre.charAt(0)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-slate-900 truncate text-xs">{user.nombre}</p>
+                            <p className="text-[10px] text-slate-500 truncate">{user.email} {user.area ? `• ${user.area}` : ''}</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div>
+              {/* Searchable Aprobador / Correo Field */}
+              <div className="relative" ref={aprobadorRef}>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Correo Electrónico (Aprobador/Solicitante) *
                 </label>
-                <input
-                  type="email"
-                  required
-                  value={usuarioEmail}
-                  onChange={(e) => setUsuarioEmail(e.target.value)}
-                  placeholder="ejemplo@firplak.com"
-                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
-                />
+                <div className="relative">
+                  <input
+                    type="email"
+                    required
+                    value={usuarioEmail}
+                    onFocus={() => {
+                      setShowAprobadorDropdown(true);
+                      setAprobadorSearch(usuarioEmail);
+                    }}
+                    onChange={(e) => {
+                      setUsuarioEmail(e.target.value);
+                      setAprobadorSearch(e.target.value);
+                      setShowAprobadorDropdown(true);
+                    }}
+                    placeholder="ejemplo@firplak.com"
+                    className="w-full p-2 pr-7 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
+                  />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {showAprobadorDropdown && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                    {filteredAprobadores.length === 0 ? (
+                      <div className="p-3 text-slate-400 text-[11px] text-center">
+                        No se encontraron correos coincidentes
+                      </div>
+                    ) : (
+                      filteredAprobadores.map((user) => (
+                        <div
+                          key={user.email}
+                          onClick={() => {
+                            setUsuarioEmail(user.email);
+                            setShowAprobadorDropdown(false);
+                          }}
+                          className="p-2.5 hover:bg-blue-50 cursor-pointer transition-colors flex items-center gap-2.5 text-left"
+                        >
+                          <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                            {user.nombre.charAt(0)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-slate-900 truncate text-xs">{user.email}</p>
+                            <p className="text-[10px] text-slate-500 truncate">{user.nombre} {user.area ? `• ${user.area}` : ''}</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>

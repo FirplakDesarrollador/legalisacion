@@ -452,6 +452,87 @@ export async function fetchLegalizacionesTarjetasCreditoFromSupabase(): Promise<
   }
 }
 
+export interface OrganizationUser {
+  nombre: string;
+  email: string;
+  area?: string;
+}
+
+export async function fetchOrganizationUsers(): Promise<OrganizationUser[]> {
+  try {
+    const usersMap = new Map<string, OrganizationUser>();
+
+    // 1. Fetch from Cajas_menores
+    const { data: cm } = await supabase.from('Cajas_menores').select('*');
+    if (cm) {
+      cm.forEach((item: any) => {
+        if (item.Aprobador && item.Aprobador.includes('#')) {
+          const parts = item.Aprobador.split('#');
+          const emailPart = parts[1]?.trim();
+          const namePart = parts[0]?.replace(',', '').trim();
+          if (emailPart) {
+            usersMap.set(emailPart.toLowerCase(), {
+              nombre: namePart || emailPart.split('@')[0],
+              email: emailPart.toLowerCase(),
+              area: item.Area || 'General',
+            });
+          }
+        }
+        if (item.Responsable) {
+          const rName = item.Responsable.trim();
+          let found = false;
+          for (const u of usersMap.values()) {
+            if (u.nombre.toLowerCase() === rName.toLowerCase()) found = true;
+          }
+          if (!found) {
+            const generatedEmail = rName.toLowerCase().replace(/\s+/g, '.') + '@firplak.com';
+            usersMap.set(generatedEmail.toLowerCase(), {
+              nombre: rName,
+              email: generatedEmail,
+              area: item.Area || 'General',
+            });
+          }
+        }
+      });
+    }
+
+    // 2. Fetch from tarjetas_credito_responsables
+    const { data: tc } = await supabase.from('tarjetas_credito_responsables').select('*');
+    if (tc) {
+      tc.forEach((item: any) => {
+        if (item.responsable_email) {
+          const email = item.responsable_email.trim().toLowerCase();
+          usersMap.set(email, {
+            nombre: item.responsable_nombre?.trim() || email.split('@')[0],
+            email: email,
+            area: item.area || 'General',
+          });
+        }
+      });
+    }
+
+    // 3. Fetch from usuarios
+    const { data: usr } = await supabase.from('usuarios').select('*');
+    if (usr) {
+      usr.forEach((item: any) => {
+        if (item.correo) {
+          const email = item.correo.trim().toLowerCase();
+          usersMap.set(email, {
+            nombre: item.nombre?.trim() || email.split('@')[0],
+            email: email,
+            area: item.area || 'General',
+          });
+        }
+      });
+    }
+
+    return Array.from(usersMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  } catch (err) {
+    console.error('Error al cargar usuarios de la organización:', err);
+    return [];
+  }
+}
+
 export async function fetchLegalizacionesGastosFromSupabase(): Promise<Legalizacion[]> {
   try {
     let { data, error } = await supabase
