@@ -256,24 +256,26 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       const detCode = currentDetNum.toString().padStart(10, '0');
       
       // 3.1 Buscar Proveedor en SAP por NIT para obtener CardCode real y Nombre (Priorizando AC y EM)
-      let realCardCode = linea.proveedorNit || 'Proveedor Varios';
-      let realCardName = linea.proveedorNombre || 'Proveedor Varios';
+      let realCardCode = (linea.proveedorNit || '').trim();
+      let realCardName = (linea.proveedorNit || '').trim();
       
       if (linea.proveedorNit) {
         try {
-          const filterStr = `(startswith(FederalTaxID, '${linea.proveedorNit}') or FederalTaxID eq '${linea.proveedorNit}') and (startswith(CardCode, 'AC') or startswith(CardCode, 'EM'))`;
-          const resBP = await fetch(`${baseUrl}/BusinessPartners?$filter=${filterStr}`, {
+          const nitClean = linea.proveedorNit.trim();
+          const filterStr = `FederalTaxID eq '${nitClean}' or startswith(FederalTaxID, '${nitClean}')`;
+          const resBP = await fetch(`${baseUrl}/BusinessPartners?$filter=${filterStr}&$select=CardCode,CardName,FederalTaxID`, {
             headers: { Cookie: session.cookieHeader },
           });
           if (resBP.ok) {
             const dataBP = await resBP.json();
             if (dataBP.value && dataBP.value.length > 0) {
-              realCardCode = dataBP.value[0].CardCode;
-              realCardName = dataBP.value[0].CardName;
+              const matched = dataBP.value.find((b: any) => b.CardCode && (b.CardCode.startsWith('AC') || b.CardCode.startsWith('EM'))) || dataBP.value[0];
+              realCardCode = matched.CardCode;
+              realCardName = matched.CardName;
             }
           }
         } catch (e) {
-          console.error('Error buscando BP:', e);
+          console.error('Error buscando BP por NIT en SAP:', e);
         }
       }
 

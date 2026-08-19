@@ -162,7 +162,7 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                   <tr>
                     <th className="py-2.5 px-3">Fecha</th>
                     <th className="py-2.5 px-3">Tipo / Factura</th>
-                    <th className="py-2.5 px-3">Proveedor / NIT</th>
+                    <th className="py-2.5 px-3">NIT Proveedor</th>
                     <th className="py-2.5 px-3">Centro de Costos</th>
                     <th className="py-2.5 px-3">Cuenta Contable</th>
                     <th className="py-2.5 px-3 text-right">Valor Total</th>
@@ -178,8 +178,7 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                         {l.facturaNumero && <p className="text-[10px] text-slate-500 font-mono">{l.facturaNumero}</p>}
                       </td>
                       <td className="py-2.5 px-3">
-                        <p className="font-semibold text-slate-900 truncate max-w-[180px]">{l.proveedorNombre || 'Proveedor Varios'}</p>
-                        {l.proveedorNit && <p className="text-[10px] text-slate-500 font-mono">NIT: {l.proveedorNit}</p>}
+                        <span className="font-mono font-bold text-slate-900">{l.proveedorNit || '-'}</span>
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-slate-700">
                         {l.concepto || gasto.centroCosto}
