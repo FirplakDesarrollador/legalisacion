@@ -460,9 +460,22 @@ export interface OrganizationUser {
 
 export async function fetchOrganizationUsers(): Promise<OrganizationUser[]> {
   try {
+    // 1. Try Microsoft Graph API route
+    const res = await fetch('/api/microsoft/users');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.users) && data.users.length > 0) {
+        return data.users as OrganizationUser[];
+      }
+    }
+  } catch (err) {
+    console.warn('Fallback a Supabase para usuarios:', err);
+  }
+
+  try {
     const usersMap = new Map<string, OrganizationUser>();
 
-    // 1. Fetch from Cajas_menores
+    // 2. Fetch from Cajas_menores
     const { data: cm } = await supabase.from('Cajas_menores').select('*');
     if (cm) {
       cm.forEach((item: any) => {
@@ -496,7 +509,7 @@ export async function fetchOrganizationUsers(): Promise<OrganizationUser[]> {
       });
     }
 
-    // 2. Fetch from tarjetas_credito_responsables
+    // 3. Fetch from tarjetas_credito_responsables
     const { data: tc } = await supabase.from('tarjetas_credito_responsables').select('*');
     if (tc) {
       tc.forEach((item: any) => {
@@ -511,7 +524,7 @@ export async function fetchOrganizationUsers(): Promise<OrganizationUser[]> {
       });
     }
 
-    // 3. Fetch from usuarios
+    // 4. Fetch from usuarios
     const { data: usr } = await supabase.from('usuarios').select('*');
     if (usr) {
       usr.forEach((item: any) => {
