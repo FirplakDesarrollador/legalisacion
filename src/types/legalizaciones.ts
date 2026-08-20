@@ -48,6 +48,11 @@ export interface Usuario {
   departamento: string;
 }
 
+export interface SoporteAdjunto {
+  name: string;
+  url: string;
+}
+
 export interface LineaGasto {
   id: string;
   fecha: string;
@@ -63,7 +68,10 @@ export interface LineaGasto {
   valorIva: number;
   valorTotal: number;
   soporteUrl?: string;
+  soporteUrls?: string[];
+  soportes?: SoporteAdjunto[];
   soporteFile?: File;
+  soporteFiles?: File[];
 }
 
 export interface ResponsableTarjetaCredito {

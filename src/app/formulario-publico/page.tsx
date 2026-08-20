@@ -1,16 +1,40 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle2, Calculator, Plus, Trash2, Database, Send, UserCheck } from 'lucide-react';
+import {
+  ShieldCheck,
+  CheckCircle2,
+  Calculator,
+  Plus,
+  Trash2,
+  Database,
+  Send,
+  UserCheck,
+  Paperclip,
+  UploadCloud,
+  FileText,
+  Image as ImageIcon,
+  ExternalLink,
+  X,
+  Loader2,
+} from 'lucide-react';
 import {
   fetchCuentasFromSupabase,
   fetchProveedoresFromSupabase,
   fetchResponsablesFromSupabase,
   fetchCentrosCostoFromSupabase,
   saveLocalLegalizacion,
-  supabase
+  supabase,
 } from '@/lib/supabase';
-import { CuentaContable, Proveedor, LineaGasto, Legalizacion, ResponsableCaja, CentroCosto } from '@/types/legalizaciones';
+import {
+  CuentaContable,
+  Proveedor,
+  LineaGasto,
+  Legalizacion,
+  ResponsableCaja,
+  CentroCosto,
+  SoporteAdjunto,
+} from '@/types/legalizaciones';
 
 export default function FormularioPublicoPage() {
   const [responsables, setResponsables] = useState<ResponsableCaja[]>([]);
@@ -20,6 +44,7 @@ export default function FormularioPublicoPage() {
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [lastCodigo, setLastCodigo] = useState('');
+  const [uploadingByLinea, setUploadingByLinea] = useState<{ [lineaId: string]: number }>({});
 
   // Primary question: Responsable de Caja Menor (Supabase dropdown)
   const [selectedResponsableId, setSelectedResponsableId] = useState<number | ''>('');
@@ -164,6 +189,81 @@ export default function FormularioPublicoPage() {
     setLineas((prev) => prev.filter((l) => l.id !== id));
   };
 
+  const handleMultiFileUpload = async (lineaId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+
+    setUploadingByLinea((prev) => ({ ...prev, [lineaId]: (prev[lineaId] || 0) + fileArray.length }));
+
+    try {
+      const uploadPromises = fileArray.map(async (file) => {
+        const fileExt = file.name.split('.').pop() || 'pdf';
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const filePath = `comprobantes/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('soportes')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          console.error('Error subiendo archivo:', uploadError);
+          throw uploadError;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('soportes')
+          .getPublicUrl(filePath);
+
+        return {
+          name: file.name,
+          url: urlData.publicUrl,
+        };
+      });
+
+      const uploadedSoportes = await Promise.all(uploadPromises);
+
+      setLineas((prev) =>
+        prev.map((lin) => {
+          if (lin.id !== lineaId) return lin;
+          const currentSoportes = lin.soportes || (lin.soporteUrl ? [{ name: 'Documento soporte', url: lin.soporteUrl }] : []);
+          const newSoportes = [...currentSoportes, ...uploadedSoportes];
+          const newUrls = newSoportes.map((s) => s.url);
+          return {
+            ...lin,
+            soportes: newSoportes,
+            soporteUrls: newUrls,
+            soporteUrl: newUrls[0] || '',
+          };
+        })
+      );
+    } catch (err: any) {
+      alert('Hubo un error al subir uno o más archivos: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setUploadingByLinea((prev) => {
+        const updated = { ...prev };
+        delete updated[lineaId];
+        return updated;
+      });
+    }
+  };
+
+  const handleRemoveSoporte = (lineaId: string, indexToRemove: number) => {
+    setLineas((prev) =>
+      prev.map((lin) => {
+        if (lin.id !== lineaId) return lin;
+        const currentSoportes = lin.soportes || (lin.soporteUrl ? [{ name: 'Documento soporte', url: lin.soporteUrl }] : []);
+        const newSoportes = currentSoportes.filter((_, idx) => idx !== indexToRemove);
+        const newUrls = newSoportes.map((s) => s.url);
+        return {
+          ...lin,
+          soportes: newSoportes,
+          soporteUrls: newUrls,
+          soporteUrl: newUrls[0] || '',
+        };
+      })
+    );
+  };
+
   const totalGastos = lineas.reduce((acc, l) => acc + (l.valorTotal || 0), 0);
   const saldoDiferencia = totalGastos - anticipoRecibido;
 
@@ -190,7 +290,7 @@ export default function FormularioPublicoPage() {
     const randomNum = Math.floor(100 + Math.random() * 900);
     const codigo = `LEG-PUB-${randomNum}`;
 
-    const cleanLineas = lineas.map(({ soporteFile, ...rest }) => rest);
+    const cleanLineas = lineas.map(({ soporteFile, soporteFiles, ...rest }) => rest);
 
     const nuevaLeg: Legalizacion = {
       id: `leg-pub-${Date.now()}`,
@@ -484,63 +584,101 @@ export default function FormularioPublicoPage() {
                         </div>
                       </div>
 
-                      {/* File Upload Row */}
-                      <div className="mt-2 border-t border-slate-100 pt-3">
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-1">
-                          Adjuntar {linea.tipoDocumento} (PDF o Imagen)
-                        </label>
-                        <input
-                          type="file"
-                          accept=".pdf,image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleUpdateLinea(linea.id, 'soporteFile', file);
-                              handleUpdateLinea(linea.id, 'soporteUrl', 'uploading');
-                              
-                              const fileExt = file.name.split('.').pop();
-                              const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-                              const filePath = `comprobantes/${fileName}`;
-                              
-                              try {
-                                const { data: uploadData, error: uploadError } = await supabase.storage
-                                  .from('soportes')
-                                  .upload(filePath, file);
-                                  
-                                if (!uploadError) {
-                                  const { data: urlData } = supabase.storage
-                                    .from('soportes')
-                                    .getPublicUrl(filePath);
-                                  handleUpdateLinea(linea.id, 'soporteUrl', urlData.publicUrl);
-                                } else {
-                                  console.error('Error uploading file:', uploadError);
-                                  handleUpdateLinea(linea.id, 'soporteUrl', '');
-                                  alert('Error al subir el archivo: ' + uploadError.message);
-                                }
-                              } catch (err: any) {
-                                console.error('Error de red al subir:', err);
-                                handleUpdateLinea(linea.id, 'soporteUrl', '');
-                              }
-                            }
-                          }}
-                          className="block w-full text-xs text-slate-500
-                            file:mr-4 file:py-1.5 file:px-4
-                            file:rounded-lg file:border-0
-                            file:text-xs file:font-bold
-                            file:bg-blue-100 file:text-blue-700
-                            hover:file:bg-blue-200
-                            cursor-pointer transition-colors"
-                        />
-                        {linea.soporteUrl === 'uploading' && (
-                          <div className="mt-1.5 flex items-center gap-1.5 text-blue-700 font-bold text-[10px]">
-                            <div className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                            <span>Subiendo soporte a Supabase Storage...</span>
+                      {/* Multi-Document File Upload Row */}
+                      <div className="mt-2 border-t border-slate-100 pt-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                            <Paperclip className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Adjuntar {linea.tipoDocumento}s o Comprobantes (PDF o Imagen)</span>
+                          </label>
+                          {linea.soportes && linea.soportes.length > 0 && (
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              {linea.soportes.length} {linea.soportes.length === 1 ? 'documento adjunto' : 'documentos adjuntos'}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Input & Upload Button */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label
+                            htmlFor={`file-upload-${linea.id}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-xs"
+                          >
+                            <UploadCloud className="w-4 h-4 text-blue-600" />
+                            <span>
+                              {linea.soportes && linea.soportes.length > 0
+                                ? '+ Adjuntar más documentos'
+                                : 'Seleccionar documentos...'}
+                            </span>
+                          </label>
+                          <input
+                            id={`file-upload-${linea.id}`}
+                            type="file"
+                            multiple
+                            accept=".pdf,image/*"
+                            onChange={(e) => {
+                              handleMultiFileUpload(linea.id, e.target.files);
+                              e.target.value = '';
+                            }}
+                            className="hidden"
+                          />
+
+                          <span className="text-[10px] text-slate-400">
+                            Puedes seleccionar y adjuntar varios archivos (PDF o fotos)
+                          </span>
+                        </div>
+
+                        {/* Uploading indicator */}
+                        {uploadingByLinea[linea.id] ? (
+                          <div className="flex items-center gap-2 text-blue-700 bg-blue-50/70 p-2 rounded-lg border border-blue-200 font-semibold text-xs animate-pulse">
+                            <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                            <span>Subiendo {uploadingByLinea[linea.id]} documento(s) a Supabase Storage...</span>
                           </div>
-                        )}
-                        {linea.soporteUrl && linea.soporteUrl !== 'uploading' && (
-                          <div className="mt-1.5 flex items-center gap-1.5 text-emerald-700 font-bold text-[10px]">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>✓ Soporte cargado correctamente y listo</span>
+                        ) : null}
+
+                        {/* List of Attached Documents */}
+                        {linea.soportes && linea.soportes.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            {linea.soportes.map((soporte, idx) => {
+                              const isImg = soporte.url?.match(/\.(jpeg|jpg|gif|png)$/i) || soporte.url?.startsWith('data:image/');
+                              return (
+                                <div
+                                  key={idx}
+                                  className="flex items-center justify-between gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs hover:border-slate-300 transition-colors shadow-xs"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {isImg ? (
+                                      <ImageIcon className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    ) : (
+                                      <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                                    )}
+                                    <span className="font-medium text-slate-800 truncate text-[11px]" title={soporte.name}>
+                                      {soporte.name || `Documento ${idx + 1}`}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <a
+                                      href={soporte.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="Ver / Descargar documento"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5" />
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveSoporte(linea.id, idx)}
+                                      className="p-1 text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                                      title="Eliminar este archivo"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

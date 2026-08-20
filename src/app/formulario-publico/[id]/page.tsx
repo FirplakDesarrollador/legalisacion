@@ -311,9 +311,26 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                         </td>
                         <td className="py-3 px-4">
                           <p className="font-semibold text-slate-900">{linea.concepto}</p>
-                          <div className="flex flex-col gap-0.5 text-[10px] text-slate-500">
+                          <div className="flex flex-col gap-1 text-[10px] text-slate-500">
                             <span>Factura/Soporte: {linea.facturaNumero || 'N/A'}</span>
-                            {linea.soporteUrl && (
+                            {/* Render all attached documents */}
+                            {(linea.soportes && linea.soportes.length > 0) ? (
+                              <div className="flex flex-wrap gap-1.5 mt-0.5">
+                                {linea.soportes.map((sop, sIdx) => (
+                                  <a
+                                    key={sIdx}
+                                    href={sop.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 font-semibold"
+                                    title={sop.name}
+                                  >
+                                    <FileText className="w-2.5 h-2.5 text-blue-500" />
+                                    <span className="max-w-[120px] truncate">{sop.name || `Adjunto #${sIdx + 1}`}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            ) : linea.soporteUrl ? (
                               <a
                                 href={linea.soporteUrl}
                                 target="_blank"
@@ -322,7 +339,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                               >
                                 <FileText className="w-3 h-3 text-blue-500" /> Ver Adjunto Soporte
                               </a>
-                            )}
+                            ) : null}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-slate-700">
@@ -345,43 +362,55 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
             </div>
 
             {/* Gallery of Attachments */}
-            {legalizacion.lineas?.some(l => l.soporteUrl) && (
+            {legalizacion.lineas?.some(l => (l.soportes && l.soportes.length > 0) || l.soporteUrl) && (
               <div className="p-5 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm">
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                   <FileText className="w-4 h-4 text-blue-600" /> Soportes y Documentos Adjuntos
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {legalizacion.lineas.filter(l => l.soporteUrl).map((linea, index) => {
-                    const isImg = linea.soporteUrl?.match(/\.(jpeg|jpg|gif|png)$/i) || linea.soporteUrl?.startsWith('data:image/');
-                    return (
-                      <div key={linea.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 flex flex-col justify-between">
-                        <div className="space-y-1">
-                          <p className="font-bold text-slate-900 text-[11px] truncate">{linea.concepto || `Gasto #${index + 1}`}</p>
-                          <p className="text-[10px] text-slate-500 font-mono">Proveedor NIT: {linea.proveedorNit || 'N/A'}</p>
-                        </div>
-                        {isImg ? (
-                          <div className="w-full aspect-[4/3] rounded-lg border border-slate-200 overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow relative group">
-                            <img
-                              src={linea.soporteUrl}
-                              alt={`Soporte ${linea.concepto}`}
-                              className="w-full h-full object-cover cursor-zoom-in"
-                              onClick={() => window.open(linea.soporteUrl, '_blank')}
-                              title="Click para ampliar"
-                            />
+                  {legalizacion.lineas.flatMap((linea, index) => {
+                    const attachments = (linea.soportes && linea.soportes.length > 0)
+                      ? linea.soportes
+                      : linea.soporteUrl
+                      ? [{ name: `Soporte #${index + 1}`, url: linea.soporteUrl }]
+                      : [];
+
+                    return attachments.map((att, attIdx) => {
+                      const isImg = att.url?.match(/\.(jpeg|jpg|gif|png)$/i) || att.url?.startsWith('data:image/');
+                      return (
+                        <div key={`${linea.id}-${attIdx}`} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 flex flex-col justify-between">
+                          <div className="space-y-1">
+                            <p className="font-bold text-slate-900 text-[11px] truncate" title={att.name || linea.concepto}>
+                              {att.name || linea.concepto || `Gasto #${index + 1}`}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-mono">Proveedor NIT: {linea.proveedorNit || 'N/A'}</p>
                           </div>
-                        ) : (
-                          <a
-                            href={linea.soporteUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 border-dashed rounded-lg hover:border-blue-500 hover:bg-blue-50/25 transition-colors gap-2 text-center cursor-pointer group"
-                          >
-                            <FileText className="w-8 h-8 text-blue-600 group-hover:scale-105 transition-transform" />
-                            <span className="font-bold text-blue-600 text-[10px] group-hover:underline">Ver Documento Soporte</span>
-                          </a>
-                        )}
-                      </div>
-                    );
+                          {isImg ? (
+                            <div className="w-full aspect-[4/3] rounded-lg border border-slate-200 overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow relative group">
+                              <img
+                                src={att.url}
+                                alt={att.name || `Soporte ${linea.concepto}`}
+                                className="w-full h-full object-cover cursor-zoom-in"
+                                onClick={() => window.open(att.url, '_blank')}
+                                title="Click para ampliar"
+                              />
+                            </div>
+                          ) : (
+                            <a
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-col items-center justify-center p-6 bg-white border border-slate-200 border-dashed rounded-lg hover:border-blue-500 hover:bg-blue-50/25 transition-colors gap-2 text-center cursor-pointer group"
+                            >
+                              <FileText className="w-8 h-8 text-blue-600 group-hover:scale-105 transition-transform" />
+                              <span className="font-bold text-blue-600 text-[10px] group-hover:underline truncate max-w-full px-2">
+                                {att.name || 'Ver Documento Soporte'}
+                              </span>
+                            </a>
+                          )}
+                        </div>
+                      );
+                    });
                   })}
                 </div>
               </div>
