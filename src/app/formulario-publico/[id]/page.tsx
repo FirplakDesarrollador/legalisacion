@@ -165,10 +165,10 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
               <ShieldCheck className="w-6 h-6 stroke-[2.5]" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                Legalisa <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200">Panel de Aprobación Público</span>
+              <h1 className="text-base font-bold text-slate-900">
+                Aprobación de Cajas Menores
               </h1>
-              <p className="text-xs text-slate-500">Registro de Viáticos y Legalización de Gastos Corporativos</p>
+              <p className="text-xs text-slate-500">Panel de revisión y autorización de caja menor</p>
             </div>
           </div>
 
