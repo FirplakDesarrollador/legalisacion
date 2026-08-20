@@ -268,7 +268,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                       <th className="py-3 px-4">Fecha</th>
                       <th className="py-3 px-4">Cuenta Contable</th>
                       <th className="py-3 px-4">Concepto & Soporte</th>
-                      <th className="py-3 px-4">Proveedor / NIT</th>
+                      <th className="py-3 px-4">NIT Proveedor</th>
                       <th className="py-3 px-4 text-right">Subtotal</th>
                       <th className="py-3 px-4 text-right">IVA</th>
                       <th className="py-3 px-4 text-right">Total</th>
@@ -314,8 +314,8 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                             ) : null}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-slate-700">
-                          {linea.proveedorNombre || 'Proveedor Varios'}
+                        <td className="py-3 px-4 font-mono font-bold text-slate-800">
+                          {linea.proveedorNit || 'N/A'}
                         </td>
                         <td className="py-3 px-4 text-right font-mono text-slate-500">
                           {formatCOP(linea.valorSubtotal)}
