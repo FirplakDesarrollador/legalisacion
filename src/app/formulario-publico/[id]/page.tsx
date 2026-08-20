@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Database } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Legalizacion } from '@/types/legalizaciones';
 
@@ -12,8 +12,6 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
   const [errorMsg, setErrorMsg] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [sapSyncing, setSapSyncing] = useState(false);
-  const [sapResult, setSapResult] = useState<{ success: boolean; message: string; docEntry?: number } | null>(null);
 
   useEffect(() => {
     async function loadLegalizacion() {
@@ -73,55 +71,62 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
     if (!legalizacion) return;
     setIsSubmitting(true);
     try {
+      const now = new Date().toISOString();
+      let createdDocEntry: number | undefined = undefined;
+
+      // Al aprobar, enviar automáticamente el borrador a SAP Service Layer
+      if (nuevoEstado === 'aprobado') {
+        try {
+          const res = await fetch('/api/sap/draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(legalizacion),
+          });
+          const sapData = await res.json();
+          if (sapData.success && sapData.docEntry) {
+            createdDocEntry = sapData.docEntry;
+          }
+        } catch (sapErr) {
+          console.error('Error al enviar borrador automático a SAP:', sapErr);
+        }
+      }
+
+      const updatePayload: any = {
+        estado: nuevoEstado,
+        observacionesAprobacion: observaciones,
+        updated_at: now,
+      };
+
+      if (createdDocEntry) {
+        updatePayload.sap_doc_entry = createdDocEntry;
+      }
+
       const { error } = await supabase
         .from('legalizaciones cajas menores')
-        .update({
-          estado: nuevoEstado,
-          observacionesAprobacion: observaciones,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', legalizacion.id);
 
       if (error) {
         alert('Error al actualizar el estado: ' + error.message);
       } else {
+        const finalDocEntry = createdDocEntry || legalizacion.sapDocEntry;
         setLegalizacion({
           ...legalizacion,
           estado: nuevoEstado,
           observacionesAprobacion: observaciones,
+          sapDocEntry: finalDocEntry,
         });
+
+        if (nuevoEstado === 'aprobado') {
+          alert(`✅ Legalización aprobada y enviada a SAP exitosamente${finalDocEntry ? ` (DocEntry #${finalDocEntry})` : ''}.`);
+        } else {
+          alert('Legalización rechazada.');
+        }
       }
     } catch (err: any) {
       alert('Error de conexión: ' + err.message);
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleEnviarSAP = async () => {
-    if (!legalizacion) return;
-    setSapSyncing(true);
-    setSapResult(null);
-    try {
-      const res = await fetch('/api/sap/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(legalizacion),
-      });
-
-      const data = await res.json();
-      setSapResult({
-        success: data.success,
-        message: data.message || (data.success ? 'Borrador creado en SAP Service Layer' : 'Error al conectar con SAP'),
-        docEntry: data.docEntry,
-      });
-    } catch (err: any) {
-      setSapResult({
-        success: false,
-        message: err.message || 'Error de conexión con la API de SAP Service Layer',
-      });
-    } finally {
-      setSapSyncing(false);
     }
   };
 
@@ -187,6 +192,11 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                 <div className="flex items-center gap-2">
                   <h2 className="text-base font-bold text-slate-900 font-mono">{legalizacion.codigo}</h2>
                   {getStatusBadge(legalizacion.estado)}
+                  {legalizacion.sapDocEntry && (
+                    <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      Doc: #{legalizacion.sapDocEntry}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500">{legalizacion.motivo}</p>
               </div>
@@ -195,44 +205,6 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
 
           {/* Body Content */}
           <div className="p-6 space-y-6 text-xs">
-            {/* SAP Service Layer Draft Trigger Banner */}
-            <div className="p-4 rounded-2xl bg-blue-50/80 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                  <Database className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-blue-900">Integración SAP Business One (Service Layer)</h4>
-                  <p className="text-[11px] text-blue-700">Compañía: Firplak_SA &bull; Objeto: OK1_LEG (Borrador)</p>
-                </div>
-              </div>
-              <button
-                onClick={handleEnviarSAP}
-                disabled={sapSyncing}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-                {sapSyncing ? 'Enviando a SAP...' : 'Enviar Borrador a SAP B1'}
-              </button>
-            </div>
-
-            {sapResult && (
-              <div
-                className={`p-3.5 rounded-2xl text-[11px] flex items-center justify-between border ${
-                  sapResult.success
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    : 'bg-rose-50 text-rose-800 border-rose-200'
-                }`}
-              >
-                <span>{sapResult.message}</span>
-                {sapResult.docEntry && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-mono font-bold text-[10px]">
-                    DocEntry: {sapResult.docEntry}
-                  </span>
-                )}
-              </div>
-            )}
-
             {/* Attributes Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
               <div className="flex items-center gap-2.5">
