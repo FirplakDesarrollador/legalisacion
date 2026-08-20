@@ -205,7 +205,6 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
                     <th className="py-3 px-4">Concepto & Soporte</th>
                     <th className="py-3 px-4">NIT Proveedor</th>
                     <th className="py-3 px-4 text-right">Subtotal</th>
-                    <th className="py-3 px-4 text-right">IVA</th>
                     <th className="py-3 px-4 text-right">Total</th>
                   </tr>
                 </thead>
@@ -221,13 +220,10 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
                         <span className="text-[10px] text-slate-500">Factura/Soporte: {linea.facturaNumero}</span>
                       </td>
                       <td className="py-3 px-4 font-mono font-bold text-slate-800">
-                        {linea.proveedorNit || 'N/A'}
+                        {linea.proveedorNit || (linea as any).proveedor_nit || (linea as any).nit || (linea.proveedorNombre && !linea.proveedorNombre.toLowerCase().includes('proveedor varios') ? linea.proveedorNombre : '') || 'N/A'}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-slate-500">
                         {formatCOP(linea.valorSubtotal)}
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-500">
-                        {formatCOP(linea.valorIva)}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
                         {formatCOP(linea.valorTotal)}
