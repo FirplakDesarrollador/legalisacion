@@ -234,24 +234,24 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
             {/* Financial Summary */}
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <p className="text-[11px] text-slate-500">Anticipo Recibido</p>
+                <p className="text-[11px] font-semibold text-slate-500">Fondo Caja Menor</p>
                 <p className="text-base font-bold font-mono text-slate-900 mt-1">
                   {formatCOP(legalizacion.anticipoRecibido)}
                 </p>
               </div>
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <p className="text-[11px] text-slate-500">Total Gastos Soportados</p>
+                <p className="text-[11px] font-semibold text-slate-500">Total Gastos Soportados</p>
                 <p className="text-base font-bold font-mono text-blue-900 mt-1">
                   {formatCOP(legalizacion.totalGastos)}
                 </p>
               </div>
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                <p className="text-[11px] text-slate-500">Saldo Diferencia</p>
-                <p className={`text-base font-bold font-mono mt-1 ${legalizacion.saldoDiferencia >= 0 ? 'text-emerald-700' : 'text-blue-700'}`}>
-                  {formatCOP(legalizacion.saldoDiferencia)}
+                <p className="text-[11px] font-semibold text-slate-500">Saldo en Caja Menor</p>
+                <p className={`text-base font-bold font-mono mt-1 ${legalizacion.anticipoRecibido - legalizacion.totalGastos >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
+                  {formatCOP(legalizacion.anticipoRecibido - legalizacion.totalGastos)}
                 </p>
                 <span className="text-[10px] text-slate-500 font-medium">
-                  {legalizacion.saldoDiferencia >= 0 ? 'Pagar a Empleado' : 'Devolver a Empresa'}
+                  {legalizacion.anticipoRecibido - legalizacion.totalGastos >= 0 ? 'Saldo disponible' : 'Tope excedido'}
                 </span>
               </div>
             </div>
