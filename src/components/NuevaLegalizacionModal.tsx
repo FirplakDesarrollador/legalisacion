@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, UserCheck, Paperclip, ExternalLink } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, UserCheck, Paperclip, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Legalizacion, LineaGasto, CuentaContable, Proveedor, ResponsableCaja, CentroCosto } from '@/types/legalizaciones';
 import { fetchResponsablesFromSupabase, fetchCentrosCostoFromSupabase, supabase } from '@/lib/supabase';
 
@@ -147,11 +147,18 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
 
   const totalGastos = lineas.reduce((acc, l) => acc + (l.valorTotal || 0), 0);
   const saldoDiferencia = totalGastos - anticipoRecibido;
+  const saldoCajaMenor = anticipoRecibido - totalGastos;
+  const isOverLimit = anticipoRecibido > 0 && totalGastos > anticipoRecibido;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!motivo.trim()) {
       alert('Por favor ingrese el motivo de la legalización.');
+      return;
+    }
+
+    if (isOverLimit) {
+      alert(`⚠️ No es posible guardar la legalización: El total de gastos (${formatCOP(totalGastos)}) supera el tope asignado de la caja menor (${formatCOP(anticipoRecibido)}) por ${formatCOP(totalGastos - anticipoRecibido)}.`);
       return;
     }
 
@@ -518,22 +525,51 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
           </div>
 
           {/* Real-time Summary Card */}
-          <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex flex-wrap items-center justify-between gap-4">
+          <div
+            className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-colors ${
+              isOverLimit
+                ? 'bg-rose-50 border-rose-300'
+                : 'bg-blue-50 border-blue-200'
+            }`}
+          >
             <div className="space-y-1">
-              <span className="text-blue-700 font-semibold text-[11px]">Resumen de Liquidación</span>
+              <span className={`font-semibold text-[11px] ${isOverLimit ? 'text-rose-700' : 'text-blue-700'}`}>
+                Resumen de Liquidación
+              </span>
               <p className="text-xs text-slate-700">
-                Anticipo: <span className="font-mono font-semibold">{formatCOP(anticipoRecibido)}</span> | Total Soportado: <span className="font-mono font-semibold text-blue-900">{formatCOP(totalGastos)}</span>
+                Fondo Asignado (Tope): <span className="font-mono font-semibold">{formatCOP(anticipoRecibido)}</span> | Total Gastos: <span className="font-mono font-semibold text-blue-900">{formatCOP(totalGastos)}</span>
               </p>
             </div>
             <div className="text-right font-mono">
-              <span className="text-[10px] text-slate-500 block uppercase font-sans font-semibold">
-                {saldoDiferencia >= 0 ? 'Saldo a Reembolsar a Empleado' : 'Saldo a Devolver a la Empresa'}
+              <span className="text-[10px] text-slate-500 block uppercase font-sans font-bold tracking-wider">
+                {isOverLimit ? 'Saldo Caja Menor (Excedido)' : 'Saldo Caja Menor'}
               </span>
-              <span className={`text-lg font-bold ${saldoDiferencia >= 0 ? 'text-emerald-700' : 'text-blue-700'}`}>
-                {formatCOP(Math.abs(saldoDiferencia))}
+              <span
+                className={`text-xl font-extrabold ${
+                  isOverLimit
+                    ? 'text-rose-700'
+                    : saldoCajaMenor === 0
+                    ? 'text-slate-800'
+                    : 'text-blue-700'
+                }`}
+              >
+                {isOverLimit ? `-${formatCOP(totalGastos - anticipoRecibido)}` : formatCOP(saldoCajaMenor)}
               </span>
             </div>
           </div>
+
+          {/* Warning alert if expenses exceed limit */}
+          {isOverLimit && (
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-900 shadow-sm animate-pulse">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-rose-900">⚠️ Tope de Caja Menor Excedido</p>
+                <p className="text-[11px] text-rose-700 mt-0.5">
+                  El total de gastos ingresados ({formatCOP(totalGastos)}) supera el fondo asignado a esta caja menor ({formatCOP(anticipoRecibido)}) por {formatCOP(totalGastos - anticipoRecibido)}. No es posible guardar la legalización.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Modal Actions */}
           <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-100">
@@ -546,9 +582,24 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-blue-600/20 flex items-center gap-2 transition-all"
+              disabled={isOverLimit}
+              className={`px-5 py-2 font-bold rounded-xl flex items-center gap-2 transition-all ${
+                isOverLimit
+                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-600/20 cursor-pointer'
+              }`}
             >
-              <CheckCircle2 className="w-4 h-4 stroke-[2.5]" /> Guardar Legalización
+              {isOverLimit ? (
+                <>
+                  <AlertTriangle className="w-4 h-4 text-rose-500" />
+                  <span>Tope Excedido</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                  <span>Guardar Legalización</span>
+                </>
+              )}
             </button>
           </div>
         </form>

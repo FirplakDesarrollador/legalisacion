@@ -17,6 +17,7 @@ import {
   ExternalLink,
   X,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   fetchCuentasFromSupabase,
@@ -266,12 +267,19 @@ export default function FormularioPublicoPage() {
 
   const totalGastos = lineas.reduce((acc, l) => acc + (l.valorTotal || 0), 0);
   const saldoDiferencia = totalGastos - anticipoRecibido;
+  const saldoCajaMenor = anticipoRecibido - totalGastos;
+  const isOverLimit = anticipoRecibido > 0 && totalGastos > anticipoRecibido;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedResponsableId) {
       alert('Por favor seleccione el Responsable / Custodio de la Caja Menor.');
+      return;
+    }
+
+    if (isOverLimit) {
+      alert(`⚠️ No es posible enviar el formulario: El total de gastos (${formatCOP(totalGastos)}) supera el tope asignado de la caja menor (${formatCOP(anticipoRecibido)}) por ${formatCOP(totalGastos - anticipoRecibido)}.`);
       return;
     }
 
@@ -688,28 +696,72 @@ export default function FormularioPublicoPage() {
               </div>
 
               {/* Total Calculation Card */}
-              <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 flex flex-wrap items-center justify-between gap-4">
+              <div
+                className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-colors ${
+                  isOverLimit
+                    ? 'bg-rose-50 border-rose-300'
+                    : 'bg-blue-50 border-blue-200'
+                }`}
+              >
                 <div>
-                  <span className="text-blue-800 font-bold text-xs">Cálculo de Liquidación</span>
-                  <p className="text-xs text-slate-700">
-                    Total Gastos Soportados: <strong className="font-mono text-blue-900">{formatCOP(totalGastos)}</strong>
+                  <span className={`font-bold text-xs ${isOverLimit ? 'text-rose-800' : 'text-blue-800'}`}>
+                    Cálculo de Liquidación
+                  </span>
+                  <p className="text-xs text-slate-700 mt-0.5">
+                    Fondo Asignado (Tope): <strong className="font-mono text-slate-900">{formatCOP(anticipoRecibido)}</strong> | Total Gastos: <strong className="font-mono text-blue-900">{formatCOP(totalGastos)}</strong>
                   </p>
                 </div>
                 <div className="text-right font-mono">
-                  <span className="text-[10px] text-slate-500 block uppercase font-sans font-semibold">
-                    {saldoDiferencia >= 0 ? 'Saldo a Reembolsar' : 'Saldo a Devolver'}
+                  <span className="text-[10px] text-slate-500 block uppercase font-sans font-bold tracking-wider">
+                    {isOverLimit ? 'Saldo Caja Menor (Excedido)' : 'Saldo Caja Menor'}
                   </span>
-                  <span className={`text-lg font-bold ${saldoDiferencia >= 0 ? 'text-emerald-700' : 'text-blue-700'}`}>
-                    {formatCOP(Math.abs(saldoDiferencia))}
+                  <span
+                    className={`text-xl font-extrabold ${
+                      isOverLimit
+                        ? 'text-rose-700'
+                        : saldoCajaMenor === 0
+                        ? 'text-slate-800'
+                        : 'text-blue-700'
+                    }`}
+                  >
+                    {isOverLimit ? `-${formatCOP(totalGastos - anticipoRecibido)}` : formatCOP(saldoCajaMenor)}
                   </span>
                 </div>
               </div>
 
+              {/* Warning alert if expenses exceed petty cash fund limit */}
+              {isOverLimit && (
+                <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-start gap-3 text-xs text-rose-900 shadow-sm animate-pulse">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="font-bold text-sm text-rose-900">⚠️ Tope de Caja Menor Excedido</h5>
+                    <p className="text-xs text-rose-700 mt-1 leading-relaxed">
+                      El total de gastos registrados (<strong>{formatCOP(totalGastos)}</strong>) supera el tope asignado de la caja menor (<strong>{formatCOP(anticipoRecibido)}</strong>) por <strong>{formatCOP(totalGastos - anticipoRecibido)}</strong>. No es posible radicar la legalización hasta ajustar o corregir los valores.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+                disabled={isOverLimit}
+                className={`w-full py-3.5 font-bold text-sm rounded-2xl flex items-center justify-center gap-2 transition-all ${
+                  isOverLimit
+                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed border border-slate-300 shadow-none'
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-600/25 active:scale-[0.99] cursor-pointer'
+                }`}
               >
-                <Send className="w-4 h-4" /> Enviar Formulario de Legalización
+                {isOverLimit ? (
+                  <>
+                    <AlertTriangle className="w-4 h-4 text-rose-500" />
+                    <span>No se puede enviar (Tope Excedido por {formatCOP(totalGastos - anticipoRecibido)})</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Enviar Formulario de Legalización</span>
+                  </>
+                )}
               </button>
             </form>
           </div>
