@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database, UserCheck, X } from 'lucide-react';
+import { supabase, fetchOrganizationUsers, OrganizationUser } from '@/lib/supabase';
 import { Legalizacion } from '@/types/legalizaciones';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 export default function PublicApprovalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
@@ -14,6 +15,13 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sapSyncing, setSapSyncing] = useState(false);
   const [sapResult, setSapResult] = useState<{ success: boolean; message: string; docEntry?: number } | null>(null);
+
+  // Reasignar Aprobación States
+  const [showReasignarModal, setShowReasignarModal] = useState(false);
+  const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
+  const [selectedNewApproverEmail, setSelectedNewApproverEmail] = useState('');
+  const [motivoReasignacion, setMotivoReasignacion] = useState('');
+  const [isReassigning, setIsReassigning] = useState(false);
 
   useEffect(() => {
     async function loadLegalizacion() {
@@ -54,6 +62,88 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
     }
     loadLegalizacion();
   }, [id]);
+
+  useEffect(() => {
+    async function loadUsers() {
+      try {
+        const users = await fetchOrganizationUsers();
+        setOrgUsers(users);
+      } catch (err) {
+        console.warn('Error cargando usuarios para reasignar:', err);
+      }
+    }
+    loadUsers();
+  }, []);
+
+  const handleReasignar = async () => {
+    if (!legalizacion || !selectedNewApproverEmail) {
+      alert('Por favor seleccione el nuevo usuario aprobador.');
+      return;
+    }
+    const newApprover = orgUsers.find(
+      (u) => u.email.toLowerCase() === selectedNewApproverEmail.toLowerCase()
+    ) || {
+      nombre: selectedNewApproverEmail.split('@')[0],
+      email: selectedNewApproverEmail,
+    };
+
+    setIsReassigning(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const observacionReasig = motivoReasignacion.trim()
+        ? `[Reasignado a ${newApprover.nombre} (${newApprover.email})]: ${motivoReasignacion.trim()}`
+        : `[Reasignado a ${newApprover.nombre} (${newApprover.email})]`;
+
+      const updateFields: any = {
+        aprobador_nombre: newApprover.nombre,
+        aprobador_email: newApprover.email,
+        observaciones_aprobacion: legalizacion.observacionesAprobacion
+          ? `${legalizacion.observacionesAprobacion}\n${observacionReasig}`
+          : observacionReasig,
+        updated_at: nowIso,
+      };
+
+      const { error } = await supabase
+        .from('legalizaciones_tarjetas_credito')
+        .update(updateFields)
+        .eq('id', id);
+
+      if (error) {
+        alert('Error al reasignar en base de datos: ' + error.message);
+        return;
+      }
+
+      // Notificar al nuevo aprobador vía API proxy
+      try {
+        const link = `${window.location.origin}/formulario-tarjetas-credito/${legalizacion.id}`;
+        await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            correo: newApprover.email,
+            titulo: `Aprobación Reasignada - Tarjeta de Crédito ${legalizacion.codigo}`,
+            contenido: `Se te ha reasignado la aprobación de la legalización de tarjeta de crédito ${legalizacion.codigo} de ${legalizacion.usuarioNombre} por valor de ${formatCOP(legalizacion.totalGastos)} COP.${motivoReasignacion.trim() ? ` Motivo: ${motivoReasignacion.trim()}` : ''}`,
+            link: link,
+          }),
+        });
+      } catch (notifErr) {
+        console.error('Error enviando notificación:', notifErr);
+      }
+
+      setLegalizacion({
+        ...legalizacion,
+        observacionesAprobacion: updateFields.observaciones_aprobacion,
+      });
+      setShowReasignarModal(false);
+      setMotivoReasignacion('');
+      setSelectedNewApproverEmail('');
+      alert(`✅ Aprobación reasignada exitosamente a ${newApprover.nombre} (${newApprover.email}). Se ha enviado la notificación correspondiente.`);
+    } catch (err: any) {
+      alert('Error al reasignar: ' + err.message);
+    } finally {
+      setIsReassigning(false);
+    }
+  };
 
   const formatCOP = (num: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -419,18 +509,25 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                   rows={3}
                   className="w-full p-3 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 shadow-sm"
                 />
-                <div className="flex items-center justify-end gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   <button
                     disabled={isSubmitting}
                     onClick={() => handleAction('rechazado')}
-                    className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer text-xs"
                   >
-                    <XCircle className="w-4 h-4" /> Rechazar Legalización
+                    <XCircle className="w-4 h-4" /> Rechazar
+                  </button>
+                  <button
+                    disabled={isSubmitting}
+                    onClick={() => setShowReasignarModal(true)}
+                    className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer text-xs shadow-2xs"
+                  >
+                    <UserCheck className="w-4 h-4 text-amber-700" /> Reasignar Aprobación
                   </button>
                   <button
                     disabled={isSubmitting}
                     onClick={() => handleAction('aprobado')}
-                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-blue-600/25 transition-all cursor-pointer"
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-blue-600/25 transition-all cursor-pointer text-xs"
                   >
                     <CheckCircle2 className="w-4 h-4 stroke-[2.5]" /> Aprobar Legalización
                   </button>
@@ -440,6 +537,103 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
       </main>
+
+      {/* Modal Reasignar Aprobación */}
+      {showReasignarModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-5 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
+                  <UserCheck className="w-5 h-5 text-amber-300" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Reasignar Aprobación</h3>
+                  <p className="text-[11px] text-blue-100">Transfiere la revisión a otro funcionario</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowReasignarModal(false)}
+                className="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1 text-slate-700">
+                <p>Legalización: <strong className="font-mono text-blue-900">{legalizacion.codigo}</strong></p>
+                <p>Solicitante: <strong className="text-slate-900">{legalizacion.usuarioNombre}</strong></p>
+                <p>Total a Aprobar: <strong className="text-emerald-700 font-mono">{formatCOP(legalizacion.totalGastos)}</strong></p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Nuevo Usuario Aprobador *
+                </label>
+                <SearchableSelect
+                  required
+                  placeholder="-- Seleccione o busque el nuevo aprobador --"
+                  searchPlaceholder="Buscar por nombre o correo..."
+                  value={selectedNewApproverEmail}
+                  onChange={(val) => setSelectedNewApproverEmail(val)}
+                  options={orgUsers.map((u) => ({
+                    value: u.email,
+                    label: `${u.nombre} - ${u.email}`,
+                    sublabel: u.area || 'Firplak',
+                  }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Motivo o Justificación de la Reasignación (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={motivoReasignacion}
+                  onChange={(e) => setMotivoReasignacion(e.target.value)}
+                  placeholder="Ej. Por ausencia o delegación de funciones del responsable de área..."
+                  className="w-full p-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isReassigning}
+                  onClick={() => setShowReasignarModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isReassigning || !selectedNewApproverEmail}
+                  onClick={handleReasignar}
+                  className={`px-5 py-2 font-bold text-white rounded-xl shadow-md transition-all flex items-center gap-1.5 ${
+                    isReassigning || !selectedNewApproverEmail
+                      ? 'bg-slate-300 cursor-not-allowed shadow-none'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20 cursor-pointer'
+                  }`}
+                >
+                  {isReassigning ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Reasignando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="w-4 h-4" />
+                      <span>Confirmar Reasignación</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
