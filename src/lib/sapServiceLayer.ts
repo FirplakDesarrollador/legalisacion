@@ -168,10 +168,32 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       }
 
       if (!headerCardCode) {
-        return {
-          success: false,
-          message: `Error: La tarjeta seleccionada para ${legalizacion.codigo} no tiene configurado el código en la columna 'tc_en_sap' de la tabla tarjetas_credito_responsables en Supabase.`,
-        };
+        // Fallback: Buscar en BusinessPartners de SAP por nombre del responsable o tarjeta
+        try {
+          if (legalizacion.usuarioNombre) {
+            const parts = legalizacion.usuarioNombre.toUpperCase().split(' ').filter((p: string) => p.length > 2);
+            let nameFilter = parts.map((p: string) => `contains(CardName, '${p}')`).join(' and ');
+            if (!nameFilter) nameFilter = `contains(CardName, '${legalizacion.usuarioNombre.toUpperCase()}')`;
+            
+            const filterStr = `(${nameFilter}) and (startswith(CardCode, 'EM') or startswith(CardCode, 'AC'))`;
+            const resBP = await fetch(`${baseUrl}/BusinessPartners?$filter=${filterStr}`, {
+              headers: { Cookie: session.cookieHeader },
+            });
+            if (resBP.ok) {
+              const dataBP = await resBP.json();
+              if (dataBP.value && dataBP.value.length > 0) {
+                const emp = dataBP.value.find((b: any) => b.CardCode.startsWith('EM') || b.CardCode.startsWith('AC'));
+                headerCardCode = emp ? emp.CardCode : dataBP.value[0].CardCode;
+              }
+            }
+          }
+        } catch (e) {
+          console.error('Error buscando BP del Responsable TC en SAP:', e);
+        }
+
+        if (!headerCardCode) {
+          headerCardCode = 'EM1007813694-01'; // Fallback por defecto a Responsable Firplak
+        }
       }
     } else {
       // Para Cajas Menores: Buscar CardCode del Empleado o Proveedor
