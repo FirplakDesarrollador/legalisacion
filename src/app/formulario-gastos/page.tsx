@@ -30,6 +30,7 @@ export default function FormularioGastosPublicoPage() {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [recibioAnticipo, setRecibioAnticipo] = useState<'no' | 'si'>('no');
   const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Dropdowns search
   const [showSolicitanteDropdown, setShowSolicitanteDropdown] = useState(false);
@@ -169,8 +170,11 @@ export default function FormularioGastosPublicoPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSubmitting) return;
+
     if (!usuarioNombre.trim()) {
-      alert('Por favor ingrese su nombre.');
+      alert('Por favor ingrese o seleccione su nombre.');
       return;
     }
     if (!usuarioEmail.trim()) {
@@ -182,59 +186,65 @@ export default function FormularioGastosPublicoPage() {
       return;
     }
 
-    const cleanLineas = lineas.map(({ soporteFile, ...rest }) => rest);
-    let assignedCodigo = `LEG-${Math.floor(100 + Math.random() * 900)}`;
+    setIsSubmitting(true);
+
     try {
-      const numRes = await fetch('/api/sap/next-number');
-      if (numRes.ok) {
-        const numData = await numRes.json();
-        if (numData.codigo) {
-          assignedCodigo = numData.codigo;
+      const cleanLineas = lineas.map(({ soporteFile, ...rest }) => rest);
+      let assignedCodigo = `LEG-${Math.floor(100 + Math.random() * 900)}`;
+      try {
+        const numRes = await fetch('/api/sap/next-number');
+        if (numRes.ok) {
+          const numData = await numRes.json();
+          if (numData.codigo) {
+            assignedCodigo = numData.codigo;
+          }
         }
+      } catch {
+        // fallback
       }
-    } catch {
-      // fallback
+
+      const nuevaLeg: Legalizacion = {
+        id: `leg-gst-${Date.now()}`,
+        codigo: assignedCodigo,
+        fecha,
+        usuarioNombre,
+        usuarioEmail,
+        centroCosto: centroCosto || 'General',
+        motivo,
+        estado: 'pendiente',
+        anticipoRecibido,
+        totalGastos,
+        saldoDiferencia,
+        lineas: cleanLineas,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Save to Supabase and local storage
+      saveLocalLegalizacionGasto(nuevaLeg);
+
+      // Trigger Power Automate Flow for approval notification
+      try {
+        const link = `${window.location.origin}/formulario-gastos/${nuevaLeg.id}`;
+        await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            correo: usuarioEmail,
+            titulo: `Aprobación de Legalización de Gastos - ${assignedCodigo}`,
+            contenido: `Tienes esta legalización de gastos pendiente por aprobar de ${usuarioNombre} por valor de ${formatCOP(totalGastos)}.`,
+            link: link,
+          }),
+        });
+      } catch (flowErr) {
+        console.error('Error enviando notificación al proxy:', flowErr);
+      }
+
+      setLastCodigo(assignedCodigo);
+      setSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const nuevaLeg: Legalizacion = {
-      id: `leg-gst-${Date.now()}`,
-      codigo: assignedCodigo,
-      fecha,
-      usuarioNombre,
-      usuarioEmail,
-      centroCosto: centroCosto || 'General',
-      motivo,
-      estado: 'pendiente',
-      anticipoRecibido,
-      totalGastos,
-      saldoDiferencia,
-      lineas: cleanLineas,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    // Save to Supabase and local storage
-    saveLocalLegalizacionGasto(nuevaLeg);
-
-    // Trigger Power Automate Flow for approval notification
-    try {
-      const link = `${window.location.origin}/formulario-gastos/${nuevaLeg.id}`;
-      await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          correo: usuarioEmail,
-          titulo: `Aprobación de Legalización de Gastos - ${assignedCodigo}`,
-          contenido: `Tienes esta legalización de gastos pendiente por aprobar de ${usuarioNombre} por valor de ${formatCOP(totalGastos)}.`,
-          link: link,
-        }),
-      });
-    } catch (flowErr) {
-      console.error('Error enviando notificación al proxy:', flowErr);
-    }
-
-    setLastCodigo(assignedCodigo);
-    setSubmitted(true);
   };
 
   const handleResetForm = () => {
@@ -760,10 +770,22 @@ export default function FormularioGastosPublicoPage() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-600/25 transition-all flex items-center justify-center gap-2"
+                  disabled={isSubmitting}
+                  className={`w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-600/25 transition-all flex items-center justify-center gap-2 ${
+                    isSubmitting ? 'opacity-60 cursor-not-allowed' : 'active:scale-[0.99] cursor-pointer'
+                  }`}
                 >
-                  <Send className="w-4 h-4" />
-                  <span>Enviar Legalización de Gastos</span>
+                  {isSubmitting ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Enviando Legalización...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Enviar Legalización de Gastos</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

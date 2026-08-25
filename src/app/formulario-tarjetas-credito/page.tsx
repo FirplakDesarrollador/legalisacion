@@ -33,6 +33,7 @@ export default function FormularioTarjetasCreditoPage() {
   const [motivo, setMotivo] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [lineas, setLineas] = useState<LineaGasto[]>([
     {
@@ -174,8 +175,10 @@ export default function FormularioTarjetasCreditoPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isSubmitting) return;
+
     if (!selectedResponsableId) {
-      alert('Por favor seleccione el Responsable / Custodio de la Caja Menor.');
+      alert('Por favor seleccione la Tarjeta de Crédito.');
       return;
     }
 
@@ -191,79 +194,89 @@ export default function FormularioTarjetasCreditoPage() {
       return;
     }
 
-    const randomNum = Math.floor(100 + Math.random() * 900);
-    const codigo = `TC-PUB-${randomNum}`;
+    setIsSubmitting(true);
 
-    const nuevaLeg: TarjetaCredito = {
-      id: `tc-pub-${Date.now()}`,
-      codigo,
-      fecha,
-      usuarioNombre,
-      usuarioEmail,
-      tarjeta_codigo: tarjetaCodigo,
-      tc_en_sap: tcEnSap,
-      centroCosto,
-      motivo,
-      estado: 'pendiente',
-      anticipoRecibido,
-      totalGastos,
-      saldoDiferencia,
-      lineas,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    // Save to Supabase (primary) and local storage (backup)
     try {
-      const insertPayload = {
-        id: nuevaLeg.id,
-        codigo: nuevaLeg.codigo,
-        fecha: nuevaLeg.fecha,
-        usuario_nombre: nuevaLeg.usuarioNombre,
-        usuario_email: nuevaLeg.usuarioEmail,
-        tarjeta_codigo: tarjetaCodigo || null,
-        tc_en_sap: tcEnSap || null,
-        aprobador_nombre: (responsables.find((r) => r.id === selectedResponsableId)?.responsable_nombre) || nuevaLeg.usuarioNombre,
-        aprobador_email: (responsables.find((r) => r.id === selectedResponsableId)?.responsable_email) || nuevaLeg.usuarioEmail,
-        centro_costo: nuevaLeg.centroCosto,
-        motivo: nuevaLeg.motivo,
-        estado: nuevaLeg.estado,
-        anticipo_recibido: nuevaLeg.anticipoRecibido,
-        total_gastos: nuevaLeg.totalGastos,
-        saldo_diferencia: nuevaLeg.saldoDiferencia,
-        lineas: nuevaLeg.lineas,
-        gestion_contable: 'Por procesar',
-        created_at: nuevaLeg.created_at,
-        updated_at: nuevaLeg.updated_at,
+      const randomNum = Math.floor(100 + Math.random() * 900);
+      const codigo = `TC-PUB-${randomNum}`;
+
+      const resp = responsables.find((r) => r.id === selectedResponsableId);
+      const aprobadorNombre = resp?.responsable_nombre || usuarioNombre;
+      const aprobadorEmail = resp?.responsable_email || usuarioEmail;
+
+      const nuevaLeg: TarjetaCredito = {
+        id: `tc-pub-${Date.now()}`,
+        codigo,
+        fecha,
+        usuarioNombre,
+        usuarioEmail,
+        tarjeta_codigo: tarjetaCodigo,
+        tc_en_sap: tcEnSap,
+        centroCosto,
+        motivo,
+        estado: 'pendiente',
+        anticipoRecibido,
+        totalGastos,
+        saldoDiferencia,
+        lineas,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
-      const { error } = await supabase.from('legalizaciones_tarjetas_credito').insert([insertPayload]);
-      if (error) {
-        console.error('Error guardando en Supabase:', error.message || error);
+
+      // Save to Supabase (primary) and local storage (backup)
+      try {
+        const insertPayload = {
+          id: nuevaLeg.id,
+          codigo: nuevaLeg.codigo,
+          fecha: nuevaLeg.fecha,
+          usuario_nombre: nuevaLeg.usuarioNombre,
+          usuario_email: nuevaLeg.usuarioEmail,
+          tarjeta_codigo: tarjetaCodigo || null,
+          tc_en_sap: tcEnSap || null,
+          aprobador_nombre: aprobadorNombre,
+          aprobador_email: aprobadorEmail,
+          centro_costo: nuevaLeg.centroCosto,
+          motivo: nuevaLeg.motivo,
+          estado: nuevaLeg.estado,
+          anticipo_recibido: nuevaLeg.anticipoRecibido,
+          total_gastos: nuevaLeg.totalGastos,
+          saldo_diferencia: nuevaLeg.saldoDiferencia,
+          lineas: nuevaLeg.lineas,
+          gestion_contable: 'Por procesar',
+          created_at: nuevaLeg.created_at,
+          updated_at: nuevaLeg.updated_at,
+        };
+        const { error } = await supabase.from('legalizaciones_tarjetas_credito').insert([insertPayload]);
+        if (error) {
+          console.error('Error guardando en Supabase:', error.message || error);
+        }
+      } catch (e: any) {
+        console.error('Error de red al guardar:', e.message || e);
       }
-    } catch (e: any) {
-      console.error('Error de red al guardar:', e.message || e);
-    }
 
-    // Enviar notificación a Power Automate vía API proxy
-    try {
-      const link = `${window.location.origin}/formulario-tarjetas-credito/${nuevaLeg.id}`;
-      await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          correo: nuevaLeg.usuarioEmail,
-          titulo: `Nueva Legalización de Tarjeta de Crédito: ${nuevaLeg.codigo}`,
-          contenido: `El usuario ${nuevaLeg.usuarioNombre} ha registrado la legalización de tarjeta de crédito ${nuevaLeg.codigo} por valor de $${nuevaLeg.totalGastos.toLocaleString('es-CO')} COP.`,
-          link: link
-        })
-      });
-    } catch (e) {
-      console.error('Error enviando notificación:', e);
-    }
+      // Enviar notificación a Power Automate vía API proxy
+      try {
+        const link = `${window.location.origin}/formulario-tarjetas-credito/${nuevaLeg.id}`;
+        await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            correo: aprobadorEmail,
+            titulo: `Nueva Legalización de Tarjeta de Crédito: ${nuevaLeg.codigo}`,
+            contenido: `El usuario ${nuevaLeg.usuarioNombre} ha registrado la legalización de tarjeta de crédito ${nuevaLeg.codigo} por valor de $${nuevaLeg.totalGastos.toLocaleString('es-CO')} COP.`,
+            link: link
+          })
+        });
+      } catch (e) {
+        console.error('Error enviando notificación:', e);
+      }
 
-    saveLocalTarjetaCredito(nuevaLeg);
-    setLastCodigo(codigo);
-    setSubmitted(true);
+      saveLocalTarjetaCredito(nuevaLeg);
+      setLastCodigo(codigo);
+      setSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleResetForm = () => {
@@ -579,9 +592,21 @@ export default function FormularioTarjetasCreditoPage() {
 
               <button
                 type="submit"
-                className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+                disabled={isSubmitting}
+                className={`w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 transition-all ${
+                  isSubmitting ? 'opacity-60 cursor-not-allowed' : 'active:scale-[0.99] cursor-pointer'
+                }`}
               >
-                <Send className="w-4 h-4" /> Enviar Formulario de Legalización
+                {isSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Enviando Legalización...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" /> Enviar Formulario de Legalización
+                  </>
+                )}
               </button>
             </form>
           </div>

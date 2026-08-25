@@ -58,6 +58,7 @@ export default function FormularioPublicoPage() {
   const [motivo, setMotivo] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [lineas, setLineas] = useState<LineaGasto[]>([
     {
@@ -274,6 +275,8 @@ export default function FormularioPublicoPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isSubmitting) return;
+
     if (!selectedResponsableId) {
       alert('Por favor seleccione el Responsable / Custodio de la Caja Menor.');
       return;
@@ -296,73 +299,79 @@ export default function FormularioPublicoPage() {
       return;
     }
 
-    const randomNum = Math.floor(100 + Math.random() * 900);
-    const codigo = `LEG-PUB-${randomNum}`;
+    setIsSubmitting(true);
 
-    const cleanLineas = lineas.map(({ soporteFile, soporteFiles, ...rest }) => rest);
-
-    const nuevaLeg: Legalizacion = {
-      id: `leg-pub-${Date.now()}`,
-      codigo,
-      fecha,
-      usuarioNombre,
-      usuarioEmail,
-      centroCosto,
-      motivo,
-      estado: 'pendiente',
-      anticipoRecibido,
-      totalGastos,
-      saldoDiferencia,
-      lineas: cleanLineas,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    // Save to Supabase (primary) and local storage (backup)
     try {
-      const { error } = await supabase.from('legalizaciones cajas menores').insert([{
-        id: nuevaLeg.id,
-        codigo: nuevaLeg.codigo,
-        fecha: nuevaLeg.fecha,
-        usuarioNombre: nuevaLeg.usuarioNombre,
-        usuarioEmail: nuevaLeg.usuarioEmail,
-        centroCosto: nuevaLeg.centroCosto,
-        motivo: nuevaLeg.motivo,
-        estado: nuevaLeg.estado,
-        anticipoRecibido: nuevaLeg.anticipoRecibido,
-        totalGastos: nuevaLeg.totalGastos,
-        saldoDiferencia: nuevaLeg.saldoDiferencia,
-        lineas: nuevaLeg.lineas,
-        created_at: nuevaLeg.created_at,
-        updated_at: nuevaLeg.updated_at,
-      }]);
-      if (error) {
-        console.error('Error guardando en Supabase:', error);
+      const randomNum = Math.floor(100 + Math.random() * 900);
+      const codigo = `LEG-PUB-${randomNum}`;
+
+      const cleanLineas = lineas.map(({ soporteFile, soporteFiles, ...rest }) => rest);
+
+      const nuevaLeg: Legalizacion = {
+        id: `leg-pub-${Date.now()}`,
+        codigo,
+        fecha,
+        usuarioNombre,
+        usuarioEmail,
+        centroCosto,
+        motivo,
+        estado: 'pendiente',
+        anticipoRecibido,
+        totalGastos,
+        saldoDiferencia,
+        lineas: cleanLineas,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Save to Supabase (primary) and local storage (backup)
+      try {
+        const { error } = await supabase.from('legalizaciones cajas menores').insert([{
+          id: nuevaLeg.id,
+          codigo: nuevaLeg.codigo,
+          fecha: nuevaLeg.fecha,
+          usuarioNombre: nuevaLeg.usuarioNombre,
+          usuarioEmail: nuevaLeg.usuarioEmail,
+          centroCosto: nuevaLeg.centroCosto,
+          motivo: nuevaLeg.motivo,
+          estado: nuevaLeg.estado,
+          anticipoRecibido: nuevaLeg.anticipoRecibido,
+          totalGastos: nuevaLeg.totalGastos,
+          saldoDiferencia: nuevaLeg.saldoDiferencia,
+          lineas: nuevaLeg.lineas,
+          created_at: nuevaLeg.created_at,
+          updated_at: nuevaLeg.updated_at,
+        }]);
+        if (error) {
+          console.error('Error guardando en Supabase:', error);
+        }
+      } catch (e) {
+        console.error('Error de red al guardar:', e);
       }
-    } catch (e) {
-      console.error('Error de red al guardar:', e);
-    }
 
-    // Trigger Power Automate Flow for approval notification via local API proxy (avoids CORS blocks)
-    try {
-      const link = `${window.location.origin}/formulario-publico/${nuevaLeg.id}`;
-      await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          correo: usuarioEmail,
-          titulo: 'Aprobación de caja menor',
-          contenido: `Tienes esta legalización pendiente por aprobar de ${usuarioNombre} por valor de ${formatCOP(totalGastos)}.`,
-          link: link
-        })
-      });
-    } catch (flowErr) {
-      console.error('Error enviando notificación al proxy:', flowErr);
-    }
+      // Trigger Power Automate Flow for approval notification via local API proxy (avoids CORS blocks)
+      try {
+        const link = `${window.location.origin}/formulario-publico/${nuevaLeg.id}`;
+        await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            correo: usuarioEmail,
+            titulo: 'Aprobación de caja menor',
+            contenido: `Tienes esta legalización pendiente por aprobar de ${usuarioNombre} por valor de ${formatCOP(totalGastos)}.`,
+            link: link
+          })
+        });
+      } catch (flowErr) {
+        console.error('Error enviando notificación al proxy:', flowErr);
+      }
 
-    saveLocalLegalizacion(nuevaLeg);
-    setLastCodigo(codigo);
-    setSubmitted(true);
+      saveLocalLegalizacion(nuevaLeg);
+      setLastCodigo(codigo);
+      setSubmitted(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleResetForm = () => {
@@ -742,9 +751,9 @@ export default function FormularioPublicoPage() {
 
               <button
                 type="submit"
-                disabled={isOverLimit}
+                disabled={isOverLimit || isSubmitting}
                 className={`w-full py-3.5 font-bold text-sm rounded-2xl flex items-center justify-center gap-2 transition-all ${
-                  isOverLimit
+                  isOverLimit || isSubmitting
                     ? 'bg-slate-300 text-slate-500 cursor-not-allowed border border-slate-300 shadow-none'
                     : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-600/25 active:scale-[0.99] cursor-pointer'
                 }`}
@@ -753,6 +762,11 @@ export default function FormularioPublicoPage() {
                   <>
                     <AlertTriangle className="w-4 h-4 text-rose-500" />
                     <span>No se puede enviar (Tope Excedido por {formatCOP(totalGastos - anticipoRecibido)})</span>
+                  </>
+                ) : isSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span>Enviando Legalización...</span>
                   </>
                 ) : (
                   <>
