@@ -1,5 +1,6 @@
 import { Legalizacion } from '@/types/legalizaciones';
 import { supabase } from './supabase';
+import { convertUSDToCOP } from './trm';
 
 // Ensure TLS certificate verification is bypassed for self-signed SAP SSL in development/internal network
 if (typeof process !== 'undefined') {
@@ -201,6 +202,33 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       }
     }
 
+    // 1.9 Pre-calcular totales convertidos a COP con TRM si vienen en USD
+    let totalGastosCOP = 0;
+    const lineasConvertidas = await Promise.all(
+      legalizacion.lineas.map(async (l) => {
+        const isUSD = l.moneda === 'USD';
+        let subCOP = l.valorSubtotal;
+        let totCOP = l.valorTotal || l.valorSubtotal;
+        let trmUsed: number | undefined = undefined;
+
+        if (isUSD) {
+          const convSub = await convertUSDToCOP(l.valorSubtotal, l.fecha || legalizacion.fecha);
+          const convTot = await convertUSDToCOP(l.valorTotal || l.valorSubtotal, l.fecha || legalizacion.fecha);
+          subCOP = convSub.valorCOP;
+          totCOP = convTot.valorCOP;
+          trmUsed = convSub.trm;
+        }
+
+        totalGastosCOP += totCOP;
+        return {
+          ...l,
+          valorSubtotalCOP: subCOP,
+          valorTotalCOP: totCOP,
+          trmUsed,
+        };
+      })
+    );
+
     // 2. Payload for Heinsohn U_HBT_LEGENC (Encabezado)
     const headerPayload = {
       Code: newEncCode,
@@ -214,10 +242,10 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       U_Comentario: `Borrador Legalización ${legalizacion.codigo} - ${legalizacion.motivo}`,
       U_TipoContabi: 'Comun',
       U_DocRate: 1,
-      U_VlrAntesIva: legalizacion.totalGastos,
+      U_VlrAntesIva: totalGastosCOP,
       U_VlrImpuesto: 0,
       U_VlrRetenciones: 0,
-      U_VlrTotal: legalizacion.totalGastos,
+      U_VlrTotal: totalGastosCOP,
       U_AcctCode: '23359505',
       U_Origen: 'SAP',
       U_Series: 69,
@@ -252,7 +280,7 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
 
     const cardCodeMap: Record<string, string> = {};
 
-    for (const linea of legalizacion.lineas) {
+    for (const linea of lineasConvertidas) {
       const detCode = currentDetNum.toString().padStart(10, '0');
       
       // 3.1 Buscar Proveedor en SAP por NIT para obtener CardCode real y Nombre (Priorizando AC y EM)
@@ -288,6 +316,9 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       const acctCode = (linea.cuentaTitulo || '').split(' - ')[0].trim();
 
       const isSoporte = linea.tipoDocumento === 'Documento Soporte';
+      const docIdWithTrm = linea.trmUsed
+        ? `${linea.facturaNumero || 'ND'} (USD $${linea.valorSubtotal} @ TRM $${linea.trmUsed.toLocaleString('es-CO')})`
+        : (linea.facturaNumero || 'ND');
 
       const detPayload = {
         Code: detCode,
@@ -298,11 +329,11 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
         U_CardName: realCardName,
         U_ProfitCode: isSoporte ? undefined : (lineProfitCode || undefined),
         U_CodeConcepto: isSoporte ? 'importar saldo' : acctCode,
-        U_IdDocumento: isSoporte ? undefined : (linea.facturaNumero || 'ND'),
+        U_IdDocumento: isSoporte ? undefined : docIdWithTrm,
         U_AcctCode: isSoporte ? undefined : acctCode,
-        U_VlrAntIVA: isSoporte ? undefined : linea.valorSubtotal,
-        U_VlrGasto: isSoporte ? undefined : linea.valorSubtotal,
-        U_VlrTotal: isSoporte ? undefined : (linea.valorTotal || linea.valorSubtotal),
+        U_VlrAntIVA: isSoporte ? undefined : linea.valorSubtotalCOP,
+        U_VlrGasto: isSoporte ? undefined : linea.valorSubtotalCOP,
+        U_VlrTotal: isSoporte ? undefined : (linea.valorTotalCOP || linea.valorSubtotalCOP),
       };
 
       const resDet = await fetch(`${baseUrl}/U_HBT_LEGDET`, {
@@ -323,7 +354,7 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
     udoData.DocNum = newEncCode;
 
     // 2. Procesar líneas de "Documento Soporte" y crear Facturas Preliminares (Drafts)
-    const lineasSoporte = legalizacion.lineas.filter(l => l.tipoDocumento === 'Documento Soporte');
+    const lineasSoporte = lineasConvertidas.filter(l => l.tipoDocumento === 'Documento Soporte');
     const draftsResults: any[] = [];
     const draftsErrors: string[] = [];
 
@@ -370,7 +401,7 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
             LineNum: lineIdx++,
             ItemCode: itemCode,
             Quantity: 1,
-            UnitPrice: l.valorSubtotal,
+            UnitPrice: l.valorSubtotalCOP,
             TaxCode: taxCode,
             CostingCode: lineProfitCode || undefined,
             U_CentroCostos: lineProfitCode || undefined,
