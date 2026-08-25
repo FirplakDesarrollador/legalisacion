@@ -252,11 +252,12 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
     );
 
     // 2. Payload for Heinsohn U_HBT_LEGENC (Encabezado)
+    const headerDate = legalizacion.fecha ? legalizacion.fecha.split('T')[0] : new Date().toISOString().split('T')[0];
     const headerPayload = {
       Code: newEncCode,
       Name: newEncCode,
       U_Currency: '$',
-      U_Fecha: new Date().toISOString().split('T')[0],
+      U_Fecha: headerDate,
       U_Estado: 1, // 1 = Borrador
       U_CardCode: headerCardCode, 
       U_CardName: headerCardName,
@@ -346,7 +347,7 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
         Code: detCode,
         Name: detCode,
         U_CodeLegEnc: newEncCode,
-        U_Fecha: new Date().toISOString().split('T')[0],
+        U_Fecha: linea.fecha ? linea.fecha.split('T')[0] : headerDate,
         U_CardCode: realCardCode,
         U_CardName: realCardName,
         U_ProfitCode: isSoporte ? undefined : (lineProfitCode || undefined),
