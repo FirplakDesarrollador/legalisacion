@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, UserCheck, Paperclip, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Legalizacion, LineaGasto, CuentaContable, Proveedor, ResponsableCaja, CentroCosto } from '@/types/legalizaciones';
 import { fetchResponsablesFromSupabase, fetchCentrosCostoFromSupabase, supabase } from '@/lib/supabase';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 interface NuevaLegalizacionModalProps {
   isOpen: boolean;
@@ -237,19 +238,18 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
             <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-blue-700" /> Seleccionar Caja Menor / Responsable *
             </label>
-            <select
-              value={selectedResponsableId}
-              onChange={(e) => handleResponsableSelect(Number(e.target.value))}
-              className="w-full p-2.5 bg-white border border-blue-300 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-xs"
+            <SearchableSelect
               required
-            >
-              <option value="" disabled>-- Seleccione la Caja Menor --</option>
-              {responsables.map((resp) => (
-                <option key={resp.id} value={resp.id}>
-                  {resp.nombre} — {resp.centro_costo || 'Área General'} (Monto Aprobado: ${resp.montoAprobadoStr || resp.montoAprobado?.toLocaleString()})
-                </option>
-              ))}
-            </select>
+              placeholder="-- Seleccione la Caja Menor --"
+              searchPlaceholder="Buscar por responsable o centro de costo..."
+              value={selectedResponsableId ? String(selectedResponsableId) : ''}
+              onChange={(val) => handleResponsableSelect(Number(val))}
+              options={responsables.map((resp) => ({
+                value: String(resp.id),
+                label: `${resp.nombre} — ${resp.centro_costo || 'Área General'} (Monto Aprobado: $${resp.montoAprobadoStr || resp.montoAprobado?.toLocaleString()})`,
+                sublabel: resp.email,
+              }))}
+            />
             {selectedResponsableId && (
               <p className="text-[11px] text-blue-800 flex items-center gap-1.5">
                 <span className="font-semibold">Aprobador asignado:</span> {responsables.find((r) => r.id === selectedResponsableId)?.aprobadorNombre || 'Por asignar'} ({responsables.find((r) => r.id === selectedResponsableId)?.email})
@@ -370,46 +370,46 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Centro de Costos *</label>
-                      <select
+                      <SearchableSelect
                         required
-                        value={linea.concepto || ''}
-                        onChange={(e) => {
-                          handleUpdateLinea(linea.id, 'concepto', e.target.value);
+                        placeholder="-- Seleccione Centro de Costo --"
+                        searchPlaceholder="Buscar centro de costo..."
+                        value={linea.concepto}
+                        onChange={(val) => {
+                          handleUpdateLinea(linea.id, 'concepto', val);
                           handleUpdateLinea(linea.id, 'cuentaId', null);
                         }}
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold focus:outline-none focus:border-blue-600"
-                      >
-                        <option value="" disabled>-- Seleccione Centro de Costo --</option>
-                        {centros.map((c) => (
-                          <option key={c.id} value={`${c.codigo} - ${c.Título}`}>
-                            {c.codigo} - {c.Título}
-                          </option>
-                        ))}
-                      </select>
+                        options={centros.map((c) => ({
+                          value: `${c.codigo} - ${c.Título}`,
+                          label: `${c.codigo} - ${c.Título}`,
+                          sublabel: c.Título,
+                        }))}
+                      />
                     </div>
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase) *</label>
-                      <select
-                        value={linea.cuentaId || ''}
-                        onChange={(e) => handleUpdateLinea(linea.id, 'cuentaId', e.target.value)}
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-blue-900 font-mono font-semibold"
+                      <SearchableSelect
                         required
-                      >
-                        <option value="" disabled>-- Seleccione Cuenta Contable --</option>
-                        {cuentas.filter((c) => {
-                          if (!linea.concepto) return true;
-                          const cc = linea.concepto.toUpperCase();
-                          if (cc.startsWith('GA')) return c.Título.startsWith('51');
-                          if (cc.startsWith('GV')) return c.Título.startsWith('52');
-                          if (cc.startsWith('IP')) return c.Título.startsWith('73');
-                          if (cc.startsWith('MO')) return c.Título.startsWith('72');
-                          return true;
-                        }).map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.Título} ({c.categoria})
-                          </option>
-                        ))}
-                      </select>
+                        placeholder="-- Seleccione Cuenta Contable --"
+                        searchPlaceholder="Buscar código o nombre de cuenta..."
+                        value={linea.cuentaId ? String(linea.cuentaId) : ''}
+                        onChange={(val) => handleUpdateLinea(linea.id, 'cuentaId', val ? Number(val) : '')}
+                        options={cuentas
+                          .filter((c) => {
+                            if (!linea.concepto) return true;
+                            const cc = linea.concepto.toUpperCase();
+                            if (cc.startsWith('GA')) return c.Título.startsWith('51');
+                            if (cc.startsWith('GV')) return c.Título.startsWith('52');
+                            if (cc.startsWith('IP')) return c.Título.startsWith('73');
+                            if (cc.startsWith('MO')) return c.Título.startsWith('72');
+                            return true;
+                          })
+                          .map((c) => ({
+                            value: String(c.id),
+                            label: `${c.Título} (${c.categoria})`,
+                            sublabel: c.categoria,
+                          }))}
+                      />
                     </div>
                   </div>
 

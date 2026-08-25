@@ -36,6 +36,7 @@ import {
   CentroCosto,
   SoporteAdjunto,
 } from '@/types/legalizaciones';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 export default function FormularioPublicoPage() {
   const [responsables, setResponsables] = useState<ResponsableCaja[]>([]);
@@ -436,21 +437,18 @@ export default function FormularioPublicoPage() {
                   </label>
                 </div>
 
-                <select
+                <SearchableSelect
                   required
-                  value={selectedResponsableId}
-                  onChange={(e) => handleResponsableChange(Number(e.target.value))}
-                  className="w-full p-3 bg-white border border-blue-300 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-sm"
-                >
-                  <option value="" disabled>
-                    -- Seleccione el Responsable de la Caja Menor --
-                  </option>
-                  {responsables.map((resp) => (
-                    <option key={resp.id} value={resp.id}>
-                      {resp.nombre} - {resp.centro_costo || 'General'} [{resp.cargo || 'Custodio'}]
-                    </option>
-                  ))}
-                </select>
+                  placeholder="-- Seleccione el Responsable de la Caja Menor --"
+                  searchPlaceholder="Buscar responsable por nombre o centro de costo..."
+                  value={selectedResponsableId ? String(selectedResponsableId) : ''}
+                  onChange={(val) => handleResponsableChange(Number(val))}
+                  options={responsables.map((resp) => ({
+                    value: String(resp.id),
+                    label: `${resp.nombre} - ${resp.centro_costo || 'General'} [Aprobador: ${resp.aprobadorNombre || resp.cargo || 'Custodio'}]`,
+                    sublabel: resp.email,
+                  }))}
+                />
 
                 <p className="text-[11px] text-blue-800">
                   Seleccione el funcionario a cargo del fondo fijo de caja menor para asignar la legalización.
@@ -503,19 +501,18 @@ export default function FormularioPublicoPage() {
                         </div>
                         <div className="sm:col-span-2">
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Centro de Costos *</label>
-                          <select
+                          <SearchableSelect
                             required
+                            placeholder="-- Seleccione Centro de Costo --"
+                            searchPlaceholder="Buscar centro de costo..."
                             value={linea.concepto}
-                            onChange={(e) => handleUpdateLinea(linea.id, 'concepto', e.target.value)}
-                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600"
-                          >
-                            <option value="" disabled>-- Seleccione Centro de Costo --</option>
-                            {centros.map((centro) => (
-                              <option key={centro.id} value={`${centro.codigo} - ${centro.Título}`}>
-                                {centro.codigo} - {centro.Título}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(val) => handleUpdateLinea(linea.id, 'concepto', val)}
+                            options={centros.map((centro) => ({
+                              value: `${centro.codigo} - ${centro.Título}`,
+                              label: `${centro.codigo} - ${centro.Título}`,
+                              sublabel: centro.Título,
+                            }))}
+                          />
                         </div>
                         <div>
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Tipo Doc.</label>
@@ -547,26 +544,27 @@ export default function FormularioPublicoPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                         <div className="sm:col-span-3">
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase)</label>
-                          <select
-                            value={linea.cuentaId || ''}
-                            onChange={(e) => handleUpdateLinea(linea.id, 'cuentaId', e.target.value)}
-                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-blue-900 font-mono font-semibold"
-                          >
-                            <option value="" disabled>-- Seleccione Cuenta --</option>
-                            {cuentas.filter((c) => {
-                              if (!linea.concepto) return true;
-                              const cc = linea.concepto.toUpperCase();
-                              if (cc.startsWith('GA')) return c.Título.startsWith('51');
-                              if (cc.startsWith('GV')) return c.Título.startsWith('52');
-                              if (cc.startsWith('IP')) return c.Título.startsWith('73');
-                              if (cc.startsWith('MO')) return c.Título.startsWith('72');
-                              return true;
-                            }).map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.Título} ({c.categoria})
-                              </option>
-                            ))}
-                          </select>
+                          <SearchableSelect
+                            placeholder="-- Seleccione Cuenta --"
+                            searchPlaceholder="Buscar código o nombre de cuenta..."
+                            value={linea.cuentaId ? String(linea.cuentaId) : ''}
+                            onChange={(val) => handleUpdateLinea(linea.id, 'cuentaId', val ? Number(val) : '')}
+                            options={cuentas
+                              .filter((c) => {
+                                if (!linea.concepto) return true;
+                                const cc = linea.concepto.toUpperCase();
+                                if (cc.startsWith('GA')) return c.Título.startsWith('51');
+                                if (cc.startsWith('GV')) return c.Título.startsWith('52');
+                                if (cc.startsWith('IP')) return c.Título.startsWith('73');
+                                if (cc.startsWith('MO')) return c.Título.startsWith('72');
+                                return true;
+                              })
+                              .map((c) => ({
+                                value: String(c.id),
+                                label: `${c.Título} (${c.categoria})`,
+                                sublabel: c.categoria,
+                              }))}
+                          />
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex-1">
