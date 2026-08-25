@@ -11,6 +11,7 @@ import {
   supabase
 } from '@/lib/supabase';
 import { CuentaContable, Proveedor, LineaGasto, TarjetaCredito, ResponsableTarjetaCredito, CentroCosto } from '@/types/legalizaciones';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 export default function FormularioTarjetasCreditoPage() {
   const [responsables, setResponsables] = useState<ResponsableTarjetaCredito[]>([]);
@@ -418,18 +419,28 @@ export default function FormularioTarjetasCreditoPage() {
                         </div>
                         <div className="sm:col-span-2">
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Centro de Costos *</label>
-                          <select
+                          <SearchableSelect
                             required
+                            placeholder="-- Seleccione Centro de Costo --"
+                            searchPlaceholder="Buscar centro de costo..."
                             value={linea.concepto}
-                            onChange={(e) => handleUpdateLinea(linea.id, 'concepto', e.target.value)}
-                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600"
+                            onChange={(val) => handleUpdateLinea(linea.id, 'concepto', val)}
+                            options={centros.map((centro) => ({
+                              value: `${centro.codigo} - ${centro.Título}`,
+                              label: `${centro.codigo} - ${centro.Título}`,
+                              sublabel: centro.Título,
+                            }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Tipo de Moneda *</label>
+                          <select
+                            value={linea.moneda || 'COP'}
+                            onChange={(e) => handleUpdateLinea(linea.id, 'moneda', e.target.value)}
+                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 font-semibold"
                           >
-                            <option value="" disabled>-- Seleccione Centro de Costo --</option>
-                            {centros.map((centro) => (
-                              <option key={centro.id} value={`${centro.codigo} - ${centro.Título}`}>
-                                {centro.codigo} - {centro.Título}
-                              </option>
-                            ))}
+                            <option value="COP">Pesos Colombianos (COP)</option>
+                            <option value="USD">USD (Dólares)</option>
                           </select>
                         </div>
                         <div>
@@ -460,40 +471,43 @@ export default function FormularioTarjetasCreditoPage() {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-3">
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase)</label>
-                          <select
-                            value={linea.cuentaId || ''}
-                            onChange={(e) => handleUpdateLinea(linea.id, 'cuentaId', e.target.value)}
-                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-blue-900 font-mono font-semibold"
-                          >
-                            <option value="" disabled>-- Seleccione Cuenta --</option>
-                            {cuentas.filter((c) => {
-                              if (!linea.concepto) return true;
-                              const cc = linea.concepto.toUpperCase();
-                              if (cc.startsWith('GA')) return c.Título.startsWith('51');
-                              if (cc.startsWith('GV')) return c.Título.startsWith('52');
-                              if (cc.startsWith('IP')) return c.Título.startsWith('73');
-                              if (cc.startsWith('MO')) return c.Título.startsWith('72');
-                              return true;
-                            }).map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.Título} ({c.categoria})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Subtotal ($ COP)</label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={linea.valorSubtotal || ''}
-                            onChange={(e) => handleUpdateLinea(linea.id, 'valorSubtotal', e.target.value)}
-                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
+                          <SearchableSelect
+                            placeholder="-- Seleccione Cuenta --"
+                            searchPlaceholder="Buscar código o nombre de cuenta..."
+                            value={linea.cuentaId ? String(linea.cuentaId) : ''}
+                            onChange={(val) => handleUpdateLinea(linea.id, 'cuentaId', val ? Number(val) : '')}
+                            options={cuentas
+                              .filter((c) => {
+                                if (!linea.concepto) return true;
+                                const cc = linea.concepto.toUpperCase();
+                                if (cc.startsWith('GA')) return c.Título.startsWith('51');
+                                if (cc.startsWith('GV')) return c.Título.startsWith('52');
+                                if (cc.startsWith('IP')) return c.Título.startsWith('73');
+                                if (cc.startsWith('MO')) return c.Título.startsWith('72');
+                                return true;
+                              })
+                              .map((c) => ({
+                                value: String(c.id),
+                                label: `${c.Título} (${c.categoria})`,
+                                sublabel: c.categoria,
+                              }))}
                           />
                         </div>
-                        <div className="flex items-center gap-2 justify-end">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                              Subtotal ({linea.moneda === 'USD' ? 'USD $' : '$ COP'})
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={linea.valorSubtotal || ''}
+                              onChange={(e) => handleUpdateLinea(linea.id, 'valorSubtotal', e.target.value)}
+                              className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
+                            />
+                          </div>
                           {lineas.length > 1 && (
                             <button
                               type="button"

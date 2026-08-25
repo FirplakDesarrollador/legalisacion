@@ -271,10 +271,17 @@ export const LegalizacionDetailModal: React.FC<LegalizacionDetailModalProps> = (
                         {linea.proveedorNit || (linea as any).proveedor_nit || (linea as any).nit || (linea.proveedorNombre && !linea.proveedorNombre.toLowerCase().includes('proveedor varios') ? linea.proveedorNombre : '') || 'N/A'}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-slate-500">
-                        {formatCOP(linea.valorSubtotal)}
+                        {linea.moneda === 'USD' ? `$${Number(linea.valorSubtotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD` : formatCOP(linea.valorSubtotal)}
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
-                        {formatCOP(linea.valorTotal)}
+                        {linea.moneda === 'USD' ? (
+                          <span className="text-amber-900 font-bold">
+                            ${Number(linea.valorTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
+                            <span className="text-[10px] bg-amber-100 text-amber-800 font-extrabold px-1.5 py-0.5 rounded">USD</span>
+                          </span>
+                        ) : (
+                          formatCOP(linea.valorTotal)
+                        )}
                       </td>
                     </tr>
                   ))}

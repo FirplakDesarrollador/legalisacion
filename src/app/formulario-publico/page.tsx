@@ -70,6 +70,7 @@ export default function FormularioPublicoPage() {
       proveedorNombre: '',
       tipoDocumento: 'Factura',
       facturaNumero: '',
+      moneda: 'COP',
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
@@ -147,6 +148,7 @@ export default function FormularioPublicoPage() {
       proveedorNombre: proveedores[0]?.razon_social || '',
       tipoDocumento: 'Factura',
       facturaNumero: '',
+      moneda: 'COP',
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
@@ -524,6 +526,17 @@ export default function FormularioPublicoPage() {
                           />
                         </div>
                         <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Tipo de Moneda *</label>
+                          <select
+                            value={linea.moneda || 'COP'}
+                            onChange={(e) => handleUpdateLinea(linea.id, 'moneda', e.target.value)}
+                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:border-blue-600 font-semibold"
+                          >
+                            <option value="COP">Pesos Colombianos (COP)</option>
+                            <option value="USD">USD (Dólares)</option>
+                          </select>
+                        </div>
+                        <div>
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Tipo Doc.</label>
                           <select
                             value={linea.tipoDocumento || 'Factura'}
@@ -577,7 +590,9 @@ export default function FormularioPublicoPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex-1">
-                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Valor ($ COP)</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                              Valor ({linea.moneda === 'USD' ? 'USD $' : '$ COP'})
+                            </label>
                             <input
                               type="number"
                               min={0}

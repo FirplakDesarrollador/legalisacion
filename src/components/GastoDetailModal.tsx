@@ -189,7 +189,14 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                         {l.cuentaTitulo || 'Cuenta asociada'}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                        {formatCOP(l.valorTotal)}
+                        {l.moneda === 'USD' ? (
+                          <span className="text-amber-900 font-bold">
+                            ${Number(l.valorTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}{' '}
+                            <span className="text-[10px] bg-amber-100 text-amber-800 font-extrabold px-1.5 py-0.5 rounded">USD</span>
+                          </span>
+                        ) : (
+                          formatCOP(l.valorTotal)
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         {l.soporteUrl ? (

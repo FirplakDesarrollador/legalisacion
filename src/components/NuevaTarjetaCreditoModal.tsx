@@ -39,6 +39,7 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
       proveedorNombre: '',
       tipoDocumento: 'Factura',
       facturaNumero: '',
+      moneda: 'COP',
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
@@ -63,6 +64,7 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
       proveedorNombre: '',
       tipoDocumento: 'Factura',
       facturaNumero: '',
+      moneda: 'COP',
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
@@ -251,6 +253,17 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
                       />
                     </div>
                     <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Tipo de Moneda *</label>
+                      <select
+                        value={linea.moneda || 'COP'}
+                        onChange={(e) => handleUpdateLinea(linea.id, 'moneda', e.target.value)}
+                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold focus:outline-none focus:border-blue-600"
+                      >
+                        <option value="COP">Pesos Colombianos (COP)</option>
+                        <option value="USD">USD (Dólares)</option>
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Tipo Doc.</label>
                       <select
                         value={linea.tipoDocumento || 'Factura'}
@@ -300,7 +313,9 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Valor del Gasto ($ COP)</label>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                        Valor del Gasto ({linea.moneda === 'USD' ? 'USD $' : '$ COP'})
+                      </label>
                       <input
                         type="number"
                         placeholder="0"
@@ -313,9 +328,11 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Total Línea ($ COP)</label>
+                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                          Total Línea ({linea.moneda === 'USD' ? 'USD $' : '$ COP'})
+                        </label>
                         <div className="p-1.5 bg-slate-100 border border-slate-200 rounded-lg text-blue-900 font-mono font-bold text-xs">
-                          {formatCOP(linea.valorTotal)}
+                          {linea.moneda === 'USD' ? `$ ${linea.valorTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD` : formatCOP(linea.valorTotal)}
                         </div>
                       </div>
                       {lineas.length > 1 && (

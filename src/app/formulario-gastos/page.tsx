@@ -12,6 +12,7 @@ import {
   supabase
 } from '@/lib/supabase';
 import { CuentaContable, Proveedor, LineaGasto, Legalizacion, CentroCosto } from '@/types/legalizaciones';
+import { SearchableSelect } from '@/components/SearchableSelect';
 
 export default function FormularioGastosPublicoPage() {
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
@@ -51,6 +52,7 @@ export default function FormularioGastosPublicoPage() {
       proveedorNombre: '',
       tipoDocumento: 'Factura',
       facturaNumero: '',
+      moneda: 'COP',
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
@@ -113,6 +115,7 @@ export default function FormularioGastosPublicoPage() {
       proveedorNombre: '',
       tipoDocumento: 'Factura',
       facturaNumero: '',
+      moneda: 'COP',
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
@@ -605,68 +608,74 @@ export default function FormularioGastosPublicoPage() {
 
                         <div>
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Centro de Costos *</label>
-                          <select
+                          <SearchableSelect
                             required
-                            value={linea.concepto || ''}
-                            onChange={(e) => {
-                              handleUpdateLinea(linea.id, 'concepto', e.target.value);
+                            placeholder="-- Seleccione Centro de Costo --"
+                            searchPlaceholder="Buscar centro de costo..."
+                            value={linea.concepto}
+                            onChange={(val) => {
+                              handleUpdateLinea(linea.id, 'concepto', val);
                               handleUpdateLinea(linea.id, 'cuentaId', null);
                             }}
-                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold focus:outline-none focus:border-blue-600 text-xs"
-                          >
-                            <option value="" disabled>-- Seleccione Centro de Costo --</option>
-                            {centros.map((c) => (
-                              <option key={c.id} value={`${c.codigo} - ${c.Título}`}>
-                                {c.codigo} - {c.Título}
-                              </option>
-                            ))}
-                          </select>
+                            options={centros.map((c) => ({
+                              value: `${c.codigo} - ${c.Título}`,
+                              label: `${c.codigo} - ${c.Título}`,
+                              sublabel: c.Título,
+                            }))}
+                          />
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase) *</label>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Tipo de Moneda *</label>
                           <select
-                            value={linea.cuentaId || ''}
-                            onChange={(e) => handleUpdateLinea(linea.id, 'cuentaId', e.target.value)}
-                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-blue-900 font-mono font-semibold text-xs"
-                            required
+                            value={linea.moneda || 'COP'}
+                            onChange={(e) => handleUpdateLinea(linea.id, 'moneda', e.target.value)}
+                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold focus:outline-none focus:border-blue-600 text-xs"
                           >
-                            <option value="" disabled>-- Seleccione Cuenta Contable --</option>
-                            {cuentas.filter((c) => {
-                              if (!linea.concepto) return true;
-                              const cc = linea.concepto.toUpperCase();
-                              if (cc.startsWith('GA')) return c.Título.startsWith('51');
-                              if (cc.startsWith('GV')) return c.Título.startsWith('52');
-                              if (cc.startsWith('IP')) return c.Título.startsWith('73');
-                              if (cc.startsWith('MO')) return c.Título.startsWith('72');
-                              return true;
-                            }).map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.Título} ({c.categoria})
-                              </option>
-                            ))}
+                            <option value="COP">Pesos Colombianos (COP)</option>
+                            <option value="USD">USD (Dólares)</option>
                           </select>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <div className="sm:col-span-2">
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase) *</label>
+                          <SearchableSelect
+                            placeholder="-- Seleccione Cuenta Contable --"
+                            searchPlaceholder="Buscar código o nombre de cuenta..."
+                            value={linea.cuentaId ? String(linea.cuentaId) : ''}
+                            onChange={(val) => handleUpdateLinea(linea.id, 'cuentaId', val ? Number(val) : '')}
+                            options={cuentas
+                              .filter((c) => {
+                                if (!linea.concepto) return true;
+                                const cc = linea.concepto.toUpperCase();
+                                if (cc.startsWith('GA')) return c.Título.startsWith('51');
+                                if (cc.startsWith('GV')) return c.Título.startsWith('52');
+                                if (cc.startsWith('IP')) return c.Título.startsWith('73');
+                                if (cc.startsWith('MO')) return c.Título.startsWith('72');
+                                return true;
+                              })
+                              .map((c) => ({
+                                value: String(c.id),
+                                label: `${c.Título} (${c.categoria})`,
+                                sublabel: c.categoria,
+                              }))}
+                          />
+                        </div>
                         <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Valor del Gasto ($ COP) *</label>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            Valor del Gasto ({linea.moneda === 'USD' ? 'USD $' : '$ COP'}) *
+                          </label>
                           <input
                             type="number"
                             min={0}
                             placeholder="0"
                             value={linea.valorSubtotal || ''}
                             onChange={(e) => handleUpdateLinea(linea.id, 'valorSubtotal', e.target.value)}
-                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono font-bold"
+                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono font-bold text-xs"
                             required
                           />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Total Comprobante</label>
-                          <div className="p-2 bg-slate-100 border border-slate-200 rounded-lg text-blue-900 font-mono font-bold">
-                            {formatCOP(linea.valorTotal)}
-                          </div>
                         </div>
                       </div>
 

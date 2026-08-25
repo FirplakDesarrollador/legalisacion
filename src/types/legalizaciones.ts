@@ -64,6 +64,7 @@ export interface LineaGasto {
   proveedorNombre?: string | null;
   tipoDocumento?: 'Factura' | 'Documento Soporte';
   facturaNumero: string;
+  moneda?: 'COP' | 'USD' | string;
   valorSubtotal: number;
   valorIva: number;
   valorTotal: number;
