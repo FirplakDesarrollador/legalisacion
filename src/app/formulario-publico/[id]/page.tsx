@@ -101,10 +101,24 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
         updatePayload.sap_doc_entry = createdDocEntry;
       }
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from('legalizaciones cajas menores')
         .update(updatePayload)
         .eq('id', legalizacion.id);
+
+      // Si la columna sap_doc_entry no existe aún en la tabla de Supabase, reintentar sin ella para no bloquear la aprobación
+      if (error && (error.message.includes('sap_doc_entry') || error.message.includes('schema cache'))) {
+        const fallbackPayload = {
+          estado: nuevoEstado,
+          observacionesAprobacion: observaciones,
+          updated_at: now,
+        };
+        const retryRes = await supabase
+          .from('legalizaciones cajas menores')
+          .update(fallbackPayload)
+          .eq('id', legalizacion.id);
+        error = retryRes.error;
+      }
 
       if (error) {
         alert('Error al actualizar el estado: ' + error.message);
