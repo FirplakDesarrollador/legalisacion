@@ -263,7 +263,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
           <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200 sticky top-0 z-10 shadow-xs backdrop-blur-xs">
             <tr>
               <th className="py-3.5 px-4 text-center">Acciones</th>
-              <th className="py-3.5 px-4">Código / Fecha</th>
+              <th className="py-3.5 px-4">N° SAP / Fecha</th>
               <th className="py-3.5 px-4">Solicitante</th>
               <th className="py-3.5 px-4">Motivo / Centro Costo</th>
               <th className="py-3.5 px-4 text-right">Fondo Caja</th>
@@ -315,16 +315,15 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
                       return (
                         <div>
                           {docEntry ? (
-                            <div className="flex items-center gap-1 mb-0.5">
-                              <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[11px]">
-                                SAP #{docEntry}
-                              </span>
-                            </div>
+                            <p className="font-mono font-bold text-indigo-900 text-xs">
+                              SAP #{docEntry}
+                            </p>
                           ) : (
-                            <p className="font-bold text-blue-900 font-mono">{leg.codigo}</p>
+                            <p className="font-semibold text-slate-400 text-xs italic">
+                              Pendiente SAP
+                            </p>
                           )}
-                          {docEntry && <p className="font-mono text-[10px] text-slate-500 font-medium">{leg.codigo}</p>}
-                          <p className="text-[10px] text-slate-400">{leg.fecha}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{leg.fecha}</p>
                         </div>
                       );
                     })()}
