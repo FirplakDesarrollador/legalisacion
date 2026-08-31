@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, UserPlus, Receipt, Loader2, Send } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, UserPlus, Receipt, Loader2, Send, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
 import { supabase } from '@/lib/supabase';
 
@@ -20,9 +20,17 @@ export const GastosList: React.FC<GastosListProps> = ({
   onUpdateStatus,
   onUpdateGestionContable,
 }) => {
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'todas' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (tableContainerRef.current) {
+      const amount = direction === 'left' ? -350 : 350;
+      tableContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
 
   const handleEnviarSAP = async (leg: Legalizacion) => {
     setSyncingId(leg.id);
@@ -188,23 +196,48 @@ export const GastosList: React.FC<GastosListProps> = ({
           ))}
         </div>
 
-        <div className="relative w-full sm:w-64">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Buscar por código, solicitante, motivo..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 shadow-xs"
-          />
+        <div className="flex items-center gap-2">
+          {/* Botones de desplazamiento horizontal rápido */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0" title="Desplazar tabla horizontalmente">
+            <button
+              type="button"
+              onClick={() => handleScroll('left')}
+              className="p-1 hover:bg-white hover:shadow-xs rounded-lg text-slate-600 hover:text-blue-600 transition-all cursor-pointer"
+              title="Desplazar a la izquierda"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-[10px] font-bold text-slate-400 px-0.5 select-none">&bull;</span>
+            <button
+              type="button"
+              onClick={() => handleScroll('right')}
+              className="p-1 hover:bg-white hover:shadow-xs rounded-lg text-slate-600 hover:text-blue-600 transition-all cursor-pointer"
+              title="Desplazar a la derecha"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="relative w-full sm:w-60">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar por código, solicitante, motivo..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 shadow-xs"
+            />
+          </div>
         </div>
       </div>
 
       {/* Main Table View */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs min-w-[1250px]">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[10px]">
+      <div 
+        ref={tableContainerRef}
+        className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-auto max-h-[calc(100vh-230px)] min-h-[380px] custom-scrollbar relative"
+      >
+        <table className="w-full text-left text-xs min-w-[1250px] whitespace-nowrap">
+          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[10px] sticky top-0 z-10 shadow-xs backdrop-blur-xs">
               <tr>
                 <th className="py-3.5 px-4 text-center">Acciones</th>
                 <th className="py-3.5 px-4">Solicitante</th>
@@ -354,6 +387,5 @@ export const GastosList: React.FC<GastosListProps> = ({
           </table>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };

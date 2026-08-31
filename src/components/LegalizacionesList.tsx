@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
 import { supabase, updateLegalizacionGestionContable } from '@/lib/supabase';
 
@@ -18,12 +18,20 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
   onOpenNuevaModal,
   onUpdateStatus,
 }) => {
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'todas' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<{ [id: string]: { success: boolean; message: string; docEntry?: number } }>({});
   const [localGestion, setLocalGestion] = useState<{ [id: string]: 'Por procesar' | 'Procesado' }>({});
   const [localFechaProcesado, setLocalFechaProcesado] = useState<{ [id: string]: string | null }>({});
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (tableContainerRef.current) {
+      const amount = direction === 'left' ? -350 : 350;
+      tableContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
 
   const handleGestionChange = async (id: string, nuevoValor: 'Por procesar' | 'Procesado') => {
     const nowIso = nuevoValor === 'Procesado' ? new Date().toISOString() : null;
@@ -183,8 +191,29 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
         </div>
 
         {/* Actions & Search */}
-        <div className="flex items-center gap-3">
-          <div className="relative w-full sm:w-64">
+        <div className="flex items-center gap-2">
+          {/* Botones de desplazamiento horizontal rápido */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0" title="Desplazar tabla horizontalmente">
+            <button
+              type="button"
+              onClick={() => handleScroll('left')}
+              className="p-1 hover:bg-white hover:shadow-xs rounded-lg text-slate-600 hover:text-blue-600 transition-all cursor-pointer"
+              title="Desplazar a la izquierda"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-[10px] font-bold text-slate-400 px-0.5 select-none">&bull;</span>
+            <button
+              type="button"
+              onClick={() => handleScroll('right')}
+              className="p-1 hover:bg-white hover:shadow-xs rounded-lg text-slate-600 hover:text-blue-600 transition-all cursor-pointer"
+              title="Desplazar a la derecha"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="relative w-full sm:w-60">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -198,14 +227,14 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
             href="https://ingreso-provedores.vercel.app/registro?tipo=contado"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 shrink-0 transition-all"
+            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 shrink-0 transition-all"
             title="Crear Proveedor de Contado"
           >
             <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" /> Crear proveedor de contado
           </a>
           <button
             onClick={onOpenNuevaModal}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 shrink-0 transition-all"
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center gap-1.5 shrink-0 transition-all"
           >
             <PlusCircle className="w-3.5 h-3.5 stroke-[2.5]" /> Nueva
           </button>
@@ -213,9 +242,12 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
       </div>
 
       {/* Main Table */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-x-auto custom-scrollbar shadow-sm">
+      <div 
+        ref={tableContainerRef}
+        className="rounded-2xl border border-slate-200 bg-white overflow-auto max-h-[calc(100vh-230px)] min-h-[380px] custom-scrollbar shadow-sm relative"
+      >
         <table className="w-full min-w-[1250px] text-left text-xs text-slate-700 whitespace-nowrap">
-          <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
+          <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200 sticky top-0 z-10 shadow-xs backdrop-blur-xs">
             <tr>
               <th className="py-3.5 px-4 text-center">Acciones</th>
               <th className="py-3.5 px-4">Código / Fecha</th>
