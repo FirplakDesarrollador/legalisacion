@@ -281,13 +281,14 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
               <th className="py-3.5 px-4 text-right">Saldo en Caja</th>
               <th className="py-3.5 px-4">Estado</th>
               <th className="py-3.5 px-4">Gestión Contable</th>
+              <th className="py-3.5 px-4">Fecha de Aprobación</th>
               <th className="py-3.5 px-4">Fecha de Procesado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-8 text-center text-slate-400">
+                <td colSpan={11} className="py-8 text-center text-slate-400">
                   No hay cajas menores para mostrar en este estado.
                 </td>
               </tr>
@@ -371,6 +372,20 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
                       <option value="Por procesar">⏳ Por procesar</option>
                       <option value="Procesado">✅ Procesado</option>
                     </select>
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-700">
+                    {leg.fechaAprobacion ? (
+                      <div>
+                        <p className="font-semibold text-slate-900">
+                          {formatFecha(leg.fechaAprobacion)}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {formatHora(leg.fechaAprobacion)}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 text-[11px] font-mono">—</span>
+                    )}
                   </td>
                   <td className="py-3.5 px-4 text-slate-700">
                     {((localGestion[leg.id] ?? leg.gestionContable) === 'Procesado') ? (

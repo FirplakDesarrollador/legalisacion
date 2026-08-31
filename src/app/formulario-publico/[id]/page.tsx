@@ -182,6 +182,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
       const updatePayload: any = {
         estado: nuevoEstado,
         observacionesAprobacion: observaciones,
+        fecha_aprobacion: nuevoEstado === 'aprobado' ? now : null,
         updated_at: now,
       };
 
@@ -199,6 +200,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
         const fallbackPayload = {
           estado: nuevoEstado,
           observacionesAprobacion: observaciones,
+          fecha_aprobacion: nuevoEstado === 'aprobado' ? now : null,
           updated_at: now,
         };
         const retryRes = await supabase
@@ -216,6 +218,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
           ...legalizacion,
           estado: nuevoEstado,
           observacionesAprobacion: observaciones,
+          fechaAprobacion: nuevoEstado === 'aprobado' ? now : undefined,
           sapDocEntry: finalDocEntry,
         });
 

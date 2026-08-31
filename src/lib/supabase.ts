@@ -412,6 +412,7 @@ export async function fetchLegalizacionesFromSupabase(): Promise<Legalizacion[]>
         ...row,
         sapDocEntry: row.sap_doc_entry || row.sapDocEntry || row.sap_docentry || row.sapDocentry,
         gestionContable: (isProcesado ? 'Procesado' : 'Por procesar') as 'Por procesar' | 'Procesado',
+        fechaAprobacion: (row.estado === 'aprobado' || row.estado === 'pagado') ? (row.fecha_aprobacion || row.fechaAprobacion || row.updated_at) : undefined,
         fechaProcesado: row.fecha_procesado || row.fechaProcesado || (isProcesado ? row.updated_at : undefined),
       };
     }) as Legalizacion[];
@@ -710,6 +711,7 @@ export function updateLegalizacionStatus(id: string, nuevoEstado: Legalizacion['
   supabase.from('legalizaciones cajas menores').update({
     estado: nuevoEstado,
     observacionesAprobacion: observaciones,
+    fecha_aprobacion: nuevoEstado === 'aprobado' ? now : undefined,
     updated_at: now
   }).eq('id', id).then(({ error }) => {
     if (error) console.error('Error al actualizar estado en Supabase:', error);
