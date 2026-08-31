@@ -405,12 +405,16 @@ export async function fetchLegalizacionesFromSupabase(): Promise<Legalizacion[]>
     }
 
     // Return real data (may be empty array if no records yet)
-    return (data || []).map((row: any) => ({
-      ...row,
-      sapDocEntry: row.sap_doc_entry || row.sapDocEntry || row.sap_docentry || row.sapDocentry,
-      gestionContable: row.gestion_contable || row.gestionContable || 'Por procesar',
-      fechaProcesado: row.fecha_procesado || row.fechaProcesado || (row.gestion_contable === 'Procesado' || row.gestionContable === 'Procesado' ? row.updated_at : undefined),
-    })) as Legalizacion[];
+    return (data || []).map((row: any) => {
+      const gRaw = String(row.gestion_contable || row.gestionContable || '').toLowerCase().trim();
+      const isProcesado = gRaw === 'procesado';
+      return {
+        ...row,
+        sapDocEntry: row.sap_doc_entry || row.sapDocEntry || row.sap_docentry || row.sapDocentry,
+        gestionContable: (isProcesado ? 'Procesado' : 'Por procesar') as 'Por procesar' | 'Procesado',
+        fechaProcesado: row.fecha_procesado || row.fechaProcesado || (isProcesado ? row.updated_at : undefined),
+      };
+    }) as Legalizacion[];
   } catch {
     return [];
   }

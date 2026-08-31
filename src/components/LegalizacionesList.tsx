@@ -35,23 +35,33 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
 
   const handleGestionChange = async (id: string, nuevoValor: 'Por procesar' | 'Procesado') => {
     const nowIso = nuevoValor === 'Procesado' ? new Date().toISOString() : null;
+    const dbValue = nuevoValor === 'Procesado' ? 'procesado' : 'por_procesar';
     setLocalGestion((prev) => ({ ...prev, [id]: nuevoValor }));
     setLocalFechaProcesado((prev) => ({ ...prev, [id]: nowIso }));
+
+    const targetLeg = legalizaciones.find((l) => l.id === id);
+    if (targetLeg) {
+      targetLeg.gestionContable = nuevoValor;
+      targetLeg.fechaProcesado = nowIso || undefined;
+    }
+
     updateLegalizacionGestionContable(id, nuevoValor, nowIso);
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('legalizaciones cajas menores')
         .update({
-          gestion_contable: nuevoValor,
-          gestionContable: nuevoValor,
+          gestion_contable: dbValue,
           fecha_procesado: nowIso,
-          fechaProcesado: nowIso,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);
+
+      if (error) {
+        console.error('Error actualizando gestion_contable en Supabase:', error);
+      }
     } catch (e) {
-      console.warn('Nota: Supabase gestion_contable guardado en almacenamiento local.');
+      console.error('Excepción al actualizar gestion_contable:', e);
     }
   };
 
