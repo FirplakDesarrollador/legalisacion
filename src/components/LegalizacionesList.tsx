@@ -74,6 +74,19 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
       }));
       if (data.success) {
         alert(`✅ Borrador creado exitosamente en SAP para ${leg.codigo} (DocEntry: ${data.docEntry || 'OK'})`);
+        if (data.docEntry) {
+          leg.sapDocEntry = data.docEntry;
+          try {
+            await supabase
+              .from('legalizaciones cajas menores')
+              .update({
+                sap_doc_entry: data.docEntry,
+                sapDocEntry: data.docEntry,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', leg.id);
+          } catch (e) {}
+        }
       } else {
         alert(`❌ Error al enviar a SAP: ${data.message}`);
       }
@@ -297,8 +310,24 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
                     </div>
                   </td>
                   <td className="py-3.5 px-4">
-                    <p className="font-bold text-blue-900 font-mono">{leg.codigo}</p>
-                    <p className="text-[10px] text-slate-400">{leg.fecha}</p>
+                    {(() => {
+                      const docEntry = syncStatus[leg.id]?.docEntry || leg.sapDocEntry;
+                      return (
+                        <div>
+                          {docEntry ? (
+                            <div className="flex items-center gap-1 mb-0.5">
+                              <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded text-[11px]">
+                                SAP #{docEntry}
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="font-bold text-blue-900 font-mono">{leg.codigo}</p>
+                          )}
+                          {docEntry && <p className="font-mono text-[10px] text-slate-500 font-medium">{leg.codigo}</p>}
+                          <p className="text-[10px] text-slate-400">{leg.fecha}</p>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="py-3.5 px-4">
                     <p className="font-semibold text-slate-900">{leg.usuarioNombre}</p>
