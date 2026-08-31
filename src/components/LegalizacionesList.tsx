@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
+import { supabase, updateLegalizacionGestionContable } from '@/lib/supabase';
 
 interface LegalizacionesListProps {
   legalizaciones: Legalizacion[];
@@ -21,6 +22,30 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<{ [id: string]: { success: boolean; message: string; docEntry?: number } }>({});
+  const [localGestion, setLocalGestion] = useState<{ [id: string]: 'Por procesar' | 'Procesado' }>({});
+  const [localFechaProcesado, setLocalFechaProcesado] = useState<{ [id: string]: string | null }>({});
+
+  const handleGestionChange = async (id: string, nuevoValor: 'Por procesar' | 'Procesado') => {
+    const nowIso = nuevoValor === 'Procesado' ? new Date().toISOString() : null;
+    setLocalGestion((prev) => ({ ...prev, [id]: nuevoValor }));
+    setLocalFechaProcesado((prev) => ({ ...prev, [id]: nowIso }));
+    updateLegalizacionGestionContable(id, nuevoValor, nowIso);
+
+    try {
+      await supabase
+        .from('legalizaciones cajas menores')
+        .update({
+          gestion_contable: nuevoValor,
+          gestionContable: nuevoValor,
+          fecha_procesado: nowIso,
+          fechaProcesado: nowIso,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+    } catch (e) {
+      console.warn('Nota: Supabase gestion_contable guardado en almacenamiento local.');
+    }
+  };
 
   const handleEnviarSAP = async (leg: Legalizacion) => {
     setSyncingId(leg.id);
@@ -64,6 +89,28 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
       currency: 'COP',
       maximumFractionDigits: 0,
     }).format(num);
+  };
+
+  const formatFecha = (isoString?: string) => {
+    if (!isoString) return '—';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return isoString;
+      return d.toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    } catch {
+      return isoString;
+    }
+  };
+
+  const formatHora = (isoString?: string) => {
+    if (!isoString) return '';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+    } catch {
+      return '';
+    }
   };
 
   const filtered = legalizaciones.filter((l) => {
@@ -167,7 +214,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
 
       {/* Main Table */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-x-auto custom-scrollbar shadow-sm">
-        <table className="w-full min-w-[1150px] text-left text-xs text-slate-700 whitespace-nowrap">
+        <table className="w-full min-w-[1250px] text-left text-xs text-slate-700 whitespace-nowrap">
           <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
             <tr>
               <th className="py-3.5 px-4 text-center">Acciones</th>
@@ -178,12 +225,14 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
               <th className="py-3.5 px-4 text-right">Total Gastos</th>
               <th className="py-3.5 px-4 text-right">Saldo en Caja</th>
               <th className="py-3.5 px-4">Estado</th>
+              <th className="py-3.5 px-4">Gestión Contable</th>
+              <th className="py-3.5 px-4">Fecha de Procesado</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-8 text-center text-slate-400">
+                <td colSpan={10} className="py-8 text-center text-slate-400">
                   No hay cajas menores para mostrar en este estado.
                 </td>
               </tr>
@@ -239,6 +288,34 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
                     </span>
                   </td>
                   <td className="py-3.5 px-4">{getStatusPill(leg.estado)}</td>
+                  <td className="py-3.5 px-4">
+                    <select
+                      value={localGestion[leg.id] ?? leg.gestionContable ?? 'Por procesar'}
+                      onChange={(e) => handleGestionChange(leg.id, e.target.value as any)}
+                      className={`text-xs font-semibold rounded-lg px-2.5 py-1 border transition-all cursor-pointer shadow-xs ${
+                        (localGestion[leg.id] ?? leg.gestionContable) === 'Procesado'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-500 hover:bg-emerald-100'
+                          : 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-500 hover:bg-amber-100'
+                      }`}
+                    >
+                      <option value="Por procesar">⏳ Por procesar</option>
+                      <option value="Procesado">✅ Procesado</option>
+                    </select>
+                  </td>
+                  <td className="py-3.5 px-4 text-slate-700">
+                    {((localGestion[leg.id] ?? leg.gestionContable) === 'Procesado') ? (
+                      <div>
+                        <p className="font-semibold text-blue-900">
+                          {formatFecha(localFechaProcesado[leg.id] ?? leg.fechaProcesado ?? leg.updated_at)}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {formatHora(localFechaProcesado[leg.id] ?? leg.fechaProcesado ?? leg.updated_at)}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 text-[11px] font-mono">—</span>
+                    )}
+                  </td>
                 </tr>
               ))
             )}

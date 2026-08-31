@@ -405,7 +405,11 @@ export async function fetchLegalizacionesFromSupabase(): Promise<Legalizacion[]>
     }
 
     // Return real data (may be empty array if no records yet)
-    return (data || []) as Legalizacion[];
+    return (data || []).map((row: any) => ({
+      ...row,
+      gestionContable: row.gestion_contable || row.gestionContable || 'Por procesar',
+      fechaProcesado: row.fecha_procesado || row.fechaProcesado || (row.gestion_contable === 'Procesado' || row.gestionContable === 'Procesado' ? row.updated_at : undefined),
+    })) as Legalizacion[];
   } catch {
     return [];
   }
@@ -631,6 +635,26 @@ export function updateTarjetaCreditoGestionContable(id: string, gestion: 'Por pr
 
   if (typeof window !== 'undefined') {
     localStorage.setItem(TARJETAS_STORAGE_KEY, JSON.stringify(updated));
+  }
+  return updated;
+}
+
+export function updateLegalizacionGestionContable(id: string, gestion: 'Por procesar' | 'Procesado', fechaProcesado?: string | null): Legalizacion[] {
+  const current = getLocalLegalizaciones();
+  const updated = current.map(item => {
+    if (item.id === id) {
+      return {
+        ...item,
+        gestionContable: gestion,
+        fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? new Date().toISOString() : undefined),
+        updated_at: new Date().toISOString()
+      };
+    }
+    return item;
+  });
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   }
   return updated;
 }
