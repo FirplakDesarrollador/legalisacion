@@ -252,7 +252,16 @@ export default function FormularioGastosPublicoPage() {
 
   const handleResetForm = () => {
     setSubmitted(false);
+    setLastCodigo('');
     setMotivo('');
+    setUsuarioNombre('');
+    setUsuarioEmail('');
+    setCentroCosto('');
+    setRecibioAnticipo('no');
+    setAnticipoRecibido(0);
+    setSolicitanteSearch('');
+    setAprobadorSearch('');
+    setFecha(new Date().toISOString().split('T')[0]);
     setLineas([
       {
         id: `lin-gst-${Date.now()}`,
@@ -261,13 +270,20 @@ export default function FormularioGastosPublicoPage() {
         cuentaId: null,
         cuentaTitulo: '',
         proveedorNombre: '',
+        proveedorNit: '',
         tipoDocumento: 'Factura',
         facturaNumero: '',
+        moneda: 'COP',
         valorSubtotal: 0,
         valorIva: 0,
         valorTotal: 0,
+        soporteFile: undefined,
+        soporteUrl: '',
       },
     ]);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   if (submitted) {
@@ -291,7 +307,7 @@ export default function FormularioGastosPublicoPage() {
             onClick={handleResetForm}
             className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs shadow-md transition-all"
           >
-            Radicar otra legalización
+            Crear otro formulario / Radicar otra legalización
           </button>
         </div>
       </div>

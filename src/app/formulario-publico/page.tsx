@@ -60,20 +60,43 @@ export default function FormularioPublicoPage() {
   const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const createEmptyLinea = (): LineaGasto => ({
+    id: `lin-pub-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+    fecha: new Date().toISOString().split('T')[0],
+    concepto: '',
+    cuentaId: null,
+    cuentaTitulo: '',
+    proveedorNombre: '',
+    proveedorNit: '',
+    tipoDocumento: 'Factura',
+    facturaNumero: '',
+    moneda: 'COP',
+    valorSubtotal: 0,
+    valorIva: 0,
+    valorTotal: 0,
+    soporteFile: undefined,
+    soporteUrl: '',
+    soportes: [],
+  });
+
   const [lineas, setLineas] = useState<LineaGasto[]>([
     {
       id: 'lin-pub-1',
       fecha: new Date().toISOString().split('T')[0],
       concepto: '',
-      cuentaId: 1,
-      cuentaTitulo: '51100505 - JUNTA DIRECTIVA',
+      cuentaId: null,
+      cuentaTitulo: '',
       proveedorNombre: '',
+      proveedorNit: '',
       tipoDocumento: 'Factura',
       facturaNumero: '',
       moneda: 'COP',
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
+      soporteFile: undefined,
+      soporteUrl: '',
+      soportes: [],
     },
   ]);
 
@@ -98,16 +121,6 @@ export default function FormularioPublicoPage() {
           setUsuarioEmail(first.email);
           if (first.centro_costo) setCentroCosto(first.centro_costo);
           if (first.montoAprobado) setAnticipoRecibido(first.montoAprobado);
-        }
-
-        if (cData.length > 0) {
-          setLineas((prev) =>
-            prev.map((l) => ({
-              ...l,
-              cuentaId: cData[0].id,
-              cuentaTitulo: cData[0].Título,
-            }))
-          );
         }
       } catch (err) {
         console.error('Error cargando catálogos de Supabase:', err);
@@ -138,22 +151,7 @@ export default function FormularioPublicoPage() {
   };
 
   const handleAddLinea = () => {
-    const defaultCuenta = cuentas[0];
-    const newLine: LineaGasto = {
-      id: `lin-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-      fecha: new Date().toISOString().split('T')[0],
-      concepto: '',
-      cuentaId: defaultCuenta ? defaultCuenta.id : 1,
-      cuentaTitulo: defaultCuenta ? defaultCuenta.Título : 'Gasto General',
-      proveedorNombre: proveedores[0]?.razon_social || '',
-      tipoDocumento: 'Factura',
-      facturaNumero: '',
-      moneda: 'COP',
-      valorSubtotal: 0,
-      valorIva: 0,
-      valorTotal: 0,
-    };
-    setLineas([...lineas, newLine]);
+    setLineas([...lineas, createEmptyLinea()]);
   };
 
   const handleUpdateLinea = (id: string, field: keyof LineaGasto, value: any) => {
@@ -378,6 +376,19 @@ export default function FormularioPublicoPage() {
 
   const handleResetForm = () => {
     setSubmitted(false);
+    setLastCodigo('');
+    setSelectedResponsableId('');
+    setUsuarioNombre('');
+    setUsuarioEmail('');
+    setCentroCosto('1020 - Operaciones Comercial');
+    setMotivo('');
+    setFecha(new Date().toISOString().split('T')[0]);
+    setAnticipoRecibido(0);
+    setUploadingByLinea({});
+    setLineas([createEmptyLinea()]);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -429,7 +440,7 @@ export default function FormularioPublicoPage() {
               onClick={handleResetForm}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/20 transition-all"
             >
-              Registrar Otra Legalización
+              Crear otro formulario / Registrar otra legalización
             </button>
           </div>
         ) : (

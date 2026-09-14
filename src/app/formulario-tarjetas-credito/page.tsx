@@ -7,6 +7,8 @@ import {
   fetchProveedoresFromSupabase,
   fetchResponsablesTarjetasCredito,
   fetchCentrosCostoFromSupabase,
+  fetchOrganizationUsers,
+  OrganizationUser,
   saveLocalTarjetaCredito,
   supabase
 } from '@/lib/supabase';
@@ -18,6 +20,7 @@ export default function FormularioTarjetasCreditoPage() {
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [centros, setCentros] = useState<CentroCosto[]>([]);
+  const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [lastCodigo, setLastCodigo] = useState('');
@@ -26,6 +29,10 @@ export default function FormularioTarjetasCreditoPage() {
   const [selectedResponsableId, setSelectedResponsableId] = useState<number | ''>('');
   const [tarjetaCodigo, setTarjetaCodigo] = useState('');
   const [tcEnSap, setTcEnSap] = useState('');
+
+  // Approver states (customizable by user)
+  const [aprobadorNombre, setAprobadorNombre] = useState('');
+  const [aprobadorEmail, setAprobadorEmail] = useState('');
 
   // Form states
   const [usuarioNombre, setUsuarioNombre] = useState('');
@@ -36,35 +43,59 @@ export default function FormularioTarjetasCreditoPage() {
   const [anticipoRecibido, setAnticipoRecibido] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const createEmptyLinea = (): LineaGasto => ({
+    id: `lin-tc-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+    fecha: new Date().toISOString().split('T')[0],
+    concepto: '',
+    cuentaId: null,
+    cuentaTitulo: '',
+    proveedorNombre: '',
+    proveedorNit: '',
+    tipoDocumento: 'Factura',
+    facturaNumero: '',
+    moneda: 'COP',
+    valorSubtotal: 0,
+    valorIva: 0,
+    valorTotal: 0,
+    soporteFile: undefined,
+    soporteUrl: '',
+  });
+
   const [lineas, setLineas] = useState<LineaGasto[]>([
     {
-      id: 'lin-pub-1',
+      id: 'lin-tc-1',
       fecha: new Date().toISOString().split('T')[0],
       concepto: '',
-      cuentaId: 1,
-      cuentaTitulo: '51100505 - JUNTA DIRECTIVA',
+      cuentaId: null,
+      cuentaTitulo: '',
       proveedorNombre: '',
+      proveedorNit: '',
       tipoDocumento: 'Factura',
       facturaNumero: '',
+      moneda: 'COP',
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
+      soporteFile: undefined,
+      soporteUrl: '',
     },
   ]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [rData, cData, pData, centrosData] = await Promise.all([
+        const [rData, cData, pData, centrosData, usersData] = await Promise.all([
           fetchResponsablesTarjetasCredito(),
           fetchCuentasFromSupabase(),
           fetchProveedoresFromSupabase(),
           fetchCentrosCostoFromSupabase(),
+          fetchOrganizationUsers(),
         ]);
         setResponsables(rData);
         setCuentas(cData);
         setProveedores(pData);
         setCentros(centrosData);
+        setOrgUsers(usersData);
 
         if (rData.length > 0) {
           const first = rData[0];
@@ -74,16 +105,8 @@ export default function FormularioTarjetasCreditoPage() {
           setTarjetaCodigo(first.tarjeta_codigo || '');
           setTcEnSap(first.tc_en_sap || first['TC en SAP'] || '');
           setMotivo(`[TC: ${first.tarjeta_codigo}] ${first.tarjeta_nombre}`);
-        }
-
-        if (cData.length > 0) {
-          setLineas((prev) =>
-            prev.map((l) => ({
-              ...l,
-              cuentaId: cData[0].id,
-              cuentaTitulo: cData[0].Título,
-            }))
-          );
+          setAprobadorNombre(first.responsable_nombre || '');
+          setAprobadorEmail(first.responsable_email || '');
         }
       } catch (err) {
         console.error('Error cargando catálogos de Supabase:', err);
@@ -103,6 +126,8 @@ export default function FormularioTarjetasCreditoPage() {
       setTarjetaCodigo(resp.tarjeta_codigo || '');
       setTcEnSap(resp.tc_en_sap || resp['TC en SAP'] || '');
       setMotivo(`[TC: ${resp.tarjeta_codigo}] ${resp.tarjeta_nombre}`);
+      setAprobadorNombre(resp.responsable_nombre || '');
+      setAprobadorEmail(resp.responsable_email || '');
     }
   };
 
@@ -115,21 +140,7 @@ export default function FormularioTarjetasCreditoPage() {
   };
 
   const handleAddLinea = () => {
-    const defaultCuenta = cuentas[0];
-    const newLine: LineaGasto = {
-      id: `lin-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-      fecha: new Date().toISOString().split('T')[0],
-      concepto: '',
-      cuentaId: defaultCuenta ? defaultCuenta.id : 1,
-      cuentaTitulo: defaultCuenta ? defaultCuenta.Título : 'Gasto General',
-      proveedorNombre: proveedores[0]?.razon_social || '',
-      tipoDocumento: 'Factura',
-      facturaNumero: '',
-      valorSubtotal: 0,
-      valorIva: 0,
-      valorTotal: 0,
-    };
-    setLineas([...lineas, newLine]);
+    setLineas([...lineas, createEmptyLinea()]);
   };
 
   const handleUpdateLinea = (id: string, field: keyof LineaGasto, value: any) => {
@@ -183,6 +194,11 @@ export default function FormularioTarjetasCreditoPage() {
       return;
     }
 
+    if (!aprobadorNombre.trim() || !aprobadorEmail.trim()) {
+      alert('Por favor especifique el Responsable de Aprobar (Nombre y Correo).');
+      return;
+    }
+
     const lineasSinNIT = lineas.some((l) => !l.proveedorNit || l.proveedorNit.trim() === '');
     if (lineasSinNIT) {
       alert('Por favor ingrese el NIT del Proveedor en todas las líneas de gasto.');
@@ -201,9 +217,8 @@ export default function FormularioTarjetasCreditoPage() {
       const randomNum = Math.floor(100 + Math.random() * 900);
       const codigo = `TC-PUB-${randomNum}`;
 
-      const resp = responsables.find((r) => r.id === selectedResponsableId);
-      const aprobadorNombre = resp?.responsable_nombre || usuarioNombre;
-      const aprobadorEmail = resp?.responsable_email || usuarioEmail;
+      const aprobadorNombreFinal = aprobadorNombre.trim();
+      const aprobadorEmailFinal = aprobadorEmail.trim();
 
       const nuevaLeg: TarjetaCredito = {
         id: `tc-pub-${Date.now()}`,
@@ -213,6 +228,8 @@ export default function FormularioTarjetasCreditoPage() {
         usuarioEmail,
         tarjeta_codigo: tarjetaCodigo,
         tc_en_sap: tcEnSap,
+        aprobadorNombre: aprobadorNombreFinal,
+        aprobadorEmail: aprobadorEmailFinal,
         centroCosto,
         motivo,
         estado: 'pendiente',
@@ -234,8 +251,8 @@ export default function FormularioTarjetasCreditoPage() {
           usuario_email: nuevaLeg.usuarioEmail,
           tarjeta_codigo: tarjetaCodigo || null,
           tc_en_sap: tcEnSap || null,
-          aprobador_nombre: aprobadorNombre,
-          aprobador_email: aprobadorEmail,
+          aprobador_nombre: aprobadorNombreFinal,
+          aprobador_email: aprobadorEmailFinal,
           centro_costo: nuevaLeg.centroCosto,
           motivo: nuevaLeg.motivo,
           estado: nuevaLeg.estado,
@@ -262,7 +279,7 @@ export default function FormularioTarjetasCreditoPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            correo: aprobadorEmail,
+            correo: aprobadorEmailFinal,
             titulo: `Nueva Legalización de Tarjeta de Crédito: ${nuevaLeg.codigo}`,
             contenido: `El usuario ${nuevaLeg.usuarioNombre} ha registrado la legalización de tarjeta de crédito ${nuevaLeg.codigo} por valor de $${nuevaLeg.totalGastos.toLocaleString('es-CO')} COP.`,
             link: link
@@ -282,6 +299,22 @@ export default function FormularioTarjetasCreditoPage() {
 
   const handleResetForm = () => {
     setSubmitted(false);
+    setLastCodigo('');
+    setSelectedResponsableId('');
+    setTarjetaCodigo('');
+    setTcEnSap('');
+    setAprobadorNombre('');
+    setAprobadorEmail('');
+    setUsuarioNombre('');
+    setUsuarioEmail('');
+    setMotivo('');
+    setCentroCosto('1020 - Operaciones Comercial');
+    setFecha(new Date().toISOString().split('T')[0]);
+    setAnticipoRecibido(0);
+    setLineas([createEmptyLinea()]);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   return (
@@ -326,6 +359,7 @@ export default function FormularioTarjetasCreditoPage() {
               <p className="text-slate-500 font-sans font-semibold">Resumen de Envío:</p>
               <p>Código: <strong className="text-slate-900">{lastCodigo}</strong></p>
               <p>Responsable: <strong className="text-slate-900">{usuarioNombre} ({usuarioEmail})</strong></p>
+              <p>Aprobador: <strong className="text-blue-900">{aprobadorNombre} ({aprobadorEmail})</strong></p>
               <p>Total Gastos: <strong className="text-emerald-700">{formatCOP(totalGastos)}</strong></p>
             </div>
 
@@ -333,7 +367,7 @@ export default function FormularioTarjetasCreditoPage() {
               onClick={handleResetForm}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/20 transition-all"
             >
-              Registrar Otra Legalización
+              Crear otro formulario / Registrar otra legalización
             </button>
           </div>
         ) : (
@@ -344,33 +378,109 @@ export default function FormularioTarjetasCreditoPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6 text-xs">
-              {/* FIRST QUESTION: Responsable de la Caja Menor (Supabase dropdown) */}
-              <div className="p-5 rounded-2xl bg-blue-50/80 border border-blue-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-blue-700" /> 1. Seleccione la Tarjeta de Crédito *
-                  </label>
+              {/* FIRST QUESTION: Tarjeta de Crédito y Responsable de Aprobar */}
+              <div className="p-5 rounded-2xl bg-blue-50/80 border border-blue-200 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-blue-700" /> 1. Seleccione la Tarjeta de Crédito *
+                    </label>
+                  </div>
+
+                  <select
+                    required
+                    value={selectedResponsableId}
+                    onChange={(e) => handleResponsableChange(Number(e.target.value))}
+                    className="w-full p-3 bg-white border border-blue-300 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-sm"
+                  >
+                    <option value="" disabled>
+                      -- Seleccione la Tarjeta de Crédito --
+                    </option>
+                    {responsables.map((resp) => (
+                      <option key={resp.id} value={resp.id}>
+                        {resp.tarjeta_codigo} - {resp.tarjeta_nombre} (Aprueba por defecto: {resp.responsable_nombre})
+                      </option>
+                    ))}
+                  </select>
+
+                  <p className="text-[11px] text-blue-800">
+                    Seleccione la tarjeta de crédito utilizada para esta legalización.
+                  </p>
                 </div>
 
-                <select
-                  required
-                  value={selectedResponsableId}
-                  onChange={(e) => handleResponsableChange(Number(e.target.value))}
-                  className="w-full p-3 bg-white border border-blue-300 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-sm"
-                >
-                  <option value="" disabled>
-                    -- Seleccione la Tarjeta de Crédito --
-                  </option>
-                  {responsables.map((resp) => (
-                    <option key={resp.id} value={resp.id}>
-                      {resp.tarjeta_codigo} - {resp.tarjeta_nombre} (Aprueba: {resp.responsable_nombre})
-                    </option>
-                  ))}
-                </select>
+                {/* Casilla: Responsable de Aprobar */}
+                <div className="pt-4 border-t border-blue-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-blue-950 uppercase tracking-wider flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-indigo-600" /> 2. Responsable de Aprobar *
+                    </label>
+                    <span className="text-[10px] text-blue-800 font-medium bg-blue-100/70 px-2.5 py-0.5 rounded-full border border-blue-200">
+                      Editable / Modificable
+                    </span>
+                  </div>
 
-                <p className="text-[11px] text-blue-800">
-                  Seleccione la tarjeta de crédito utilizada para esta legalización.
-                </p>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                      Seleccionar o cambiar aprobador desde el directorio:
+                    </label>
+                    <SearchableSelect
+                      placeholder="-- Buscar aprobador por nombre o correo... --"
+                      searchPlaceholder="Escriba nombre o correo del aprobador..."
+                      value={aprobadorEmail}
+                      onChange={(selectedEmail) => {
+                        setAprobadorEmail(selectedEmail);
+                        const match = orgUsers.find((u) => u.email.toLowerCase() === selectedEmail.toLowerCase())
+                          || responsables.find((r) => r.responsable_email.toLowerCase() === selectedEmail.toLowerCase());
+                        if (match) {
+                          setAprobadorNombre('nombre' in match ? match.nombre : (match as any).responsable_nombre);
+                        }
+                      }}
+                      options={[
+                        ...responsables.map((r) => ({
+                          value: r.responsable_email,
+                          label: `${r.responsable_nombre} (${r.responsable_email})`,
+                          sublabel: `Tarjeta ${r.tarjeta_codigo}`,
+                        })),
+                        ...orgUsers
+                          .filter((u) => !responsables.some((r) => r.responsable_email.toLowerCase() === u.email.toLowerCase()))
+                          .map((u) => ({
+                            value: u.email,
+                            label: `${u.nombre} (${u.email})`,
+                            sublabel: u.area || 'Organización',
+                          }))
+                      ]}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                        Nombre del Aprobador *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={aprobadorNombre}
+                        onChange={(e) => setAprobadorNombre(e.target.value)}
+                        placeholder="Nombre completo del aprobador"
+                        className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-slate-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-600 mb-1">
+                        Correo Electrónico del Aprobador *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={aprobadorEmail}
+                        onChange={(e) => setAprobadorEmail(e.target.value)}
+                        placeholder="aprobador@firplak.com"
+                        className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-slate-900 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Section removed per user request */}
