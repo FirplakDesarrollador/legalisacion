@@ -59,14 +59,59 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     };
   }, [isOpen]);
 
-  const filteredOptions = options.filter((opt) => {
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.toLowerCase();
-    const matchLabel = opt.label.toLowerCase().includes(term);
-    const matchSublabel = opt.sublabel ? opt.sublabel.toLowerCase().includes(term) : false;
-    const matchValue = String(opt.value).toLowerCase().includes(term);
-    return matchLabel || matchSublabel || matchValue;
-  });
+  const normalizeText = (text: string) =>
+    (text || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+  const filteredOptions = React.useMemo(() => {
+    if (!searchTerm.trim()) return options;
+
+    const term = normalizeText(searchTerm);
+    const searchWords = term.split(/\s+/).filter(Boolean);
+
+    const matches: { opt: SelectOption; score: number }[] = [];
+
+    for (const opt of options) {
+      const normLabel = normalizeText(opt.label);
+      const normSublabel = opt.sublabel ? normalizeText(opt.sublabel) : '';
+      const normValue = normalizeText(String(opt.value));
+
+      // Must match every typed word in label, sublabel, or value
+      const matchesAllWords = searchWords.every(
+        (word) =>
+          normLabel.includes(word) ||
+          normSublabel.includes(word) ||
+          normValue.includes(word)
+      );
+
+      if (!matchesAllWords) continue;
+
+      // Ranking score: lower is higher priority (appears "de primeras")
+      let score = 100;
+
+      if (normLabel.startsWith(term)) {
+        score = 10; // Exact start of label (e.g. "Duvan ...")
+      } else if (normValue.startsWith(term)) {
+        score = 20; // Exact start of value/email
+      } else if (normLabel.split(/\s+/).some((part) => part.startsWith(term))) {
+        score = 30; // Word in label starts with term
+      } else if (normLabel.includes(term)) {
+        score = 40; // Substring in label
+      } else if (normValue.includes(term)) {
+        score = 50; // Substring in value/email
+      } else {
+        score = 60; // Substring in sublabel
+      }
+
+      matches.push({ opt, score });
+    }
+
+    matches.sort((a, b) => a.score - b.score);
+    return matches.map((m) => m.opt);
+  }, [options, searchTerm]);
 
   const handleSelect = (val: string | number) => {
     onChange(String(val));
@@ -144,11 +189,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 No se encontraron resultados para &quot;{searchTerm}&quot;
               </div>
             ) : (
-              filteredOptions.map((opt) => {
+              filteredOptions.map((opt, idx) => {
                 const isSelected = String(opt.value) === String(value);
                 return (
                   <button
-                    key={String(opt.value)}
+                    key={`${opt.value}-${idx}`}
                     type="button"
                     onClick={() => handleSelect(opt.value)}
                     className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors flex items-center justify-between gap-2 cursor-pointer ${

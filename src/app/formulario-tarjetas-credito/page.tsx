@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ShieldCheck, CheckCircle2, Calculator, Plus, Trash2, Database, Send, UserCheck } from 'lucide-react';
 import {
   fetchCuentasFromSupabase,
@@ -24,6 +24,35 @@ export default function FormularioTarjetasCreditoPage() {
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [lastCodigo, setLastCodigo] = useState('');
+
+  // Clean, deduplicated list of approvers from directory and cards
+  const approverOptions = useMemo(() => {
+    const userMap = new Map<string, { value: string; label: string; sublabel?: string }>();
+
+    // 1. All organizational users
+    orgUsers.forEach((u) => {
+      if (u.email) {
+        userMap.set(u.email.toLowerCase(), {
+          value: u.email,
+          label: `${u.nombre} (${u.email})`,
+          sublabel: u.area || 'Directorio Firplak',
+        });
+      }
+    });
+
+    // 2. Unique credit card responsables who might not be in orgUsers
+    responsables.forEach((r) => {
+      if (r.responsable_email && !userMap.has(r.responsable_email.toLowerCase())) {
+        userMap.set(r.responsable_email.toLowerCase(), {
+          value: r.responsable_email,
+          label: `${r.responsable_nombre} (${r.responsable_email})`,
+          sublabel: `Responsable TC ${r.tarjeta_codigo || ''}`.trim(),
+        });
+      }
+    });
+
+    return Array.from(userMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [orgUsers, responsables]);
 
   // Primary question: Responsable de Caja Menor (Supabase dropdown)
   const [selectedResponsableId, setSelectedResponsableId] = useState<number | ''>('');
@@ -429,26 +458,17 @@ export default function FormularioTarjetasCreditoPage() {
                       value={aprobadorEmail}
                       onChange={(selectedEmail) => {
                         setAprobadorEmail(selectedEmail);
-                        const match = orgUsers.find((u) => u.email.toLowerCase() === selectedEmail.toLowerCase())
-                          || responsables.find((r) => r.responsable_email.toLowerCase() === selectedEmail.toLowerCase());
-                        if (match) {
-                          setAprobadorNombre('nombre' in match ? match.nombre : (match as any).responsable_nombre);
+                        const matchUser = orgUsers.find((u) => u.email.toLowerCase() === selectedEmail.toLowerCase());
+                        if (matchUser) {
+                          setAprobadorNombre(matchUser.nombre);
+                          return;
+                        }
+                        const matchResp = responsables.find((r) => r.responsable_email.toLowerCase() === selectedEmail.toLowerCase());
+                        if (matchResp) {
+                          setAprobadorNombre(matchResp.responsable_nombre);
                         }
                       }}
-                      options={[
-                        ...responsables.map((r) => ({
-                          value: r.responsable_email,
-                          label: `${r.responsable_nombre} (${r.responsable_email})`,
-                          sublabel: `Tarjeta ${r.tarjeta_codigo}`,
-                        })),
-                        ...orgUsers
-                          .filter((u) => !responsables.some((r) => r.responsable_email.toLowerCase() === u.email.toLowerCase()))
-                          .map((u) => ({
-                            value: u.email,
-                            label: `${u.nombre} (${u.email})`,
-                            sublabel: u.area || 'Organización',
-                          }))
-                      ]}
+                      options={approverOptions}
                     />
                   </div>
 
