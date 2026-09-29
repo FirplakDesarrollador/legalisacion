@@ -45,6 +45,23 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
 
   const handleAction = async (nuevoEstado: TarjetaCredito['estado']) => {
     setIsSubmitting(true);
+
+    try {
+      const link = typeof window !== 'undefined' ? `${window.location.origin}/formulario-tarjetas-credito/${tarjetaCredito.id}` : '';
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          correo: tarjetaCredito.usuarioEmail,
+          titulo: `Legalización TC ${tarjetaCredito.codigo} - ${nuevoEstado === 'aprobado' ? 'Aprobada' : 'Rechazada'}`,
+          contenido: `Tu legalización de tarjeta de crédito ${tarjetaCredito.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
+          link: link,
+        }),
+      }).catch((e) => console.error('Error enviando notificación de estado:', e));
+    } catch (e) {
+      console.error(e);
+    }
+
     if (nuevoEstado === 'aprobado') {
       await handleEnviarSAP();
       // wait a bit for user to see the success message before closing

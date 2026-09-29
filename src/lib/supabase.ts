@@ -456,6 +456,7 @@ export async function fetchLegalizacionesTarjetasCreditoFromSupabase(): Promise<
       aprobadorNombre: row.aprobador_nombre,
       aprobadorEmail: row.aprobador_email,
       sapDocEntry: row.sap_doc_entry,
+      observacionesAprobacion: row.observaciones_aprobacion || row.observacionesAprobacion,
     })) as any[];
   } catch {
     return [];
@@ -756,9 +757,9 @@ export function saveLocalTarjetaCredito(tarjeta: Legalizacion): Legalizacion[] {
 
 export function updateTarjetaCreditoStatus(id: string, nuevoEstado: Legalizacion['estado'], observaciones?: string): Legalizacion[] {
   const current = getLocalTarjetasCredito();
+  const now = new Date().toISOString();
   const updated = current.map(item => {
     if (item.id === id) {
-      const now = new Date().toISOString();
       return {
         ...item,
         estado: nuevoEstado,
@@ -773,6 +774,19 @@ export function updateTarjetaCreditoStatus(id: string, nuevoEstado: Legalizacion
   if (typeof window !== 'undefined') {
     localStorage.setItem(TARJETAS_STORAGE_KEY, JSON.stringify(updated));
   }
+
+  // Persistir en Supabase
+  supabase.from('legalizaciones_tarjetas_credito').update({
+    estado: nuevoEstado,
+    observaciones_aprobacion: observaciones || null,
+    fecha_aprobacion: nuevoEstado === 'aprobado' ? now : undefined,
+    updated_at: now
+  }).eq('id', id).then(({ error }) => {
+    if (error) {
+      console.error('Error al actualizar estado de tarjeta de crédito en Supabase:', error);
+    }
+  });
+
   return updated;
 }
 

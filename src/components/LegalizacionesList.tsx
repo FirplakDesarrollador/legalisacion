@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
 import { supabase, updateLegalizacionGestionContable } from '@/lib/supabase';
@@ -25,6 +25,16 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
   const [syncStatus, setSyncStatus] = useState<{ [id: string]: { success: boolean; message: string; docEntry?: number } }>({});
   const [localGestion, setLocalGestion] = useState<{ [id: string]: 'Por procesar' | 'Procesado' }>({});
   const [localFechaProcesado, setLocalFechaProcesado] = useState<{ [id: string]: string | null }>({});
+
+  const prevPendingCountRef = useRef<number>(legalizaciones.filter((l) => l.estado === 'pendiente').length);
+
+  useEffect(() => {
+    const currentPending = legalizaciones.filter((l) => l.estado === 'pendiente').length;
+    if (activeTab === 'pendiente' && prevPendingCountRef.current > 0 && currentPending === 0) {
+      setActiveTab('todas');
+    }
+    prevPendingCountRef.current = currentPending;
+  }, [legalizaciones, activeTab]);
 
   const handleScroll = (direction: 'left' | 'right') => {
     if (tableContainerRef.current) {
@@ -189,7 +199,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
       {/* Top Filter Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
         {/* Status Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl overflow-x-auto">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto shrink-0">
           {[
             { id: 'todas', label: 'Todas', count: legalizaciones.length },
             { id: 'pendiente', label: 'Pendientes', count: legalizaciones.filter((l) => l.estado === 'pendiente').length },
@@ -199,7 +209,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
                 activeTab === tab.id
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -288,8 +298,48 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
           <tbody className="divide-y divide-slate-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-8 text-center text-slate-400">
-                  No hay cajas menores para mostrar en este estado.
+                <td colSpan={11} className="py-12 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-3 max-w-md mx-auto text-slate-500">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-xs">
+                        {activeTab === 'pendiente'
+                          ? '¡No hay cajas menores pendientes!'
+                          : `No hay cajas menores en estado "${activeTab}"`}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {activeTab === 'pendiente'
+                          ? 'Todas las legalizaciones han sido revisadas.'
+                          : 'No se encontraron registros que coincidan con este filtro.'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => setActiveTab('todas')}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
+                      >
+                        Ver Todas ({legalizaciones.length})
+                      </button>
+                      {legalizaciones.filter((l) => l.estado === 'rechazado').length > 0 && activeTab !== 'rechazado' && (
+                        <button
+                          onClick={() => setActiveTab('rechazado')}
+                          className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition-all"
+                        >
+                          Ver Rechazadas ({legalizaciones.filter((l) => l.estado === 'rechazado').length})
+                        </button>
+                      )}
+                      {legalizaciones.filter((l) => l.estado === 'aprobado').length > 0 && activeTab !== 'aprobado' && (
+                        <button
+                          onClick={() => setActiveTab('aprobado')}
+                          className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-all"
+                        >
+                          Ver Aprobadas ({legalizaciones.filter((l) => l.estado === 'aprobado').length})
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </td>
               </tr>
             ) : (

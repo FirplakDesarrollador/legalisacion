@@ -27,6 +27,16 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
   const [localFechaProcesado, setLocalFechaProcesado] = useState<{ [id: string]: string | null }>({});
   const [responsables, setResponsables] = useState<any[]>([]);
 
+  const prevPendingCountRef = useRef<number>(tarjetasCredito.filter((l) => l.estado === 'pendiente').length);
+
+  useEffect(() => {
+    const currentPending = tarjetasCredito.filter((l) => l.estado === 'pendiente').length;
+    if (activeTab === 'pendiente' && prevPendingCountRef.current > 0 && currentPending === 0) {
+      setActiveTab('todas');
+    }
+    prevPendingCountRef.current = currentPending;
+  }, [tarjetasCredito, activeTab]);
+
   const handleScroll = (direction: 'left' | 'right') => {
     if (tableContainerRef.current) {
       const amount = direction === 'left' ? -350 : 350;
@@ -202,7 +212,7 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
       {/* Top Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
         {/* Tabs */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 shrink-0">
           {[
             { id: 'todas', label: 'Todas', count: tarjetasCredito.length },
             { id: 'pendiente', label: 'Pendientes', count: tarjetasCredito.filter((l) => l.estado === 'pendiente').length },
@@ -212,7 +222,7 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
                 activeTab === tab.id
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
@@ -301,8 +311,48 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
           <tbody className="divide-y divide-slate-100">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-8 text-center text-slate-400">
-                  No hay tarjetas de crédito para mostrar en este estado.
+                <td colSpan={10} className="py-12 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-3 max-w-md mx-auto text-slate-500">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-xs">
+                        {activeTab === 'pendiente'
+                          ? '¡No hay tarjetas de crédito pendientes!'
+                          : `No hay tarjetas de crédito en estado "${activeTab}"`}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {activeTab === 'pendiente'
+                          ? 'Todas las legalizaciones han sido revisadas.'
+                          : 'No se encontraron registros que coincidan con este filtro.'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => setActiveTab('todas')}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
+                      >
+                        Ver Todas ({tarjetasCredito.length})
+                      </button>
+                      {tarjetasCredito.filter((l) => l.estado === 'rechazado').length > 0 && activeTab !== 'rechazado' && (
+                        <button
+                          onClick={() => setActiveTab('rechazado')}
+                          className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition-all"
+                        >
+                          Ver Rechazadas ({tarjetasCredito.filter((l) => l.estado === 'rechazado').length})
+                        </button>
+                      )}
+                      {tarjetasCredito.filter((l) => l.estado === 'aprobado').length > 0 && activeTab !== 'aprobado' && (
+                        <button
+                          onClick={() => setActiveTab('aprobado')}
+                          className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-all"
+                        >
+                          Ver Aprobadas ({tarjetasCredito.filter((l) => l.estado === 'aprobado').length})
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </td>
               </tr>
             ) : (

@@ -153,6 +153,9 @@ export default function Home() {
       setProveedores(pData);
       if (tcData && tcData.length > 0) {
         setTarjetasCredito(tcData);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('app_tarjetas_credito_data_v1', JSON.stringify(tcData));
+        }
       }
       if (legData && legData.length > 0) {
         setLegalizaciones(legData);
