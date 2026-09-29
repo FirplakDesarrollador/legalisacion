@@ -273,6 +273,14 @@ export default function FormularioTarjetasCreditoPage() {
       newLine.concepto = defaultCentro;
       newLine.cuentaId = defaultCuenta.id;
       newLine.cuentaTitulo = defaultCuenta.titulo;
+    } else {
+      // Si la línea anterior ya tiene Centro y Cuenta, heredar a la nueva línea para evitar reingresarla
+      const lastLine = lineas[lineas.length - 1];
+      if (lastLine && lastLine.concepto) {
+        newLine.concepto = lastLine.concepto;
+        newLine.cuentaId = lastLine.cuentaId;
+        newLine.cuentaTitulo = lastLine.cuentaTitulo;
+      }
     }
 
     setLineas((prev) => [...prev, newLine]);
@@ -285,8 +293,19 @@ export default function FormularioTarjetasCreditoPage() {
         const updated = { ...lin, [field]: value };
 
         if (field === 'concepto') {
-          updated.cuentaId = null;
-          updated.cuentaTitulo = '';
+          // Solo limpiar la cuenta si la cuenta actual no es compatible con el nuevo centro de costo
+          if (updated.cuentaTitulo) {
+            const cc = (String(value) || '').toUpperCase();
+            const ct = updated.cuentaTitulo;
+            const isGa = cc.startsWith('GA') && ct.startsWith('51');
+            const isGv = cc.startsWith('GV') && ct.startsWith('52');
+            const isIp = cc.startsWith('IP') && ct.startsWith('73');
+            const isMo = cc.startsWith('MO') && ct.startsWith('72');
+            if (!isGa && !isGv && !isIp && !isMo) {
+              updated.cuentaId = null;
+              updated.cuentaTitulo = '';
+            }
+          }
         }
 
         if (field === 'tipoDocumento' && value === 'Documento Soporte') {
@@ -620,7 +639,7 @@ export default function FormularioTarjetasCreditoPage() {
                   </button>
                 </div>
 
-                <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
+                <div className="space-y-3">
                   {lineas.map((linea) => (
                     <div
                       key={linea.id}

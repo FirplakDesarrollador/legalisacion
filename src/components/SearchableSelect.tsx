@@ -40,7 +40,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const selectedOption = options.find((opt) => String(opt.value) === String(value));
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
@@ -48,16 +48,22 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      // Focus input when opened
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 50);
+      document.addEventListener('touchstart', handleClickOutside);
+
+      // Only autofocus on non-touch devices to prevent mobile keyboard from blocking the options list
+      const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+      if (!isTouchDevice) {
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 50);
+      }
     } else {
       setSearchTerm('');
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, [isOpen]);
 
@@ -197,6 +203,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   <button
                     key={`${opt.value}-${idx}`}
                     type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                    }}
                     onClick={() => handleSelect(opt.value)}
                     className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors flex items-center justify-between gap-2 cursor-pointer ${
                       isSelected
