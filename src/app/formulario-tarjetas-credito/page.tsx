@@ -145,6 +145,8 @@ export default function FormularioTarjetasCreditoPage() {
           setMotivo(`[TC: ${first.tarjeta_codigo}] ${first.tarjeta_nombre}`);
           setAprobadorNombre(first.responsable_nombre || '');
           setAprobadorEmail(first.responsable_email || '');
+
+          applyTarjetaDefaults(first.tarjeta_codigo, first.tarjeta_nombre, centrosData, cData);
         }
       } catch (err) {
         console.error('Error cargando catálogos de Supabase:', err);
@@ -154,6 +156,85 @@ export default function FormularioTarjetasCreditoPage() {
     }
     loadData();
   }, []);
+
+  // Configuración de tarjetas predeterminadas
+  const TARJETAS_CONFIG_PREDETERMINADAS: Record<string, { centroCodigo: string; cuentaCodigo: string }> = {
+    '1597': { centroCodigo: 'GA-FICOG', cuentaCodigo: '51952015' },
+    '2108': { centroCodigo: 'GA-NEGOC', cuentaCodigo: '51952015' },
+    '1738': { centroCodigo: 'GA-I+D+I', cuentaCodigo: '51952015' },
+    '4962': { centroCodigo: 'GA-FICOG', cuentaCodigo: '51952015' },
+  };
+
+  const getTarjetaDefaults = (codigo?: string, nombre?: string) => {
+    const cod = (codigo || '').trim();
+    const nom = (nombre || '').trim();
+    for (const [key, config] of Object.entries(TARJETAS_CONFIG_PREDETERMINADAS)) {
+      if (cod.includes(key) || nom.includes(key)) {
+        return config;
+      }
+    }
+    return null;
+  };
+
+  const getCentroValue = (codigoPrefix: string, centrosList: CentroCosto[]) => {
+    const match = centrosList.find((c) => {
+      const cod = c.codigo.trim().toUpperCase();
+      const target = codigoPrefix.trim().toUpperCase();
+      return cod === target || cod.startsWith(target);
+    });
+    if (match) {
+      return `${match.codigo} - ${match.Título}`;
+    }
+    return codigoPrefix;
+  };
+
+  const getCuentaMatch = (codigoPrefix: string, cuentasList: CuentaContable[]) => {
+    const match = cuentasList.find((c) => {
+      const tit = c.Título.trim();
+      return tit.startsWith(codigoPrefix) || tit.includes(codigoPrefix);
+    });
+    if (match) {
+      return { id: match.id, titulo: match.Título };
+    }
+    return {
+      id: null,
+      titulo: '51952015 - GASTOS DE REPRESENTACION TC CORPORATIVO COMPRAS',
+    };
+  };
+
+  const applyTarjetaDefaults = (
+    codigo?: string,
+    nombre?: string,
+    centrosList: CentroCosto[] = centros,
+    cuentasList: CuentaContable[] = cuentas
+  ) => {
+    const config = getTarjetaDefaults(codigo, nombre);
+    if (config) {
+      const defaultCentro = getCentroValue(config.centroCodigo, centrosList);
+      const defaultCuenta = getCuentaMatch(config.cuentaCodigo, cuentasList);
+
+      setCentroCosto(defaultCentro);
+      setLineas((prev) =>
+        prev.map((lin) => ({
+          ...lin,
+          concepto: defaultCentro,
+          cuentaId: defaultCuenta.id,
+          cuentaTitulo: defaultCuenta.titulo,
+        }))
+      );
+    } else {
+      // Para cualquier otra tarjeta, la información debe estar en blanco
+      setCentroCosto('');
+      setLineas((prev) =>
+        prev.map((lin) => ({
+          ...lin,
+          concepto: '',
+          cuentaId: null,
+          cuentaTitulo: '',
+        }))
+      );
+    }
+  };
 
   const handleResponsableChange = (idVal: number) => {
     setSelectedResponsableId(idVal);
@@ -166,6 +247,10 @@ export default function FormularioTarjetasCreditoPage() {
       setMotivo(`[TC: ${resp.tarjeta_codigo}] ${resp.tarjeta_nombre}`);
       setAprobadorNombre(resp.responsable_nombre || '');
       setAprobadorEmail(resp.responsable_email || '');
+
+      applyTarjetaDefaults(resp.tarjeta_codigo, resp.tarjeta_nombre, centros, cuentas);
+    } else {
+      applyTarjetaDefaults('', '', centros, cuentas);
     }
   };
 
@@ -178,7 +263,19 @@ export default function FormularioTarjetasCreditoPage() {
   };
 
   const handleAddLinea = () => {
-    setLineas([...lineas, createEmptyLinea()]);
+    const newLine = createEmptyLinea();
+    const resp = responsables.find((r) => r.id === selectedResponsableId);
+    const config = resp ? getTarjetaDefaults(resp.tarjeta_codigo, resp.tarjeta_nombre) : null;
+
+    if (config) {
+      const defaultCentro = getCentroValue(config.centroCodigo, centros);
+      const defaultCuenta = getCuentaMatch(config.cuentaCodigo, cuentas);
+      newLine.concepto = defaultCentro;
+      newLine.cuentaId = defaultCuenta.id;
+      newLine.cuentaTitulo = defaultCuenta.titulo;
+    }
+
+    setLineas((prev) => [...prev, newLine]);
   };
 
   const handleUpdateLinea = (id: string, field: keyof LineaGasto, value: any) => {
