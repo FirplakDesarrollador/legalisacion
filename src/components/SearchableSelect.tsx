@@ -17,6 +17,7 @@ interface SearchableSelectProps {
   searchPlaceholder?: string;
   disabled?: boolean;
   className?: string;
+  triggerClassName?: string;
   required?: boolean;
 }
 
@@ -28,6 +29,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   searchPlaceholder = 'Buscar...',
   disabled = false,
   className = '',
+  triggerClassName,
   required = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -138,7 +140,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full p-1.5 bg-white border border-slate-200 rounded-lg text-left text-xs flex items-center justify-between gap-1.5 transition-all shadow-2xs hover:border-slate-300 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 ${
+        className={triggerClassName || `w-full p-1.5 bg-white border border-slate-200 rounded-lg text-left text-xs flex items-center justify-between gap-1.5 transition-all shadow-2xs hover:border-slate-300 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-100 ${
           disabled ? 'opacity-60 cursor-not-allowed bg-slate-50' : 'cursor-pointer'
         }`}
       >

@@ -54,6 +54,15 @@ export default function FormularioTarjetasCreditoPage() {
     return Array.from(userMap.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [orgUsers, responsables]);
 
+  // Opciones de tarjetas con buscador por número, nombre de tarjeta o responsable
+  const tarjetaOptions = useMemo(() => {
+    return responsables.map((resp) => ({
+      value: String(resp.id),
+      label: `${resp.tarjeta_codigo} - ${resp.tarjeta_nombre} (Aprueba por defecto: ${resp.responsable_nombre})`,
+      sublabel: resp.tc_en_sap || resp['TC en SAP'] ? `TC SAP: ${resp.tc_en_sap || resp['TC en SAP']}` : undefined,
+    }));
+  }, [responsables]);
+
   // Primary question: Responsable de Caja Menor (Supabase dropdown)
   const [selectedResponsableId, setSelectedResponsableId] = useState<number | ''>('');
   const [tarjetaCodigo, setTarjetaCodigo] = useState('');
@@ -416,21 +425,15 @@ export default function FormularioTarjetasCreditoPage() {
                     </label>
                   </div>
 
-                  <select
+                  <SearchableSelect
                     required
-                    value={selectedResponsableId}
-                    onChange={(e) => handleResponsableChange(Number(e.target.value))}
-                    className="w-full p-3 bg-white border border-blue-300 rounded-xl text-slate-900 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-sm"
-                  >
-                    <option value="" disabled>
-                      -- Seleccione la Tarjeta de Crédito --
-                    </option>
-                    {responsables.map((resp) => (
-                      <option key={resp.id} value={resp.id}>
-                        {resp.tarjeta_codigo} - {resp.tarjeta_nombre} (Aprueba por defecto: {resp.responsable_nombre})
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="-- Seleccione o busque la Tarjeta de Crédito --"
+                    searchPlaceholder="Buscar por número (ej: 3680) o nombre de la tarjeta..."
+                    value={selectedResponsableId ? String(selectedResponsableId) : ''}
+                    onChange={(val) => handleResponsableChange(Number(val))}
+                    options={tarjetaOptions}
+                    triggerClassName="w-full p-3 bg-white border border-blue-300 rounded-xl text-slate-900 font-bold text-xs flex items-center justify-between gap-2 shadow-sm hover:border-blue-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
 
                   <p className="text-[11px] text-blue-800">
                     Seleccione la tarjeta de crédito utilizada para esta legalización.
