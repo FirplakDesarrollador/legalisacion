@@ -119,10 +119,10 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
 
     // 1.8 Buscar CardCode del Encabezado (Código SN)
     const isTarjetaCredito =
-      legalizacion.codigo?.startsWith('TC-') ||
+      legalizacion.codigo?.toUpperCase().startsWith('TC-') ||
       Boolean((legalizacion as any).tarjeta_codigo) ||
       Boolean((legalizacion as any).tc_en_sap) ||
-      legalizacion.motivo?.includes('Tarjeta') ||
+      legalizacion.motivo?.toLowerCase().includes('tarjeta') ||
       legalizacion.motivo?.includes('[TC:');
 
     let headerCardCode = '';
@@ -269,7 +269,7 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       U_VlrImpuesto: 0,
       U_VlrRetenciones: 0,
       U_VlrTotal: totalGastosCOP,
-      U_AcctCode: '23359505',
+      U_AcctCode: isTarjetaCredito ? '21051025' : '23359505',
       U_Origen: 'SAP',
       U_Series: 69,
     };
