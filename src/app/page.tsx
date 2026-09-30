@@ -29,12 +29,14 @@ import {
   getLocalTarjetasCredito,
   saveLocalTarjetaCredito,
   updateTarjetaCreditoStatus,
+  updateTarjetaCreditoGestionContable,
   fetchLegalizacionesTarjetasCreditoFromSupabase,
   fetchLegalizacionesGastosFromSupabase,
   getLocalLegalizacionesGastos,
   saveLocalLegalizacionGasto,
   updateLegalizacionGastoStatus,
   updateLegalizacionGastoGestionContable,
+  updateLegalizacionGestionContable,
   getLocalCajasMenores,
   saveLocalCajaMenor,
   agregarMovimientoCaja,
@@ -238,6 +240,24 @@ export default function Home() {
     }
   };
 
+  const handleUpdateTarjetaGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado') => {
+    const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
+    const updated = updateTarjetaCreditoGestionContable(id, gestion, nowIso);
+    setTarjetasCredito(updated);
+    if (selectedTarjetaCredito && selectedTarjetaCredito.id === id) {
+      setSelectedTarjetaCredito((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined } : null));
+    }
+  };
+
+  const handleUpdateLegalizacionGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado') => {
+    const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
+    const updated = updateLegalizacionGestionContable(id, gestion, nowIso);
+    setLegalizaciones(updated);
+    if (selectedLegalizacion && selectedLegalizacion.id === id) {
+      setSelectedLegalizacion((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined } : null));
+    }
+  };
+
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white text-xs">
@@ -390,6 +410,7 @@ export default function Home() {
           legalizacion={selectedLegalizacion}
           onClose={() => setSelectedLegalizacion(null)}
           onUpdateStatus={handleUpdateStatus}
+          onUpdateGestionContable={handleUpdateLegalizacionGestionContable}
         />
       )}
 
@@ -408,6 +429,7 @@ export default function Home() {
           tarjetaCredito={selectedTarjetaCredito}
           onClose={() => setSelectedTarjetaCredito(null)}
           onUpdateStatus={handleUpdateStatusTarjeta}
+          onUpdateGestionContable={handleUpdateTarjetaGestionContable}
         />
       )}
 
