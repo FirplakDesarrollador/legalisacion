@@ -365,6 +365,18 @@ export default function FormularioTarjetasCreditoPage() {
       return;
     }
 
+    const lineasSubiendo = lineas.some((l) => l.soporteUrl === 'uploading');
+    if (lineasSubiendo) {
+      alert('Hay comprobantes que aún se están subiendo a la nube. Por favor espera unos segundos.');
+      return;
+    }
+
+    const lineasSinSoporte = lineas.some((l) => !l.soporteUrl || l.soporteUrl.trim() === '');
+    if (lineasSinSoporte) {
+      alert('Los soportes/facturas son obligatorios. Por favor adjunta el comprobante (PDF o Imagen) en cada una de las líneas de gasto.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -772,9 +784,16 @@ export default function FormularioTarjetasCreditoPage() {
 
                       {/* File Upload Row */}
                       <div className="mt-2 border-t border-slate-100 pt-3">
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-1">
-                          Adjuntar {linea.tipoDocumento} (PDF o Imagen)
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-[10px] font-bold text-slate-700">
+                            Adjuntar {linea.tipoDocumento} (PDF o Imagen) <span className="text-rose-600 font-bold">* Obligatorio</span>
+                          </label>
+                          {linea.soporteUrl && linea.soporteUrl !== 'uploading' && (
+                            <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Listo
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="file"
                           accept=".pdf,image/*"
@@ -809,13 +828,17 @@ export default function FormularioTarjetasCreditoPage() {
                               }
                             }
                           }}
-                          className="block w-full text-xs text-slate-500
+                          className={`block w-full text-xs text-slate-500 rounded-xl p-1.5 border transition-colors ${
+                            !linea.soporteUrl
+                              ? 'border-dashed border-rose-300 bg-rose-50/20'
+                              : 'border-slate-200 bg-white'
+                          }
                             file:mr-4 file:py-1.5 file:px-4
                             file:rounded-lg file:border-0
                             file:text-xs file:font-bold
                             file:bg-blue-100 file:text-blue-700
                             hover:file:bg-blue-200
-                            cursor-pointer transition-colors"
+                            cursor-pointer`}
                         />
                         {linea.soporteUrl === 'uploading' && (
                           <div className="mt-1.5 flex items-center gap-1.5 text-blue-700 font-bold text-[10px]">
@@ -828,6 +851,11 @@ export default function FormularioTarjetasCreditoPage() {
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                             <span>Soporte adjunto correctamente</span>
                           </div>
+                        )}
+                        {!linea.soporteUrl && (
+                          <p className="mt-1 text-[10px] text-rose-600 font-medium">
+                            * Se debe adjuntar obligatoriamente el archivo de soporte.
+                          </p>
                         )}
                       </div>
                     </div>

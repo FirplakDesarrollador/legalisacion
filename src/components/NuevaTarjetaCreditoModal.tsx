@@ -116,6 +116,12 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
       return;
     }
 
+    const lineasSinSoporte = lineas.some((l) => !l.soporteUrl || l.soporteUrl === 'uploading');
+    if (lineasSinSoporte) {
+      alert('Los soportes/facturas son obligatorios. Por favor adjunta el comprobante en cada línea de gasto.');
+      return;
+    }
+
     const randomNum = Math.floor(100 + Math.random() * 900);
     const nuevaLeg: TarjetaCredito = {
       id: `leg-${Date.now()}`,
@@ -351,9 +357,9 @@ export const NuevaTarjetaCreditoModal: React.FC<NuevaTarjetaCreditoModalProps> =
                   {/* File Upload Row */}
                   <div className="mt-2 border-t border-slate-200/70 pt-2.5">
                     <div className="flex items-center justify-between mb-1">
-                      <label className="text-[10px] font-bold text-slate-600 flex items-center gap-1.5">
+                      <label className="text-[10px] font-bold text-slate-700 flex items-center gap-1.5">
                         <Paperclip className="w-3.5 h-3.5 text-blue-600" />
-                        Adjuntar Documento / Soporte ({linea.tipoDocumento || 'Factura'})
+                        Adjuntar Documento / Soporte ({linea.tipoDocumento || 'Factura'}) <span className="text-rose-600 font-bold">* Obligatorio</span>
                       </label>
                       {linea.soporteUrl && linea.soporteUrl !== 'uploading' && (
                         <a

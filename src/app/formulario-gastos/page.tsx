@@ -189,6 +189,14 @@ export default function FormularioGastosPublicoPage() {
       return;
     }
 
+    const lineasSinSoporte = lineas.some(
+      (l) => (!l.soporteUrls || l.soporteUrls.length === 0) && (!l.soportes || l.soportes.length === 0) && (!l.soporteUrl || l.soporteUrl.trim() === '')
+    );
+    if (lineasSinSoporte) {
+      alert('Los soportes/facturas son obligatorios. Por favor adjunta el comprobante en cada línea de gasto.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
