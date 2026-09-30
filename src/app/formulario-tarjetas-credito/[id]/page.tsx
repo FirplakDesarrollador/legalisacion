@@ -268,6 +268,8 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
     );
   }
 
+  const activeDocEntry = sapResult?.docEntry || legalizacion.sapDocEntry;
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       {/* Header */}
@@ -303,7 +305,14 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-slate-900 font-mono">{legalizacion.codigo}</h2>
+                  <h2 className="text-base font-bold text-slate-900 font-mono">
+                    {activeDocEntry ? `SAP #${activeDocEntry}` : legalizacion.codigo}
+                  </h2>
+                  {activeDocEntry && (
+                    <span className="text-xs text-slate-400 font-mono font-normal">
+                      ({legalizacion.codigo})
+                    </span>
+                  )}
                   {getStatusBadge(legalizacion.estado)}
                 </div>
                 <p className="text-xs text-slate-500">{legalizacion.motivo}</p>
@@ -335,6 +344,18 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                     DocEntry: {sapResult.docEntry}
                   </span>
                 )}
+              </div>
+            )}
+
+            {!sapResult && legalizacion.sapDocEntry && (
+              <div className="p-3.5 rounded-2xl text-xs flex items-center justify-between border bg-emerald-50 text-emerald-800 border-emerald-200">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Legalización registrada en SAP Business One
+                </span>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-200 text-emerald-900 font-mono font-bold text-[10px]">
+                  DocEntry: #{legalizacion.sapDocEntry}
+                </span>
               </div>
             )}
 

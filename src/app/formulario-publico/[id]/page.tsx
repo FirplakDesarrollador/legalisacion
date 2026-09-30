@@ -295,13 +295,15 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-slate-900 font-mono">{legalizacion.codigo}</h2>
-                  {getStatusBadge(legalizacion.estado)}
+                  <h2 className="text-base font-bold text-slate-900 font-mono">
+                    {legalizacion.sapDocEntry ? `SAP #${legalizacion.sapDocEntry}` : legalizacion.codigo}
+                  </h2>
                   {legalizacion.sapDocEntry && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                      Doc: #{legalizacion.sapDocEntry}
+                    <span className="text-xs text-slate-400 font-mono font-normal">
+                      ({legalizacion.codigo})
                     </span>
                   )}
+                  {getStatusBadge(legalizacion.estado)}
                 </div>
                 <p className="text-xs text-slate-500">{legalizacion.motivo}</p>
               </div>

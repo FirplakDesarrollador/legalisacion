@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database } from 'lucide-react';
 import { TarjetaCredito } from '@/types/tarjetasCredito';
+import { supabase } from '@/lib/supabase';
 
 interface TarjetaCreditoDetailModalProps {
   tarjetaCredito: TarjetaCredito | null;
@@ -21,6 +22,8 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
   const [sapResult, setSapResult] = useState<{ success: boolean; message: string; docEntry?: number } | null>(null);
 
   if (!tarjetaCredito) return null;
+
+  const activeDocEntry = sapResult?.docEntry || tarjetaCredito.sapDocEntry;
 
   const formatCOP = (num: number) => {
     return new Intl.NumberFormat('es-CO', {
@@ -95,6 +98,18 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
         message: data.message || (data.success ? 'Borrador creado en SAP Service Layer' : 'Error al conectar con SAP'),
         docEntry: data.docEntry,
       });
+
+      if (data.success && data.docEntry) {
+        tarjetaCredito.sapDocEntry = data.docEntry;
+        try {
+          await supabase
+            .from('legalizaciones_tarjetas_credito')
+            .update({ sap_doc_entry: data.docEntry, updated_at: new Date().toISOString() })
+            .eq('id', tarjetaCredito.id);
+        } catch (e) {
+          console.warn('Error guardando sap_doc_entry en Supabase:', e);
+        }
+      }
     } catch (err: any) {
       setSapResult({
         success: false,
@@ -116,7 +131,14 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900 font-mono">{tarjetaCredito.codigo}</h2>
+                <h2 className="text-base font-bold text-slate-900 font-mono">
+                  {activeDocEntry ? `SAP #${activeDocEntry}` : tarjetaCredito.codigo}
+                </h2>
+                {activeDocEntry && (
+                  <span className="text-xs text-slate-400 font-mono font-normal">
+                    ({tarjetaCredito.codigo})
+                  </span>
+                )}
                 {getStatusBadge(tarjetaCredito.estado)}
               </div>
               <p className="text-xs text-slate-500">{tarjetaCredito.motivo}</p>
@@ -154,6 +176,18 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
                   DocEntry: {sapResult.docEntry}
                 </span>
               )}
+            </div>
+          )}
+
+          {!sapResult && tarjetaCredito.sapDocEntry && (
+            <div className="p-3.5 rounded-2xl text-xs flex items-center justify-between border bg-emerald-50 text-emerald-800 border-emerald-200">
+              <span className="flex items-center gap-1.5 font-medium">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Legalización registrada en SAP Business One
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-emerald-200 text-emerald-900 font-mono font-bold text-[10px]">
+                DocEntry: #{tarjetaCredito.sapDocEntry}
+              </span>
             </div>
           )}
 
