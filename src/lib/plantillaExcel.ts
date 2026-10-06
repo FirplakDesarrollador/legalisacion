@@ -30,7 +30,6 @@ export const COLUMNAS = [
   { key: 'destino', header: 'Destino', width: 20, note: 'Obligatorio si incluye transporte' },
   { key: 'pasajeros', header: '# Pasajeros', width: 12, note: 'Obligatorio si incluye transporte' },
   { key: 'idaVuelta', header: '¿Ida y Vuelta? (SI/NO)', width: 16, note: 'Obligatorio si incluye transporte' },
-  { key: 'archivos', header: 'Nombre del Archivo Soporte *', width: 34, note: 'Nombre EXACTO del archivo adjunto (con extensión). Varios archivos separados por ;' },
 ] as const;
 
 export interface CatalogoItem {
@@ -62,22 +61,22 @@ export async function construirPlantilla(ExcelJS: any, catalogos: PlantillaCatal
     ['CÓMO USARLA', true],
     ['1. Vaya a la hoja "Lineas" y diligencie UNA FILA POR CADA COMPROBANTE (factura o documento soporte).', false],
     ['2. Los campos con asterisco (*) son obligatorios. No cambie los títulos de las columnas ni el orden.', false],
-    ['3. En la columna "Nombre del Archivo Soporte" escriba el nombre EXACTO del archivo del comprobante (con extensión), ej: factura_001.pdf', false],
-    ['4. Guarde este Excel (formato .xlsx).', false],
-    ['5. Ingrese a Legalización de Gastos, pulse "Cargar desde Excel", adjunte este Excel y TODOS los archivos de los comprobantes y pulse "Procesar".', false],
-    ['6. Revise las líneas cargadas en pantalla, complete los datos generales (solicitante, aprobador, motivo) y radique.', false],
+    ['3. Guarde este Excel (formato .xlsx).', false],
+    ['4. Ingrese a Legalización de Gastos, pulse "Cargar desde Excel", adjunte este Excel y pulse "Procesar". Se crearán las líneas de gasto.', false],
+    ['5. Una vez cargadas las líneas, adjunte el soporte (PDF o foto) directamente en cada línea, complete los datos generales (solicitante, aprobador, motivo) y radique.', false],
     ['', false],
     ['REGLAS', true],
     ['• Tipo Documento: "Factura" o "Documento Soporte". Si es Documento Soporte deje vacío el N° Factura.', false],
-    ['• Centro de Costo y Cuenta Contable: escriba solo el CÓDIGO (ej. GA-FICOG y 51952015). Los centros GA usan cuentas 51*, GV 52*, IP 73* y MO 72*.', false],
+    ['• Centro de Costo y Cuenta Contable: escriba o elija solo el CÓDIGO (ej. GA-FICOG y 51952015).', false],
+    ['• La cuenta depende del centro de costo: GA → cuentas que empiezan por 51, GV → 52, IP → 73, MO → 72. Para los demás centros (N/A) se puede usar cualquier cuenta.', false],
     ['• Moneda: COP o USD.  Valor: solo números, sin símbolos (ej. 150000).', false],
     ['• Si "Incluye Transporte" = SI, son obligatorios: Medio de Transporte, Origen, Destino, # Pasajeros y ¿Ida y Vuelta?', false],
-    ['• Si un mismo gasto tiene varios archivos, sepárelos con punto y coma: factura1.pdf;recibo1.jpg', false],
+    ['• Los soportes NO van en el Excel: se adjuntan en la app, en cada línea, después de cargar el Excel.', false],
     ['• Máximo ' + MAX_FILAS + ' comprobantes por archivo.', false],
     ['', false],
     ['EJEMPLO (no lo copie en la hoja Lineas, es solo ilustrativo)', true],
-    ['Fecha: 05/10/2026 | Factura | FE-1092 | 900123456 | GA-FICOG | 51952015 | COP | 150000 | NO | | | | | | factura_001.pdf', false],
-    ['Fecha: 06/10/2026 | Factura | FE-2210 | 800555111 | GV-VENTAS | 52952015 | COP | 85000 | SI | Taxi | Medellín | Bogotá | 1 | SI | taxi_001.jpg', false],
+    ['Fecha: 05/10/2026 | Factura | FE-1092 | 900123456 | GA-FICOG | 51952015 | COP | 150000 | NO | | | | | ', false],
+    ['Fecha: 06/10/2026 | Factura | FE-2210 | 800555111 | GV-VENTAS | 52952015 | COP | 85000 | SI | Taxi | Medellín | Bogotá | 1 | SI', false],
   ];
   textoInstr.forEach(([t, bold], i) => {
     const c = ins.getCell(`B${i + 2}`);
@@ -88,24 +87,54 @@ export async function construirPlantilla(ExcelJS: any, catalogos: PlantillaCatal
 
   // ---------------- Hoja de catálogos (opcional) ----------------
   let centrosRange = '';
-  let cuentasRange = '';
+  let cuentasDependiente = false;
   if (tieneCatalogos) {
     const cat = wb.addWorksheet('Catalogos', { properties: { tabColor: { argb: 'FF10B981' } } });
-    cat.columns = [{ width: 50 }, { width: 70 }];
-    cat.getCell('A1').value = 'Centros de Costo';
-    cat.getCell('B1').value = 'Cuentas Contables';
-    [cat.getCell('A1'), cat.getCell('B1')].forEach((c) => {
+    const cuentasTodas = (catalogos.cuentas || []).map((c) => `${c.codigo} - ${c.nombre}`);
+    const grupos: [string, string, string[]][] = [
+      ['C', 'GA', cuentasTodas.filter((t) => t.startsWith('51'))],
+      ['D', 'GV', cuentasTodas.filter((t) => t.startsWith('52'))],
+      ['E', 'IP', cuentasTodas.filter((t) => t.startsWith('73'))],
+      ['F', 'MO', cuentasTodas.filter((t) => t.startsWith('72'))],
+    ];
+    cat.columns = [{ width: 50 }, { width: 70 }, { width: 60 }, { width: 60 }, { width: 60 }, { width: 60 }];
+    const titulos: [string, string][] = [
+      ['A1', 'Centros de Costo'],
+      ['B1', 'Cuentas Contables (todas / N/A)'],
+      ['C1', 'Cuentas para centros GA (51)'],
+      ['D1', 'Cuentas para centros GV (52)'],
+      ['E1', 'Cuentas para centros IP (73)'],
+      ['F1', 'Cuentas para centros MO (72)'],
+    ];
+    titulos.forEach(([addr, t]) => {
+      const c = cat.getCell(addr);
+      c.value = t;
       c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AZUL } };
     });
     (catalogos.centros || []).forEach((c, i) => {
       cat.getCell(`A${i + 2}`).value = `${c.codigo} - ${c.nombre}`;
     });
-    (catalogos.cuentas || []).forEach((c, i) => {
-      cat.getCell(`B${i + 2}`).value = `${c.codigo} - ${c.nombre}`;
+    cuentasTodas.forEach((t, i) => {
+      cat.getCell(`B${i + 2}`).value = t;
+    });
+    grupos.forEach(([col, , lista]) => {
+      lista.forEach((t, i) => {
+        cat.getCell(`${col}${i + 2}`).value = t;
+      });
     });
     if (catalogos.centros?.length) centrosRange = `Catalogos!$A$2:$A$${catalogos.centros.length + 1}`;
-    if (catalogos.cuentas?.length) cuentasRange = `Catalogos!$B$2:$B$${catalogos.cuentas.length + 1}`;
+    if (cuentasTodas.length) {
+      // Rangos con nombre usados por el desplegable dependiente de la cuenta
+      wb.definedNames.add(`Catalogos!$B$2:$B$${cuentasTodas.length + 1}`, 'Lista_TODAS');
+      grupos.forEach(([col, pref, lista]) => {
+        const rango = lista.length
+          ? `Catalogos!$${col}$2:$${col}$${lista.length + 1}`
+          : `Catalogos!$B$2:$B$${cuentasTodas.length + 1}`;
+        wb.definedNames.add(rango, `Lista_${pref}`);
+      });
+      cuentasDependiente = true;
+    }
   }
 
   // ---------------- Hoja principal ----------------
@@ -135,8 +164,14 @@ export async function construirPlantilla(ExcelJS: any, catalogos: PlantillaCatal
     if (centrosRange) {
       ws.getCell(`E${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: [centrosRange], showErrorMessage: false };
     }
-    if (cuentasRange) {
-      ws.getCell(`F${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: [cuentasRange], showErrorMessage: false };
+    if (cuentasDependiente) {
+      const p = `UPPER(LEFT($E${r},2))`;
+      ws.getCell(`F${r}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`INDIRECT("Lista_"&IF(OR(${p}="GA",${p}="GV",${p}="IP",${p}="MO"),${p},"TODAS"))`],
+        showErrorMessage: false,
+      };
     }
     ws.getCell(`G${r}`).dataValidation = { type: 'list', allowBlank: true, formulae: ['"COP,USD"'] };
     ws.getCell(`H${r}`).numFmt = '#,##0.00';
@@ -157,7 +192,6 @@ export async function construirPlantilla(ExcelJS: any, catalogos: PlantillaCatal
   ['I', 'J', 'K', 'L', 'M', 'N'].forEach((col) => {
     ws.getCell(`${col}1`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
   });
-  ws.getCell('O1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF047857' } };
   ws.autoFilter = { from: 'A1', to: `${String.fromCharCode(64 + COLUMNAS.length)}1` };
   ws.getCell('A1').alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
   void AZUL_CLARO;
@@ -188,7 +222,6 @@ export interface FilaImportada {
   destino: string;
   numeroPasajeros: number;
   esIdaVuelta: boolean;
-  archivos: string[];
 }
 
 export interface ResultadoLectura {
@@ -273,7 +306,7 @@ export async function leerPlantilla(
   // Validar encabezados
   const h1 = norm(celdaTexto(ws.getCell('A1')));
   const hLast = norm(celdaTexto(ws.getCell(1, COLUMNAS.length)));
-  if (!h1.startsWith('fecha') || !hLast.startsWith('nombre del archivo')) {
+  if (!h1.startsWith('fecha') || !hLast.includes('ida y vuelta')) {
     return { filas: [], errores: ['El Excel no corresponde a la plantilla oficial (encabezados modificados). Descargue la plantilla nuevamente.'] };
   }
 
@@ -349,12 +382,6 @@ export async function leerPlantilla(
       else idaVuelta = iv === 'SI';
     }
 
-    const archivos = celdaTexto(g(15))
-      .split(/[;\n]/)
-      .map((a) => a.trim())
-      .filter(Boolean);
-    if (archivos.length === 0) E('Nombre del archivo soporte es obligatorio.');
-
     if (errores.length === n0) {
       filas.push({
         fila: r,
@@ -375,7 +402,6 @@ export async function leerPlantilla(
         destino,
         numeroPasajeros: pasajeros,
         esIdaVuelta: idaVuelta,
-        archivos,
       });
     }
   }

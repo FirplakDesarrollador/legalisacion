@@ -59,7 +59,6 @@ export default function FormularioGastosPublicoPage() {
   // Carga masiva desde Excel
   const [showExcelModal, setShowExcelModal] = useState(false);
   const [excelFile, setExcelFile] = useState<File | null>(null);
-  const [soporteFilesExcel, setSoporteFilesExcel] = useState<File[]>([]);
   const [excelErrors, setExcelErrors] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState('');
@@ -359,7 +358,6 @@ export default function FormularioGastosPublicoPage() {
     if (isImporting) return;
     setShowExcelModal(false);
     setExcelFile(null);
-    setSoporteFilesExcel([]);
     setExcelErrors([]);
     setImportProgress('');
   };
@@ -399,69 +397,37 @@ export default function FormularioGastosPublicoPage() {
       const { leerPlantilla } = await import('@/lib/plantillaExcel');
       const buffer = await excelFile.arrayBuffer();
       const { filas, errores } = await leerPlantilla(ExcelJS, buffer, { centros, cuentas, proveedores });
-      const errs = [...errores];
 
-      const key = (s: string) => s.normalize('NFC').trim().toLowerCase();
-      const mapaArchivos = new Map<string, File>();
-      soporteFilesExcel.forEach((f) => mapaArchivos.set(key(f.name), f));
-      filas.forEach((f) =>
-        f.archivos.forEach((a) => {
-          if (!mapaArchivos.has(key(a))) errs.push(`Fila ${f.fila}: no se adjuntó el archivo "${a}".`);
-        })
-      );
-      if (errs.length > 0) {
-        setExcelErrors(errs);
+      if (errores.length > 0) {
+        setExcelErrors(errores);
         return;
       }
 
-      // Subir archivos únicos a Supabase Storage
-      const unicos = Array.from(new Set(filas.flatMap((f) => f.archivos.map(key))));
-      const urls = new Map<string, string>();
-      let hechos = 0;
-      const subir = async (k: string) => {
-        const file = mapaArchivos.get(k)!;
-        const ext = file.name.split('.').pop() || 'pdf';
-        const path = `comprobantes/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
-        const { error } = await supabase.storage.from('soportes').upload(path, file);
-        if (error) throw new Error(`"${file.name}": ${error.message}`);
-        urls.set(k, supabase.storage.from('soportes').getPublicUrl(path).data.publicUrl);
-        hechos++;
-        setImportProgress(`Subiendo comprobantes ${hechos} de ${unicos.length}...`);
-      };
-      setImportProgress(`Subiendo comprobantes 0 de ${unicos.length}...`);
-      for (let i = 0; i < unicos.length; i += 4) {
-        await Promise.all(unicos.slice(i, i + 4).map(subir));
-      }
-
-      const nuevas: LineaGasto[] = filas.map((f, i) => {
-        const soportes = f.archivos.map((a) => ({ name: mapaArchivos.get(key(a))!.name, url: urls.get(key(a))! }));
-        const soporteUrls = soportes.map((s) => s.url);
-        return {
-          id: `lin-gst-xl-${Date.now()}-${i}`,
-          fecha: f.fecha,
-          concepto: f.concepto,
-          cuentaId: f.cuentaId,
-          cuentaTitulo: f.cuentaTitulo,
-          proveedorId: f.proveedorId,
-          proveedorNit: f.proveedorNit,
-          proveedorNombre: f.proveedorNombre,
-          tipoDocumento: f.tipoDocumento,
-          facturaNumero: f.facturaNumero,
-          moneda: f.moneda,
-          valorSubtotal: f.valorSubtotal,
-          valorIva: 0,
-          valorTotal: f.valorSubtotal,
-          soportes,
-          soporteUrls,
-          soporteUrl: soporteUrls[0] || '',
-          incluyeTransporte: f.incluyeTransporte,
-          medioTransporte: f.medioTransporte,
-          origen: f.origen,
-          destino: f.destino,
-          numeroPasajeros: f.numeroPasajeros,
-          esIdaVuelta: f.esIdaVuelta,
-        };
-      });
+      const nuevas: LineaGasto[] = filas.map((f, i) => ({
+        id: `lin-gst-xl-${Date.now()}-${i}`,
+        fecha: f.fecha,
+        concepto: f.concepto,
+        cuentaId: f.cuentaId,
+        cuentaTitulo: f.cuentaTitulo,
+        proveedorId: f.proveedorId,
+        proveedorNit: f.proveedorNit,
+        proveedorNombre: f.proveedorNombre,
+        tipoDocumento: f.tipoDocumento,
+        facturaNumero: f.facturaNumero,
+        moneda: f.moneda,
+        valorSubtotal: f.valorSubtotal,
+        valorIva: 0,
+        valorTotal: f.valorSubtotal,
+        soportes: [],
+        soporteUrls: [],
+        soporteUrl: '',
+        incluyeTransporte: f.incluyeTransporte,
+        medioTransporte: f.medioTransporte,
+        origen: f.origen,
+        destino: f.destino,
+        numeroPasajeros: f.numeroPasajeros,
+        esIdaVuelta: f.esIdaVuelta,
+      }));
 
       setLineas((prev) => {
         const vacia = prev.length === 1 && !prev[0].concepto && !prev[0].valorSubtotal && !prev[0].soporteUrl;
@@ -469,9 +435,8 @@ export default function FormularioGastosPublicoPage() {
       });
       setShowExcelModal(false);
       setExcelFile(null);
-      setSoporteFilesExcel([]);
       setImportProgress('');
-      alert(`Se cargaron ${nuevas.length} línea(s) de gasto desde el Excel. Revíselas, complete los datos generales y radique.`);
+      alert(`Se cargaron ${nuevas.length} línea(s) de gasto desde el Excel exitosamente. Ahora puedes adjuntar el soporte (PDF o foto) directamente en cada línea.`);
     } catch (err: any) {
       console.error('Error importando Excel:', err);
       setExcelErrors([`Ocurrió un error procesando la carga: ${err?.message || 'error desconocido'}`]);
@@ -1876,24 +1841,9 @@ export default function FormularioGastosPublicoPage() {
                 onChange={(e) => { setExcelFile(e.target.files?.[0] || null); setExcelErrors([]); }}
                 className="block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
               />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">
-                Paso 3: Archivos de los comprobantes (PDF o imágenes)
-                {soporteFilesExcel.length > 0 && (
-                  <span className="ml-2 text-emerald-700">{soporteFilesExcel.length} archivo(s)</span>
-                )}
-              </label>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,image/*"
-                disabled={isImporting}
-                onChange={(e) => { setSoporteFilesExcel(Array.from(e.target.files || [])); setExcelErrors([]); }}
-                className="block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-              />
-              <p className="text-[10px] text-slate-400">Los nombres de archivo deben coincidir exactamente con la columna del Excel.</p>
+              <p className="text-[10px] text-slate-400">
+                Los soportes (facturas o recibos en PDF/foto) se adjuntan directamente en cada línea después de cargar el Excel.
+              </p>
             </div>
 
             {excelErrors.length > 0 && (
@@ -1924,7 +1874,7 @@ export default function FormularioGastosPublicoPage() {
               <button
                 type="button"
                 onClick={handleProcesarExcel}
-                disabled={isImporting || !excelFile || soporteFilesExcel.length === 0}
+                disabled={isImporting || !excelFile}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Procesar y cargar líneas
