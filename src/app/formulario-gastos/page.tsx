@@ -52,6 +52,7 @@ export default function FormularioGastosPublicoPage() {
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [lastCodigo, setLastCodigo] = useState('');
+  const [showAvisoBancario, setShowAvisoBancario] = useState(true);
 
   // Draft management states
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
@@ -1504,6 +1505,40 @@ export default function FormularioGastosPublicoPage() {
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Aviso Importante Certificación Bancaria */}
+      {showAvisoBancario && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-[#f3f5f8] border border-slate-200 rounded-3xl p-6 sm:p-10 max-w-md w-full shadow-2xl text-center space-y-6 animate-in zoom-in-95 duration-200">
+            <h2 className="text-2xl sm:text-3xl font-black text-red-600 tracking-tight">
+              ¡Importante!
+            </h2>
+
+            <p className="text-slate-800 text-sm sm:text-base leading-relaxed font-normal px-1">
+              Si es primer vez que solicita reembolso de gastos, por favor enviar certificación bancaria al correo:
+            </p>
+
+            <div>
+              <a
+                href="mailto:coordinacionfinanciera@firplak.com"
+                className="text-[#2eb85c] hover:text-[#259b4c] font-semibold text-base sm:text-lg break-all transition-colors inline-block"
+              >
+                coordinacionfinanciera@firplak.com
+              </a>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAvisoBancario(false)}
+                className="px-10 py-2.5 bg-[#3b66b2] hover:bg-[#2f5394] active:scale-95 text-white font-bold text-sm sm:text-base rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                Entendido
               </button>
             </div>
           </div>
