@@ -404,18 +404,27 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-center">
-                        {l.soporteUrl ? (
-                          <a
-                            href={l.soporteUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline font-semibold text-[11px]"
-                          >
-                            Ver Soporte
-                          </a>
-                        ) : (
-                          <span className="text-slate-400 text-[10px]">Sin archivo</span>
-                        )}
+                        {(() => {
+                          const lista = l.soportes && l.soportes.length > 0
+                            ? l.soportes
+                            : l.soporteUrl ? [{ name: 'Ver Soporte', url: l.soporteUrl }] : [];
+                          if (lista.length === 0) return <span className="text-slate-400 text-[10px]">Sin archivo</span>;
+                          return (
+                            <div className="flex flex-col gap-0.5 items-center">
+                              {lista.map((s, i) => (
+                                <a
+                                  key={i}
+                                  href={s.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline font-semibold text-[11px]"
+                                >
+                                  {lista.length > 1 ? `Soporte ${i + 1}` : 'Ver Soporte'}
+                                </a>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}

@@ -27,6 +27,8 @@ import {
   Calendar,
   UploadCloud,
   Camera,
+  FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 import {
   fetchCuentasFromSupabase,
@@ -53,6 +55,14 @@ export default function FormularioGastosPublicoPage() {
   const [submitted, setSubmitted] = useState(false);
   const [lastCodigo, setLastCodigo] = useState('');
   const [showAvisoBancario, setShowAvisoBancario] = useState(true);
+
+  // Carga masiva desde Excel
+  const [showExcelModal, setShowExcelModal] = useState(false);
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [soporteFilesExcel, setSoporteFilesExcel] = useState<File[]>([]);
+  const [excelErrors, setExcelErrors] = useState<string[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState('');
 
   // Draft management states
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
@@ -336,6 +346,137 @@ export default function FormularioGastosPublicoPage() {
       console.error('Error de red al subir:', err);
       handleUpdateLinea(lineaId, 'soporteUrl', '');
       alert('Error de red al subir el archivo.');
+    }
+  };
+
+  // ---------- Carga masiva desde Excel ----------
+  const cargarExcelJS = async () => {
+    const m: any = await import('exceljs');
+    return m.default ?? m;
+  };
+
+  const closeExcelModal = () => {
+    if (isImporting) return;
+    setShowExcelModal(false);
+    setExcelFile(null);
+    setSoporteFilesExcel([]);
+    setExcelErrors([]);
+    setImportProgress('');
+  };
+
+  const handleDescargarPlantilla = async () => {
+    try {
+      const ExcelJS = await cargarExcelJS();
+      const { construirPlantilla } = await import('@/lib/plantillaExcel');
+      const wb = await construirPlantilla(ExcelJS, {
+        centros: centros.map((c) => ({ codigo: c.codigo.trim(), nombre: c.Título })),
+        cuentas: cuentas.map((c) => {
+          const partes = c.Título.split(' - ');
+          return { codigo: partes[0].trim(), nombre: partes.length > 1 ? partes.slice(1).join(' - ') : c.Título };
+        }),
+      });
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plantilla-legalizacion-gastos.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error generando plantilla:', err);
+      alert('No se pudo generar la plantilla. Intente nuevamente.');
+    }
+  };
+
+  const handleProcesarExcel = async () => {
+    if (!excelFile || isImporting) return;
+    setIsImporting(true);
+    setExcelErrors([]);
+    try {
+      setImportProgress('Leyendo y validando el Excel...');
+      const ExcelJS = await cargarExcelJS();
+      const { leerPlantilla } = await import('@/lib/plantillaExcel');
+      const buffer = await excelFile.arrayBuffer();
+      const { filas, errores } = await leerPlantilla(ExcelJS, buffer, { centros, cuentas, proveedores });
+      const errs = [...errores];
+
+      const key = (s: string) => s.normalize('NFC').trim().toLowerCase();
+      const mapaArchivos = new Map<string, File>();
+      soporteFilesExcel.forEach((f) => mapaArchivos.set(key(f.name), f));
+      filas.forEach((f) =>
+        f.archivos.forEach((a) => {
+          if (!mapaArchivos.has(key(a))) errs.push(`Fila ${f.fila}: no se adjuntó el archivo "${a}".`);
+        })
+      );
+      if (errs.length > 0) {
+        setExcelErrors(errs);
+        return;
+      }
+
+      // Subir archivos únicos a Supabase Storage
+      const unicos = Array.from(new Set(filas.flatMap((f) => f.archivos.map(key))));
+      const urls = new Map<string, string>();
+      let hechos = 0;
+      const subir = async (k: string) => {
+        const file = mapaArchivos.get(k)!;
+        const ext = file.name.split('.').pop() || 'pdf';
+        const path = `comprobantes/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+        const { error } = await supabase.storage.from('soportes').upload(path, file);
+        if (error) throw new Error(`"${file.name}": ${error.message}`);
+        urls.set(k, supabase.storage.from('soportes').getPublicUrl(path).data.publicUrl);
+        hechos++;
+        setImportProgress(`Subiendo comprobantes ${hechos} de ${unicos.length}...`);
+      };
+      setImportProgress(`Subiendo comprobantes 0 de ${unicos.length}...`);
+      for (let i = 0; i < unicos.length; i += 4) {
+        await Promise.all(unicos.slice(i, i + 4).map(subir));
+      }
+
+      const nuevas: LineaGasto[] = filas.map((f, i) => {
+        const soportes = f.archivos.map((a) => ({ name: mapaArchivos.get(key(a))!.name, url: urls.get(key(a))! }));
+        const soporteUrls = soportes.map((s) => s.url);
+        return {
+          id: `lin-gst-xl-${Date.now()}-${i}`,
+          fecha: f.fecha,
+          concepto: f.concepto,
+          cuentaId: f.cuentaId,
+          cuentaTitulo: f.cuentaTitulo,
+          proveedorId: f.proveedorId,
+          proveedorNit: f.proveedorNit,
+          proveedorNombre: f.proveedorNombre,
+          tipoDocumento: f.tipoDocumento,
+          facturaNumero: f.facturaNumero,
+          moneda: f.moneda,
+          valorSubtotal: f.valorSubtotal,
+          valorIva: 0,
+          valorTotal: f.valorSubtotal,
+          soportes,
+          soporteUrls,
+          soporteUrl: soporteUrls[0] || '',
+          incluyeTransporte: f.incluyeTransporte,
+          medioTransporte: f.medioTransporte,
+          origen: f.origen,
+          destino: f.destino,
+          numeroPasajeros: f.numeroPasajeros,
+          esIdaVuelta: f.esIdaVuelta,
+        };
+      });
+
+      setLineas((prev) => {
+        const vacia = prev.length === 1 && !prev[0].concepto && !prev[0].valorSubtotal && !prev[0].soporteUrl;
+        return vacia ? nuevas : [...prev, ...nuevas];
+      });
+      setShowExcelModal(false);
+      setExcelFile(null);
+      setSoporteFilesExcel([]);
+      setImportProgress('');
+      alert(`Se cargaron ${nuevas.length} línea(s) de gasto desde el Excel. Revíselas, complete los datos generales y radique.`);
+    } catch (err: any) {
+      console.error('Error importando Excel:', err);
+      setExcelErrors([`Ocurrió un error procesando la carga: ${err?.message || 'error desconocido'}`]);
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -1089,13 +1230,22 @@ export default function FormularioGastosPublicoPage() {
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                     <Calculator className="w-4 h-4 text-blue-600" /> Líneas de Gasto Soportado
                   </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddLinea}
-                    className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Añadir Comprobante
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowExcelModal(true)}
+                      className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" /> Cargar desde Excel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddLinea}
+                      className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Añadir Comprobante
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -1676,6 +1826,108 @@ export default function FormularioGastosPublicoPage() {
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Carga Masiva desde Excel */}
+      {showExcelModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-slate-800">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-600" /> Cargar comprobantes desde Excel
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Diligencie la plantilla, y adjunte aquí el Excel junto con todos los archivos de soporte.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeExcelModal}
+                disabled={isImporting}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer disabled:opacity-40"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-2xl">
+              <Download className="w-4 h-4 text-emerald-700" />
+              <span className="text-xs text-emerald-900 font-semibold flex-1">Paso 1: descargue la plantilla</span>
+              <button
+                type="button"
+                onClick={handleDescargarPlantilla}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Descargar plantilla
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">Paso 2: Excel diligenciado (.xlsx)</label>
+              <input
+                type="file"
+                accept=".xlsx"
+                disabled={isImporting}
+                onChange={(e) => { setExcelFile(e.target.files?.[0] || null); setExcelErrors([]); }}
+                className="block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Paso 3: Archivos de los comprobantes (PDF o imágenes)
+                {soporteFilesExcel.length > 0 && (
+                  <span className="ml-2 text-emerald-700">{soporteFilesExcel.length} archivo(s)</span>
+                )}
+              </label>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,image/*"
+                disabled={isImporting}
+                onChange={(e) => { setSoporteFilesExcel(Array.from(e.target.files || [])); setExcelErrors([]); }}
+                className="block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+              />
+              <p className="text-[10px] text-slate-400">Los nombres de archivo deben coincidir exactamente con la columna del Excel.</p>
+            </div>
+
+            {excelErrors.length > 0 && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl space-y-1 max-h-48 overflow-y-auto">
+                <p className="text-xs font-bold text-rose-800">Corrija lo siguiente y vuelva a intentarlo:</p>
+                <ul className="list-disc pl-4 text-[11px] text-rose-700 space-y-0.5">
+                  {excelErrors.map((er, i) => <li key={i}>{er}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {isImporting && (
+              <div className="flex items-center gap-2 text-blue-700 bg-blue-50 p-2.5 rounded-xl border border-blue-200 text-xs font-semibold">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <span>{importProgress || 'Procesando...'}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={closeExcelModal}
+                disabled={isImporting}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleProcesarExcel}
+                disabled={isImporting || !excelFile || soporteFilesExcel.length === 0}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Procesar y cargar líneas
               </button>
             </div>
           </div>
