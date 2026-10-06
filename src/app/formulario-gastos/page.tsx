@@ -68,6 +68,8 @@ export default function FormularioGastosPublicoPage() {
   // Form states
   const [usuarioNombre, setUsuarioNombre] = useState('');
   const [usuarioEmail, setUsuarioEmail] = useState('');
+  const [aprobadorNombre, setAprobadorNombre] = useState('');
+  const [aprobadorEmail, setAprobadorEmail] = useState('');
   const [centroCosto, setCentroCosto] = useState('');
   const [motivo, setMotivo] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
@@ -128,6 +130,8 @@ export default function FormularioGastosPublicoPage() {
     setCurrentDraftCodigo(draft.codigo || '');
     setUsuarioNombre(draft.usuarioNombre || '');
     setUsuarioEmail(draft.usuarioEmail || '');
+    setAprobadorNombre(draft.aprobadorNombre || '');
+    setAprobadorEmail(draft.aprobadorEmail || '');
     setCentroCosto(draft.centroCosto || '');
     setMotivo(draft.motivo || '');
     setFecha(draft.fecha || new Date().toISOString().split('T')[0]);
@@ -293,6 +297,8 @@ export default function FormularioGastosPublicoPage() {
         fecha,
         usuarioNombre: usuarioNombre.trim() || 'Borrador sin nombre',
         usuarioEmail: usuarioEmail.trim() || '',
+        aprobadorNombre: aprobadorNombre.trim() || '',
+        aprobadorEmail: aprobadorEmail.trim() || '',
         centroCosto: centroCosto || 'General',
         motivo: motivo.trim() || 'Borrador en preparación',
         estado: 'borrador',
@@ -411,6 +417,10 @@ export default function FormularioGastosPublicoPage() {
       alert('Por favor ingrese su correo electrónico.');
       return;
     }
+    if (!aprobadorEmail.trim()) {
+      alert('Por favor seleccione o ingrese el correo electrónico del aprobador.');
+      return;
+    }
     if (!motivo.trim()) {
       alert('Por favor ingrese el motivo del gasto.');
       return;
@@ -449,6 +459,8 @@ export default function FormularioGastosPublicoPage() {
         fecha,
         usuarioNombre,
         usuarioEmail,
+        aprobadorNombre: aprobadorNombre || '',
+        aprobadorEmail: aprobadorEmail.trim(),
         centroCosto: centroCosto || 'General',
         motivo,
         estado: 'pendiente',
@@ -482,7 +494,7 @@ export default function FormularioGastosPublicoPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            correo: usuarioEmail,
+            correo: aprobadorEmail.trim() || usuarioEmail,
             titulo: `Aprobación de Legalización de Gastos - ${assignedCodigo}`,
             contenido: `Tienes esta legalización de gastos pendiente por aprobar de ${usuarioNombre} por valor de ${formatCOP(totalGastos)}.`,
             link: link,
@@ -509,6 +521,8 @@ export default function FormularioGastosPublicoPage() {
     setMotivo('');
     setUsuarioNombre('');
     setUsuarioEmail('');
+    setAprobadorNombre('');
+    setAprobadorEmail('');
     setCentroCosto('');
     setRecibioAnticipo('no');
     setAnticipoRecibido(0);
@@ -750,7 +764,7 @@ export default function FormularioGastosPublicoPage() {
                               key={user.email}
                               onClick={() => {
                                 setUsuarioNombre(user.nombre);
-                                if (!usuarioEmail) setUsuarioEmail(user.email);
+                                setUsuarioEmail(user.email);
                                 if (user.area && user.area !== 'General') setCentroCosto(user.area);
                                 setShowSolicitanteDropdown(false);
                               }}
@@ -767,55 +781,128 @@ export default function FormularioGastosPublicoPage() {
                           ))}
                       </div>
                     )}
+                    {usuarioEmail && (
+                      <p className="text-[10px] text-slate-500 mt-1 truncate">
+                        Solicitante: <span className="font-semibold text-slate-700">{usuarioEmail}</span>
+                      </p>
+                    )}
                   </div>
 
-                  {/* Searchable Aprobador / Correo Field */}
+                  {/* Searchable Aprobador Field */}
                   <div className="relative" ref={aprobadorRef}>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Correo Electrónico (Aprobador/Solicitante) *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-600">
+                        Correo Electrónico Aprobador *
+                      </label>
+                      {aprobadorNombre && (
+                        <span className="text-[10px] text-blue-600 font-bold truncate max-w-[160px]" title={aprobadorNombre}>
+                          ✓ {aprobadorNombre}
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <input
-                        type="email"
+                        type="text"
                         required
-                        value={usuarioEmail}
+                        value={showAprobadorDropdown ? aprobadorSearch : (aprobadorEmail ? `${aprobadorEmail}${aprobadorNombre ? ` (${aprobadorNombre})` : ''}` : '')}
                         onFocus={() => {
+                          setAprobadorSearch('');
                           setShowAprobadorDropdown(true);
-                          setAprobadorSearch(usuarioEmail);
+                        }}
+                        onClick={() => {
+                          setShowAprobadorDropdown(true);
                         }}
                         onChange={(e) => {
-                          setUsuarioEmail(e.target.value);
                           setAprobadorSearch(e.target.value);
+                          setAprobadorEmail(e.target.value);
+                          const matchUser = orgUsers.find(
+                            (u) => u.email.toLowerCase() === e.target.value.trim().toLowerCase()
+                          );
+                          if (matchUser) {
+                            setAprobadorNombre(matchUser.nombre);
+                          }
                           setShowAprobadorDropdown(true);
                         }}
-                        placeholder="ejemplo@firplak.com"
-                        className="w-full p-2.5 pr-8 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
+                        placeholder="Buscar o escribir aprobador..."
+                        className="w-full p-2.5 pr-14 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-blue-600 font-medium text-xs"
                       />
-                      <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        {(aprobadorEmail || aprobadorSearch) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAprobadorEmail('');
+                              setAprobadorNombre('');
+                              setAprobadorSearch('');
+                              setShowAprobadorDropdown(true);
+                            }}
+                            className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                            title="Limpiar y cambiar aprobador"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const nextState = !showAprobadorDropdown;
+                            setShowAprobadorDropdown(nextState);
+                            if (nextState) {
+                              setAprobadorSearch('');
+                            }
+                          }}
+                          className="p-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                          title="Desplegar lista de aprobadores"
+                        >
+                          <ChevronDown className={`w-4 h-4 transition-transform ${showAprobadorDropdown ? 'rotate-180' : ''}`} />
+                        </button>
+                      </div>
                     </div>
 
                     {showAprobadorDropdown && (
-                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                        <div className="p-2 bg-slate-50 text-[10px] text-slate-500 font-semibold sticky top-0 border-b border-slate-100 flex items-center justify-between">
+                          <span>Directorio de Aprobadores (M365)</span>
+                          <span>
+                            {orgUsers.filter((u) => {
+                              if (!aprobadorSearch.trim()) return true;
+                              const term = aprobadorSearch.toLowerCase();
+                              return u.nombre.toLowerCase().includes(term) || u.email.toLowerCase().includes(term) || (u.area || '').toLowerCase().includes(term);
+                            }).length} usuarios
+                          </span>
+                        </div>
                         {orgUsers
                           .filter((u) => {
-                            const term = (aprobadorSearch || usuarioEmail).toLowerCase();
-                            return u.nombre.toLowerCase().includes(term) || u.email.toLowerCase().includes(term);
+                            if (!aprobadorSearch.trim()) return true;
+                            const term = aprobadorSearch.toLowerCase();
+                            return u.nombre.toLowerCase().includes(term) || u.email.toLowerCase().includes(term) || (u.area || '').toLowerCase().includes(term);
                           })
                           .map((user) => (
                             <div
                               key={user.email}
                               onClick={() => {
-                                setUsuarioEmail(user.email);
+                                setAprobadorEmail(user.email);
+                                setAprobadorNombre(user.nombre);
+                                setAprobadorSearch('');
                                 setShowAprobadorDropdown(false);
                               }}
-                              className="p-2.5 hover:bg-blue-50 cursor-pointer transition-colors flex items-center gap-2.5 text-left"
+                              className={`p-2.5 hover:bg-blue-50 cursor-pointer transition-colors flex items-center gap-2.5 text-left ${
+                                aprobadorEmail.toLowerCase() === user.email.toLowerCase() ? 'bg-blue-50/80 border-l-4 border-blue-600' : ''
+                              }`}
                             >
-                              <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">
+                              <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-[10px] shrink-0">
                                 {user.nombre.charAt(0)}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="font-semibold text-slate-900 truncate text-xs">{user.email}</p>
-                                <p className="text-[10px] text-slate-500 truncate">{user.nombre} {user.area ? `• ${user.area}` : ''}</p>
+                                <div className="flex items-center justify-between gap-1">
+                                  <p className="font-semibold text-slate-900 truncate text-xs">{user.nombre}</p>
+                                  {aprobadorEmail.toLowerCase() === user.email.toLowerCase() && (
+                                    <span className="text-[9px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.2 rounded-full">Seleccionado</span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-slate-500 truncate">{user.email} {user.area ? `• ${user.area}` : ''}</p>
                               </div>
                             </div>
                           ))}

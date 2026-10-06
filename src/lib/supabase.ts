@@ -839,6 +839,8 @@ export function saveLocalLegalizacionGasto(gasto: Legalizacion): Legalizacion[] 
     lineas: gasto.lineas,
     gestion_contable: gasto.gestionContable || 'Por procesar',
     fecha_procesado: gasto.fechaProcesado || null,
+    aprobador_nombre: gasto.aprobadorNombre || null,
+    aprobador_email: gasto.aprobadorEmail || null,
     created_at: gasto.created_at,
     updated_at: gasto.updated_at,
   }]).then(({ error }) => {
@@ -884,6 +886,8 @@ export async function saveLegalizacionGastoToSupabase(gasto: Legalizacion): Prom
       lineas: gasto.lineas,
       gestion_contable: gasto.gestionContable || 'Por procesar',
       fecha_procesado: gasto.fechaProcesado || null,
+      aprobador_nombre: gasto.aprobadorNombre || null,
+      aprobador_email: gasto.aprobadorEmail || null,
       created_at: gasto.created_at || now,
       updated_at: now,
     };
@@ -939,6 +943,8 @@ export async function fetchLegalizacionGastoById(id: string): Promise<Legalizaci
         lineas: data.lineas || [],
         gestionContable: data.gestion_contable || data.gestionContable || 'Por procesar',
         fechaProcesado: data.fecha_procesado || data.fechaProcesado,
+        aprobadorNombre: data.aprobador_nombre || data.aprobadorNombre || '',
+        aprobadorEmail: data.aprobador_email || data.aprobadorEmail || '',
         created_at: data.created_at,
         updated_at: data.updated_at,
       };
@@ -995,6 +1001,8 @@ export async function fetchBorradoresGastosByUser(email: string): Promise<Legali
         lineas: row.lineas || [],
         gestionContable: row.gestion_contable || row.gestionContable || 'Por procesar',
         fechaProcesado: row.fecha_procesado || row.fechaProcesado,
+        aprobadorNombre: row.aprobador_nombre || row.aprobadorNombre || '',
+        aprobadorEmail: row.aprobador_email || row.aprobadorEmail || '',
         created_at: row.created_at,
         updated_at: row.updated_at,
       }));
