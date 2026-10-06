@@ -1,7 +1,31 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, CheckCircle2, Calculator, Plus, Trash2, Database, Send, UserCheck, Paperclip, ExternalLink, Receipt, ChevronDown, User, Mail } from 'lucide-react';
+import {
+  ShieldCheck,
+  CheckCircle2,
+  Calculator,
+  Plus,
+  Trash2,
+  Database,
+  Send,
+  UserCheck,
+  Paperclip,
+  ExternalLink,
+  Receipt,
+  ChevronDown,
+  User,
+  Mail,
+  Save,
+  FolderOpen,
+  Clock,
+  AlertCircle,
+  FileText,
+  RotateCcw,
+  X,
+  Search,
+  Calendar
+} from 'lucide-react';
 import {
   fetchCuentasFromSupabase,
   fetchProveedoresFromSupabase,
@@ -9,6 +33,10 @@ import {
   fetchOrganizationUsers,
   OrganizationUser,
   saveLocalLegalizacionGasto,
+  saveLegalizacionGastoToSupabase,
+  fetchLegalizacionGastoById,
+  fetchBorradoresGastosByUser,
+  deleteLegalizacionGasto,
   supabase
 } from '@/lib/supabase';
 import { CuentaContable, Proveedor, LineaGasto, Legalizacion, CentroCosto } from '@/types/legalizaciones';
@@ -22,6 +50,20 @@ export default function FormularioGastosPublicoPage() {
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [lastCodigo, setLastCodigo] = useState('');
+
+  // Draft management states
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [currentDraftCodigo, setCurrentDraftCodigo] = useState<string>('');
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+  const [unloadedDraftDetected, setUnloadedDraftDetected] = useState<Legalizacion | null>(null);
+
+  // "Mis Borradores" modal state
+  const [showDraftsModal, setShowDraftsModal] = useState(false);
+  const [draftSearchEmail, setDraftSearchEmail] = useState('');
+  const [userDraftsList, setUserDraftsList] = useState<Legalizacion[]>([]);
+  const [isLoadingDrafts, setIsLoadingDrafts] = useState(false);
+  const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null);
 
   // Form states
   const [usuarioNombre, setUsuarioNombre] = useState('');
@@ -79,6 +121,65 @@ export default function FormularioGastosPublicoPage() {
       }
     }
     loadData();
+  }, []);
+
+  const handleLoadDraft = (draft: Legalizacion) => {
+    setCurrentDraftId(draft.id);
+    setCurrentDraftCodigo(draft.codigo || '');
+    setUsuarioNombre(draft.usuarioNombre || '');
+    setUsuarioEmail(draft.usuarioEmail || '');
+    setCentroCosto(draft.centroCosto || '');
+    setMotivo(draft.motivo || '');
+    setFecha(draft.fecha || new Date().toISOString().split('T')[0]);
+    setRecibioAnticipo((draft.anticipoRecibido || 0) > 0 ? 'si' : 'no');
+    setAnticipoRecibido(draft.anticipoRecibido || 0);
+
+    if (draft.lineas && draft.lineas.length > 0) {
+      setLineas(draft.lineas);
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('formulario_gastos_active_draft_id', draft.id);
+      const url = new URL(window.location.href);
+      url.searchParams.set('borrador', draft.id);
+      window.history.replaceState({}, '', url.toString());
+    }
+
+    setUnloadedDraftDetected(null);
+    setShowDraftsModal(false);
+    setDraftNotice(`✓ Borrador ${draft.codigo || ''} cargado exitosamente.`);
+    setTimeout(() => setDraftNotice(null), 5000);
+  };
+
+  // Check for draft in URL or LocalStorage on mount
+  useEffect(() => {
+    async function checkForDraft() {
+      if (typeof window === 'undefined') return;
+
+      const params = new URLSearchParams(window.location.search);
+      const urlDraftId = params.get('borrador') || params.get('id');
+
+      if (urlDraftId) {
+        const found = await fetchLegalizacionGastoById(urlDraftId);
+        if (found && found.estado === 'borrador') {
+          handleLoadDraft(found);
+          return;
+        }
+      }
+
+      // Check localStorage for active draft
+      const activeDraftId = localStorage.getItem('formulario_gastos_active_draft_id');
+      if (activeDraftId) {
+        const found = await fetchLegalizacionGastoById(activeDraftId);
+        if (found && found.estado === 'borrador') {
+          setUnloadedDraftDetected(found);
+        } else {
+          localStorage.removeItem('formulario_gastos_active_draft_id');
+        }
+      }
+    }
+
+    checkForDraft();
   }, []);
 
   // Click outside to close dropdowns
@@ -171,6 +272,132 @@ export default function FormularioGastosPublicoPage() {
   const totalGastos = lineas.reduce((acc, l) => acc + (l.valorTotal || 0), 0);
   const saldoDiferencia = totalGastos - anticipoRecibido;
 
+  const handleGuardarBorrador = async () => {
+    if (isSavingDraft) return;
+
+    if (!usuarioNombre.trim() && !usuarioEmail.trim()) {
+      alert('Por favor ingresa al menos tu Nombre o Correo electrónico para poder guardar tu borrador y recuperarlo después.');
+      return;
+    }
+
+    setIsSavingDraft(true);
+    try {
+      const draftId = currentDraftId || `leg-gst-draft-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const draftCodigo = currentDraftCodigo || `BORR-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const cleanLineas = lineas.map(({ soporteFile, soporteFiles, ...rest }: any) => rest);
+
+      const draftGasto: Legalizacion = {
+        id: draftId,
+        codigo: draftCodigo,
+        fecha,
+        usuarioNombre: usuarioNombre.trim() || 'Borrador sin nombre',
+        usuarioEmail: usuarioEmail.trim() || '',
+        centroCosto: centroCosto || 'General',
+        motivo: motivo.trim() || 'Borrador en preparación',
+        estado: 'borrador',
+        anticipoRecibido,
+        totalGastos,
+        saldoDiferencia,
+        lineas: cleanLineas,
+        gestionContable: 'Por procesar',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      await saveLegalizacionGastoToSupabase(draftGasto);
+
+      setCurrentDraftId(draftId);
+      setCurrentDraftCodigo(draftCodigo);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('formulario_gastos_active_draft_id', draftId);
+        const url = new URL(window.location.href);
+        url.searchParams.set('borrador', draftId);
+        window.history.replaceState({}, '', url.toString());
+      }
+
+      setUnloadedDraftDetected(null);
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setDraftNotice(`✓ Borrador ${draftCodigo} guardado en la nube (${timeStr}). Puedes continuar luego.`);
+      setTimeout(() => setDraftNotice(null), 6000);
+    } catch (err) {
+      console.error('Error guardando borrador:', err);
+      alert('Ocurrió un error al guardar el borrador en la nube.');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const handleDiscardDraft = () => {
+    if (confirm('¿Deseas descartar este borrador y empezar un formulario en blanco?')) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('formulario_gastos_active_draft_id');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('borrador');
+        url.searchParams.delete('id');
+        window.history.replaceState({}, '', url.pathname);
+      }
+      setCurrentDraftId(null);
+      setCurrentDraftCodigo('');
+      setUnloadedDraftDetected(null);
+      handleResetForm();
+    }
+  };
+
+  const handleOpenDraftsModal = async () => {
+    setShowDraftsModal(true);
+    const emailToSearch = usuarioEmail.trim() || draftSearchEmail.trim();
+    if (emailToSearch) {
+      setDraftSearchEmail(emailToSearch);
+      setIsLoadingDrafts(true);
+      try {
+        const drafts = await fetchBorradoresGastosByUser(emailToSearch);
+        setUserDraftsList(drafts);
+      } finally {
+        setIsLoadingDrafts(false);
+      }
+    }
+  };
+
+  const handleSearchUserDrafts = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!draftSearchEmail.trim()) {
+      alert('Por favor ingresa un correo para buscar borradores.');
+      return;
+    }
+    setIsLoadingDrafts(true);
+    try {
+      const drafts = await fetchBorradoresGastosByUser(draftSearchEmail.trim());
+      setUserDraftsList(drafts);
+    } finally {
+      setIsLoadingDrafts(false);
+    }
+  };
+
+  const handleDeleteUserDraft = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('¿Estás seguro de eliminar este borrador permanentemente?')) return;
+    setDeletingDraftId(id);
+    try {
+      await deleteLegalizacionGasto(id);
+      setUserDraftsList((prev) => prev.filter((d) => d.id !== id));
+      if (currentDraftId === id) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('formulario_gastos_active_draft_id');
+          const url = new URL(window.location.href);
+          url.searchParams.delete('borrador');
+          url.searchParams.delete('id');
+          window.history.replaceState({}, '', url.pathname);
+        }
+        setCurrentDraftId(null);
+        setCurrentDraftCodigo('');
+      }
+    } finally {
+      setDeletingDraftId(null);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -200,7 +427,7 @@ export default function FormularioGastosPublicoPage() {
     setIsSubmitting(true);
 
     try {
-      const cleanLineas = lineas.map(({ soporteFile, ...rest }) => rest);
+      const cleanLineas = lineas.map(({ soporteFile, soporteFiles, ...rest }: any) => rest);
       let assignedCodigo = `LEG-${Math.floor(100 + Math.random() * 900)}`;
       try {
         const numRes = await fetch('/api/sap/next-number');
@@ -214,8 +441,10 @@ export default function FormularioGastosPublicoPage() {
         // fallback
       }
 
+      const finalId = currentDraftId || `leg-gst-${Date.now()}`;
+
       const nuevaLeg: Legalizacion = {
-        id: `leg-gst-${Date.now()}`,
+        id: finalId,
         codigo: assignedCodigo,
         fecha,
         usuarioNombre,
@@ -227,12 +456,24 @@ export default function FormularioGastosPublicoPage() {
         totalGastos,
         saldoDiferencia,
         lineas: cleanLineas,
+        gestionContable: 'Por procesar',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
       // Save to Supabase and local storage
-      saveLocalLegalizacionGasto(nuevaLeg);
+      await saveLegalizacionGastoToSupabase(nuevaLeg);
+
+      // Clear active draft from local storage & URL
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('formulario_gastos_active_draft_id');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('borrador');
+        url.searchParams.delete('id');
+        window.history.replaceState({}, '', url.pathname);
+      }
+      setCurrentDraftId(null);
+      setCurrentDraftCodigo('');
 
       // Trigger Power Automate Flow for approval notification
       try {
@@ -261,6 +502,10 @@ export default function FormularioGastosPublicoPage() {
   const handleResetForm = () => {
     setSubmitted(false);
     setLastCodigo('');
+    setCurrentDraftId(null);
+    setCurrentDraftCodigo('');
+    setUnloadedDraftDetected(null);
+    setDraftNotice(null);
     setMotivo('');
     setUsuarioNombre('');
     setUsuarioEmail('');
@@ -290,6 +535,11 @@ export default function FormularioGastosPublicoPage() {
       },
     ]);
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('formulario_gastos_active_draft_id');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('borrador');
+      url.searchParams.delete('id');
+      window.history.replaceState({}, '', url.pathname);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -340,7 +590,112 @@ export default function FormularioGastosPublicoPage() {
               </p>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={handleOpenDraftsModal}
+            className="flex items-center gap-2 px-3.5 py-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700/80 rounded-2xl text-xs font-semibold shadow-xs transition-all cursor-pointer active:scale-95"
+            title="Ver y cargar borradores guardados"
+          >
+            <FolderOpen className="w-4 h-4 text-blue-400" />
+            <span>Mis Borradores</span>
+          </button>
         </div>
+
+        {/* Notice Toast */}
+        {draftNotice && (
+          <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 px-4 py-3 rounded-2xl flex items-center gap-2.5 text-xs shadow-lg animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-medium">{draftNotice}</span>
+          </div>
+        )}
+
+        {/* Unloaded Draft Detected Banner */}
+        {unloadedDraftDetected && !currentDraftId && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-200 text-xs shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500/20 rounded-xl text-amber-400 shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-amber-100">Borrador anterior detectado</p>
+                <p className="text-[11px] text-amber-300/80">
+                  Tienes un borrador pendiente ({unloadedDraftDetected.codigo}) de {unloadedDraftDetected.usuarioNombre || 'tu sesión previa'} por {formatCOP(unloadedDraftDetected.totalGastos)}.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => handleLoadDraft(unloadedDraftDetected)}
+                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                Cargar Borrador
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setUnloadedDraftDetected(null);
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('formulario_gastos_active_draft_id');
+                  }
+                }}
+                className="px-3 py-2 text-amber-300 hover:text-white text-xs cursor-pointer font-medium"
+              >
+                Descartar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Active Draft Banner */}
+        {currentDraftId && (
+          <div className="bg-blue-600/15 border border-blue-500/30 rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/20 rounded-xl text-blue-400 shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-white">Editando Borrador:</span>
+                  <span className="font-mono bg-blue-500/30 text-blue-200 px-2.5 py-0.5 rounded-lg font-bold text-xs border border-blue-400/30">
+                    {currentDraftCodigo}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 border border-slate-700 font-semibold">
+                    Estado: Borrador (No radicado)
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Tus cambios quedan guardados como borrador. Cuando todo esté listo, haz clic en "Radicar y Enviar Definitivo".
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={handleGuardarBorrador}
+                disabled={isSavingDraft}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
+              >
+                {isSavingDraft ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <Save className="w-3.5 h-3.5" />
+                )}
+                <span>Guardar Cambios</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDiscardDraft}
+                className="flex items-center gap-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition-colors cursor-pointer border border-slate-700"
+                title="Descartar borrador y comenzar en blanco"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                <span>Nuevo</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Main Card Form */}
         <div className="bg-white text-slate-800 rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
@@ -799,24 +1154,45 @@ export default function FormularioGastosPublicoPage() {
                 </div>
               </div>
 
-              {/* Submit Button */}
-              <div className="pt-2">
+              {/* Submit & Save Draft Action Buttons */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleGuardarBorrador}
+                  disabled={isSavingDraft || isSubmitting}
+                  className={`w-full sm:w-auto sm:px-6 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 shadow-sm ${
+                    isSavingDraft ? 'opacity-60 cursor-not-allowed' : 'active:scale-[0.99] cursor-pointer'
+                  }`}
+                >
+                  {isSavingDraft ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-slate-700 border-t-transparent rounded-full animate-spin"></span>
+                      <span>Guardando Borrador...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 text-blue-600" />
+                      <span>{currentDraftId ? 'Guardar Cambios de Borrador' : 'Guardar Borrador'}</span>
+                    </>
+                  )}
+                </button>
+
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className={`w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-600/25 transition-all flex items-center justify-center gap-2 ${
+                  disabled={isSubmitting || isSavingDraft}
+                  className={`flex-1 w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-600/25 transition-all flex items-center justify-center gap-2 ${
                     isSubmitting ? 'opacity-60 cursor-not-allowed' : 'active:scale-[0.99] cursor-pointer'
                   }`}
                 >
                   {isSubmitting ? (
                     <>
                       <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                      <span>Enviando Legalización...</span>
+                      <span>Enviando Legalización Definitiva...</span>
                     </>
                   ) : (
                     <>
                       <Send className="w-4 h-4" />
-                      <span>Enviar Legalización de Gastos</span>
+                      <span>Radicar y Enviar Definitivo</span>
                     </>
                   )}
                 </button>
@@ -830,6 +1206,139 @@ export default function FormularioGastosPublicoPage() {
           Firplak S.A.S &bull; Departamento de Contabilidad y Finanzas
         </div>
       </div>
+
+      {/* Modal: Mis Borradores Guardados */}
+      {showDraftsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white text-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <FolderOpen className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Mis Borradores Guardados</h3>
+                  <p className="text-[11px] text-slate-500">Recupera cualquier borrador previo para continuar editándolo o enviarlo</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDraftsModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search by Email */}
+            <form onSubmit={handleSearchUserDrafts} className="flex gap-2">
+              <div className="relative flex-1">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  value={draftSearchEmail}
+                  onChange={(e) => setDraftSearchEmail(e.target.value)}
+                  placeholder="Ingresa tu correo institucional..."
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoadingDrafts}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+              >
+                {isLoadingDrafts ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <Search className="w-3.5 h-3.5" />
+                )}
+                <span>Buscar</span>
+              </button>
+            </form>
+
+            {/* Drafts List */}
+            <div className="flex-1 overflow-y-auto space-y-3 min-h-[160px] max-h-[360px] pr-1">
+              {isLoadingDrafts ? (
+                <div className="p-8 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+                  <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Buscando borradores guardados...</span>
+                </div>
+              ) : userDraftsList.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-xs border border-dashed border-slate-200 rounded-2xl space-y-1">
+                  <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="font-semibold text-slate-600">No se encontraron borradores</p>
+                  <p className="text-[11px] text-slate-400">
+                    {draftSearchEmail
+                      ? `No hay borradores guardados para "${draftSearchEmail}".`
+                      : 'Escribe tu correo arriba para consultar los borradores que has guardado.'}
+                  </p>
+                </div>
+              ) : (
+                userDraftsList.map((draft) => (
+                  <div
+                    key={draft.id}
+                    className="p-3.5 bg-slate-50 hover:bg-blue-50/50 border border-slate-200 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-blue-900 text-xs bg-blue-100/70 px-2 py-0.5 rounded-md">
+                          {draft.codigo}
+                        </span>
+                        <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {draft.updated_at ? new Date(draft.updated_at).toLocaleDateString() : draft.fecha}
+                        </span>
+                      </div>
+                      <p className="font-semibold text-xs text-slate-800 truncate">
+                        {draft.motivo || 'Sin motivo'}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Líneas: <span className="font-bold text-slate-700">{draft.lineas?.length || 0}</span> | Total: <span className="font-bold text-slate-900">{formatCOP(draft.totalGastos)}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleLoadDraft(draft)}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                      >
+                        Cargar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeleteUserDraft(draft.id, e)}
+                        disabled={deletingDraftId === draft.id}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+                        title="Eliminar borrador"
+                      >
+                        {deletingDraftId === draft.id ? (
+                          <span className="w-4 h-4 border-2 border-rose-600 border-t-transparent rounded-full animate-spin block"></span>
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-slate-100 pt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDraftsModal(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

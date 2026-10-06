@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, UserPlus, Receipt, Loader2, Send, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, UserPlus, Receipt, Loader2, Send, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
 import { supabase } from '@/lib/supabase';
 
@@ -21,7 +21,7 @@ export const GastosList: React.FC<GastosListProps> = ({
   onUpdateGestionContable,
 }) => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<'todas' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
+  const [activeTab, setActiveTab] = useState<'todas' | 'borrador' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
@@ -118,6 +118,12 @@ export const GastosList: React.FC<GastosListProps> = ({
 
   const getStatusPill = (estado: Legalizacion['estado']) => {
     switch (estado) {
+      case 'borrador':
+        return (
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-1 w-fit">
+            <FileText className="w-3 h-3 text-slate-500" /> Borrador
+          </span>
+        );
       case 'aprobado':
         return (
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 w-fit">
@@ -186,7 +192,7 @@ export const GastosList: React.FC<GastosListProps> = ({
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto overflow-x-auto shrink-0">
-          {(['todas', 'pendiente', 'aprobado', 'rechazado'] as const).map((tab) => (
+          {(['todas', 'borrador', 'pendiente', 'aprobado', 'rechazado'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -196,7 +202,7 @@ export const GastosList: React.FC<GastosListProps> = ({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              {tab === 'todas' ? 'Todas' : tab === 'pendiente' ? 'Pendientes' : tab === 'aprobado' ? 'Aprobadas' : 'Rechazadas'}{' '}
+              {tab === 'todas' ? 'Todas' : tab === 'borrador' ? 'Borradores' : tab === 'pendiente' ? 'Pendientes' : tab === 'aprobado' ? 'Aprobadas' : 'Rechazadas'}{' '}
               <span className={`text-[10px] ml-1 px-1.5 py-0.2 rounded-full ${
                 activeTab === tab ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
               }`}>

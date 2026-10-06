@@ -850,6 +850,184 @@ export function saveLocalLegalizacionGasto(gasto: Legalizacion): Legalizacion[] 
   return updated;
 }
 
+export async function saveLegalizacionGastoToSupabase(gasto: Legalizacion): Promise<{ success: boolean; error?: any }> {
+  // Update local storage first
+  const current = getLocalLegalizacionesGastos();
+  const existingIdx = current.findIndex(item => item.id === gasto.id);
+  let updated: Legalizacion[];
+
+  const now = new Date().toISOString();
+  if (existingIdx >= 0) {
+    updated = [...current];
+    updated[existingIdx] = { ...gasto, updated_at: now };
+  } else {
+    updated = [{ ...gasto, created_at: gasto.created_at || now, updated_at: now }, ...current];
+  }
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify(updated));
+  }
+
+  try {
+    const payload = {
+      id: gasto.id,
+      codigo: gasto.codigo,
+      fecha: gasto.fecha,
+      usuario_nombre: gasto.usuarioNombre,
+      usuario_email: gasto.usuarioEmail,
+      centro_costo: gasto.centroCosto,
+      motivo: gasto.motivo,
+      estado: gasto.estado,
+      anticipo_recibido: gasto.anticipoRecibido,
+      total_gastos: gasto.totalGastos,
+      saldo_diferencia: gasto.saldoDiferencia,
+      lineas: gasto.lineas,
+      gestion_contable: gasto.gestionContable || 'Por procesar',
+      fecha_procesado: gasto.fechaProcesado || null,
+      created_at: gasto.created_at || now,
+      updated_at: now,
+    };
+
+    let { error } = await supabase.from('legalizaciones_gastos').upsert([payload]);
+    if (error) {
+      const res2 = await supabase.from('legalizaciones gastos').upsert([gasto]);
+      if (res2.error) {
+        console.error('Error guardando en Supabase:', res2.error);
+        return { success: false, error: res2.error };
+      }
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error al guardar legalización:', err);
+    return { success: false, error: err };
+  }
+}
+
+export async function fetchLegalizacionGastoById(id: string): Promise<Legalizacion | null> {
+  try {
+    let { data, error } = await supabase
+      .from('legalizaciones_gastos')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (!data) {
+      const res2 = await supabase
+        .from('legalizaciones gastos')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+      if (!res2.error && res2.data) {
+        data = res2.data;
+      }
+    }
+
+    if (data) {
+      return {
+        id: data.id,
+        codigo: data.codigo,
+        fecha: data.fecha,
+        usuarioNombre: data.usuario_nombre || data.usuarioNombre || '',
+        usuarioEmail: data.usuario_email || data.usuarioEmail || '',
+        centroCosto: data.centro_costo || data.centroCosto || '',
+        motivo: data.motivo || '',
+        estado: data.estado,
+        anticipoRecibido: data.anticipo_recibido ?? data.anticipoRecibido ?? 0,
+        totalGastos: data.total_gastos ?? data.totalGastos ?? 0,
+        saldoDiferencia: data.saldo_diferencia ?? data.saldoDiferencia ?? 0,
+        observacionesAprobacion: data.observaciones_aprobacion || data.observacionesAprobacion,
+        lineas: data.lineas || [],
+        gestionContable: data.gestion_contable || data.gestionContable || 'Por procesar',
+        fechaProcesado: data.fecha_procesado || data.fechaProcesado,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+    }
+
+    // Fallback to local storage
+    const local = getLocalLegalizacionesGastos().find(item => item.id === id || item.codigo === id);
+    return local || null;
+  } catch (err) {
+    console.error('Error en fetchLegalizacionGastoById:', err);
+    const local = getLocalLegalizacionesGastos().find(item => item.id === id || item.codigo === id);
+    return local || null;
+  }
+}
+
+export async function fetchBorradoresGastosByUser(email: string): Promise<Legalizacion[]> {
+  try {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!cleanEmail) return [];
+
+    let { data, error } = await supabase
+      .from('legalizaciones_gastos')
+      .select('*')
+      .ilike('usuario_email', cleanEmail)
+      .eq('estado', 'borrador')
+      .order('updated_at', { ascending: false });
+
+    if (error || !data) {
+      const res2 = await supabase
+        .from('legalizaciones gastos')
+        .select('*')
+        .ilike('usuario_email', cleanEmail)
+        .eq('estado', 'borrador')
+        .order('updated_at', { ascending: false });
+      if (!res2.error && res2.data) {
+        data = res2.data;
+      }
+    }
+
+    if (data && data.length > 0) {
+      return data.map((row: any) => ({
+        id: row.id,
+        codigo: row.codigo,
+        fecha: row.fecha,
+        usuarioNombre: row.usuario_nombre || row.usuarioNombre || '',
+        usuarioEmail: row.usuario_email || row.usuarioEmail || '',
+        centroCosto: row.centro_costo || row.centroCosto || '',
+        motivo: row.motivo || '',
+        estado: row.estado,
+        anticipoRecibido: row.anticipo_recibido ?? row.anticipoRecibido ?? 0,
+        totalGastos: row.total_gastos ?? row.totalGastos ?? 0,
+        saldoDiferencia: row.saldo_diferencia ?? row.saldoDiferencia ?? 0,
+        observacionesAprobacion: row.observaciones_aprobacion || row.observacionesAprobacion,
+        lineas: row.lineas || [],
+        gestionContable: row.gestion_contable || row.gestionContable || 'Por procesar',
+        fechaProcesado: row.fecha_procesado || row.fechaProcesado,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      }));
+    }
+
+    // Fallback: check localStorage
+    return getLocalLegalizacionesGastos().filter(
+      l => l.estado === 'borrador' && (l.usuarioEmail || '').trim().toLowerCase() === cleanEmail
+    );
+  } catch (err) {
+    console.error('Error fetching borradores:', err);
+    return [];
+  }
+}
+
+export async function deleteLegalizacionGasto(id: string): Promise<boolean> {
+  try {
+    const current = getLocalLegalizacionesGastos();
+    const updated = current.filter(item => item.id !== id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify(updated));
+    }
+
+    const { error } = await supabase.from('legalizaciones_gastos').delete().eq('id', id);
+    if (error) {
+      await supabase.from('legalizaciones gastos').delete().eq('id', id);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function updateLegalizacionGastoGestionContable(
   id: string,
   gestion: 'Por procesar' | 'Procesado',
