@@ -155,9 +155,42 @@ export default function FormularioGastosPublicoPage() {
     setTimeout(() => setDraftNotice(null), 5000);
   };
 
-  // Check for draft in URL or LocalStorage on mount
+  const checkDraftsForUser = async (email: string, nombre?: string) => {
+    if (!email) return;
+    const cleanEmail = email.trim().toLowerCase();
+
+    // If already editing a draft, do not prompt
+    if (currentDraftId) return;
+
+    try {
+      // 1. Check user-specific localStorage first
+      const localDraftId = typeof window !== 'undefined'
+        ? (localStorage.getItem(`formulario_gastos_draft_${cleanEmail}`) || localStorage.getItem('formulario_gastos_active_draft_id'))
+        : null;
+
+      if (localDraftId) {
+        const found = await fetchLegalizacionGastoById(localDraftId);
+        if (found && found.estado === 'borrador' && (found.usuarioEmail || '').trim().toLowerCase() === cleanEmail) {
+          setUnloadedDraftDetected(found);
+          return;
+        }
+      }
+
+      // 2. Check Supabase for active drafts belonging specifically to this user
+      const userDrafts = await fetchBorradoresGastosByUser(cleanEmail);
+      if (userDrafts && userDrafts.length > 0) {
+        setUnloadedDraftDetected(userDrafts[0]);
+      } else {
+        setUnloadedDraftDetected(null);
+      }
+    } catch (err) {
+      console.error('Error verificando borradores del usuario:', err);
+    }
+  };
+
+  // Only check URL params on mount (?borrador=... or ?id=...)
   useEffect(() => {
-    async function checkForDraft() {
+    async function checkForUrlDraft() {
       if (typeof window === 'undefined') return;
 
       const params = new URLSearchParams(window.location.search);
@@ -167,23 +200,11 @@ export default function FormularioGastosPublicoPage() {
         const found = await fetchLegalizacionGastoById(urlDraftId);
         if (found && found.estado === 'borrador') {
           handleLoadDraft(found);
-          return;
-        }
-      }
-
-      // Check localStorage for active draft
-      const activeDraftId = localStorage.getItem('formulario_gastos_active_draft_id');
-      if (activeDraftId) {
-        const found = await fetchLegalizacionGastoById(activeDraftId);
-        if (found && found.estado === 'borrador') {
-          setUnloadedDraftDetected(found);
-        } else {
-          localStorage.removeItem('formulario_gastos_active_draft_id');
         }
       }
     }
 
-    checkForDraft();
+    checkForUrlDraft();
   }, []);
 
   // Click outside to close dropdowns
@@ -317,7 +338,9 @@ export default function FormularioGastosPublicoPage() {
       setCurrentDraftCodigo(draftCodigo);
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem('formulario_gastos_active_draft_id', draftId);
+        const cleanEmail = usuarioEmail.trim().toLowerCase();
+        localStorage.setItem(`formulario_gastos_draft_${cleanEmail}`, draftId);
+        localStorage.removeItem('formulario_gastos_active_draft_id');
         const url = new URL(window.location.href);
         url.searchParams.set('borrador', draftId);
         window.history.replaceState({}, '', url.toString());
@@ -338,6 +361,9 @@ export default function FormularioGastosPublicoPage() {
   const handleDiscardDraft = () => {
     if (confirm('¿Deseas descartar este borrador y empezar un formulario en blanco?')) {
       if (typeof window !== 'undefined') {
+        if (usuarioEmail) {
+          localStorage.removeItem(`formulario_gastos_draft_${usuarioEmail.trim().toLowerCase()}`);
+        }
         localStorage.removeItem('formulario_gastos_active_draft_id');
         const url = new URL(window.location.href);
         url.searchParams.delete('borrador');
@@ -478,6 +504,9 @@ export default function FormularioGastosPublicoPage() {
 
       // Clear active draft from local storage & URL
       if (typeof window !== 'undefined') {
+        if (usuarioEmail) {
+          localStorage.removeItem(`formulario_gastos_draft_${usuarioEmail.trim().toLowerCase()}`);
+        }
         localStorage.removeItem('formulario_gastos_active_draft_id');
         const url = new URL(window.location.href);
         url.searchParams.delete('borrador');
@@ -549,6 +578,9 @@ export default function FormularioGastosPublicoPage() {
       },
     ]);
     if (typeof window !== 'undefined') {
+      if (usuarioEmail) {
+        localStorage.removeItem(`formulario_gastos_draft_${usuarioEmail.trim().toLowerCase()}`);
+      }
       localStorage.removeItem('formulario_gastos_active_draft_id');
       const url = new URL(window.location.href);
       url.searchParams.delete('borrador');
@@ -634,7 +666,7 @@ export default function FormularioGastosPublicoPage() {
               <div>
                 <p className="font-bold text-amber-100">Borrador anterior detectado</p>
                 <p className="text-[11px] text-amber-300/80">
-                  Tienes un borrador pendiente ({unloadedDraftDetected.codigo}) de {unloadedDraftDetected.usuarioNombre || 'tu sesión previa'} por {formatCOP(unloadedDraftDetected.totalGastos)}.
+                  Hola <strong className="text-white">{unloadedDraftDetected.usuarioNombre}</strong>, tienes un borrador pendiente ({unloadedDraftDetected.codigo}) por {formatCOP(unloadedDraftDetected.totalGastos)}.
                 </p>
               </div>
             </div>
@@ -649,10 +681,13 @@ export default function FormularioGastosPublicoPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setUnloadedDraftDetected(null);
                   if (typeof window !== 'undefined') {
+                    if (unloadedDraftDetected.usuarioEmail) {
+                      localStorage.removeItem(`formulario_gastos_draft_${unloadedDraftDetected.usuarioEmail.trim().toLowerCase()}`);
+                    }
                     localStorage.removeItem('formulario_gastos_active_draft_id');
                   }
+                  setUnloadedDraftDetected(null);
                 }}
                 className="px-3 py-2 text-amber-300 hover:text-white text-xs cursor-pointer font-medium"
               >
@@ -767,6 +802,7 @@ export default function FormularioGastosPublicoPage() {
                                 setUsuarioEmail(user.email);
                                 if (user.area && user.area !== 'General') setCentroCosto(user.area);
                                 setShowSolicitanteDropdown(false);
+                                checkDraftsForUser(user.email, user.nombre);
                               }}
                               className="p-2.5 hover:bg-blue-50 cursor-pointer transition-colors flex items-center gap-2.5 text-left"
                             >
