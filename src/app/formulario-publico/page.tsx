@@ -18,6 +18,7 @@ import {
   X,
   Loader2,
   AlertTriangle,
+  Camera,
 } from 'lucide-react';
 import {
   fetchCuentasFromSupabase,
@@ -645,8 +646,8 @@ export default function FormularioPublicoPage() {
                             <UploadCloud className="w-4 h-4 text-blue-600" />
                             <span>
                               {linea.soportes && linea.soportes.length > 0
-                                ? '+ Adjuntar más documentos'
-                                : 'Seleccionar documentos...'}
+                                ? '+ Adjuntar más archivos'
+                                : 'Adjuntar archivo...'}
                             </span>
                           </label>
                           <input
@@ -661,8 +662,27 @@ export default function FormularioPublicoPage() {
                             className="hidden"
                           />
 
+                          <label
+                            htmlFor={`camera-upload-${linea.id}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-xs"
+                          >
+                            <Camera className="w-4 h-4 text-emerald-600" />
+                            <span>Tomar foto</span>
+                          </label>
+                          <input
+                            id={`camera-upload-${linea.id}`}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => {
+                              handleMultiFileUpload(linea.id, e.target.files);
+                              e.target.value = '';
+                            }}
+                            className="hidden"
+                          />
+
                           <span className="text-[10px] text-slate-400">
-                            Puedes seleccionar y adjuntar varios archivos (PDF o fotos)
+                            Puedes adjuntar archivos (PDF o fotos) o tomar fotos con tu cámara
                           </span>
                         </div>
 

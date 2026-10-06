@@ -24,7 +24,9 @@ import {
   RotateCcw,
   X,
   Search,
-  Calendar
+  Calendar,
+  UploadCloud,
+  Camera,
 } from 'lucide-react';
 import {
   fetchCuentasFromSupabase,
@@ -292,6 +294,36 @@ export default function FormularioGastosPublicoPage() {
   const handleRemoveLinea = (id: string) => {
     if (lineas.length <= 1) return;
     setLineas((prev) => prev.filter((l) => l.id !== id));
+  };
+
+  const handleUploadSoporte = async (lineaId: string, file: File) => {
+    handleUpdateLinea(lineaId, 'soporteFile', file);
+    handleUpdateLinea(lineaId, 'soporteUrl', 'uploading');
+
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+    const filePath = `comprobantes/${fileName}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('soportes')
+        .upload(filePath, file);
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from('soportes')
+          .getPublicUrl(filePath);
+        handleUpdateLinea(lineaId, 'soporteUrl', urlData.publicUrl);
+      } else {
+        console.error('Error uploading file:', uploadError);
+        handleUpdateLinea(lineaId, 'soporteUrl', '');
+        alert('Error al subir el archivo: ' + uploadError.message);
+      }
+    } catch (err: any) {
+      console.error('Error de red al subir:', err);
+      handleUpdateLinea(lineaId, 'soporteUrl', '');
+      alert('Error de red al subir el archivo.');
+    }
   };
 
   const totalGastos = lineas.reduce((acc, l) => acc + (l.valorTotal || 0), 0);
@@ -1183,10 +1215,11 @@ export default function FormularioGastosPublicoPage() {
 
                       {/* File Upload Row */}
                       <div className="mt-2 border-t border-slate-200/70 pt-2.5">
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center justify-between mb-2">
                           <label className="text-[10px] font-bold text-slate-600 flex items-center gap-1.5">
                             <Paperclip className="w-3.5 h-3.5 text-blue-600" />
-                            Adjuntar Soporte ({linea.tipoDocumento || 'Factura'})
+                            <span>Adjuntar Soporte ({linea.tipoDocumento || 'Factura'})</span>
+                            <span className="text-rose-600 font-bold">* Obligatorio</span>
                           </label>
                           {linea.soporteUrl && linea.soporteUrl !== 'uploading' && (
                             <a
@@ -1199,59 +1232,74 @@ export default function FormularioGastosPublicoPage() {
                             </a>
                           )}
                         </div>
-                        <input
-                          type="file"
-                          accept=".pdf,image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              handleUpdateLinea(linea.id, 'soporteFile', file);
-                              handleUpdateLinea(linea.id, 'soporteUrl', 'uploading');
-                              
-                              const fileExt = file.name.split('.').pop();
-                              const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-                              const filePath = `comprobantes/${fileName}`;
-                              
-                              try {
-                                const { data: uploadData, error: uploadError } = await supabase.storage
-                                  .from('soportes')
-                                  .upload(filePath, file);
-                                  
-                                if (!uploadError) {
-                                  const { data: urlData } = supabase.storage
-                                    .from('soportes')
-                                    .getPublicUrl(filePath);
-                                  handleUpdateLinea(linea.id, 'soporteUrl', urlData.publicUrl);
-                                } else {
-                                  console.error('Error uploading file:', uploadError);
-                                  handleUpdateLinea(linea.id, 'soporteUrl', '');
-                                  alert('Error al subir el archivo: ' + uploadError.message);
-                                }
-                              } catch (err: any) {
-                                console.error('Error de red al subir:', err);
-                                handleUpdateLinea(linea.id, 'soporteUrl', '');
-                              }
-                            }
-                          }}
-                          className="block w-full text-xs text-slate-500
-                            file:mr-4 file:py-1 file:px-3
-                            file:rounded-lg file:border-0
-                            file:text-xs file:font-bold
-                            file:bg-blue-50 file:text-blue-700
-                            hover:file:bg-blue-100
-                            cursor-pointer transition-colors"
-                        />
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Adjuntar Archivo */}
+                          <label
+                            htmlFor={`file-upload-gastos-${linea.id}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-xs"
+                          >
+                            <UploadCloud className="w-4 h-4 text-blue-600" />
+                            <span>
+                              {linea.soporteUrl && linea.soporteUrl !== 'uploading'
+                                ? 'Cambiar archivo'
+                                : 'Adjuntar archivo...'}
+                            </span>
+                          </label>
+                          <input
+                            id={`file-upload-gastos-${linea.id}`}
+                            type="file"
+                            accept=".pdf,image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleUploadSoporte(linea.id, file);
+                              e.target.value = '';
+                            }}
+                            className="hidden"
+                          />
+
+                          {/* Tomar Foto */}
+                          <label
+                            htmlFor={`camera-upload-gastos-${linea.id}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-xs"
+                          >
+                            <Camera className="w-4 h-4 text-emerald-600" />
+                            <span>Tomar foto</span>
+                          </label>
+                          <input
+                            id={`camera-upload-gastos-${linea.id}`}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleUploadSoporte(linea.id, file);
+                              e.target.value = '';
+                            }}
+                            className="hidden"
+                          />
+
+                          <span className="text-[10px] text-slate-400">
+                            Puedes adjuntar PDF/imagen o capturar foto con la cámara
+                          </span>
+                        </div>
+
                         {linea.soporteUrl === 'uploading' && (
-                          <div className="mt-1 flex items-center gap-1.5 text-blue-700 font-bold text-[10px]">
-                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                          <div className="mt-2 flex items-center gap-1.5 text-blue-700 font-bold text-[10px]">
+                            <div className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                             <span>Subiendo documento a Supabase Storage...</span>
                           </div>
                         )}
                         {linea.soporteUrl && linea.soporteUrl !== 'uploading' && (
-                          <div className="mt-1 flex items-center gap-1.5 text-emerald-700 font-bold text-[10px]">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <div className="mt-2 flex items-center gap-1.5 text-emerald-700 font-bold text-[10px]">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                             <span>✓ Documento guardado correctamente</span>
                           </div>
+                        )}
+                        {!linea.soporteUrl && (
+                          <p className="mt-1.5 text-[10px] text-rose-600 font-medium">
+                            * Se debe adjuntar o tomar foto del soporte obligatoriamente.
+                          </p>
                         )}
                       </div>
                     </div>
