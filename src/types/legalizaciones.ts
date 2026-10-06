@@ -73,6 +73,12 @@ export interface LineaGasto {
   soportes?: SoporteAdjunto[];
   soporteFile?: File;
   soporteFiles?: File[];
+  incluyeTransporte?: 'SI' | 'NO' | string;
+  medioTransporte?: string;
+  origen?: string;
+  destino?: string;
+  numeroPasajeros?: number;
+  esIdaVuelta?: boolean;
 }
 
 export interface ResponsableTarjetaCredito {

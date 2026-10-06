@@ -375,6 +375,14 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
                       <td className="py-2.5 px-3">
                         <span className="font-semibold text-slate-800">{l.tipoDocumento || 'Factura'}</span>
                         {l.facturaNumero && <p className="text-[10px] text-slate-500 font-mono">{l.facturaNumero}</p>}
+                        {l.incluyeTransporte === 'SI' && (
+                          <div className="mt-1 text-[10px] text-blue-700 bg-blue-50/80 p-1.5 rounded-lg border border-blue-200 space-y-0.5">
+                            <p className="font-bold">🚗 Transporte: {l.medioTransporte || 'No especificado'}</p>
+                            <p className="text-slate-600">
+                              {l.origen || '-'} ➔ {l.destino || '-'} ({l.numeroPasajeros || 1} pas.) {l.esIdaVuelta ? '• Ida y vuelta' : ''}
+                            </p>
+                          </div>
+                        )}
                       </td>
                       <td className="py-2.5 px-3">
                         <span className="font-mono font-bold text-slate-900">{l.proveedorNit || '-'}</span>

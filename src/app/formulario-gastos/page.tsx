@@ -103,6 +103,12 @@ export default function FormularioGastosPublicoPage() {
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
+      incluyeTransporte: 'NO',
+      medioTransporte: '',
+      origen: '',
+      destino: '',
+      numeroPasajeros: 1,
+      esIdaVuelta: false,
     },
   ]);
 
@@ -248,6 +254,12 @@ export default function FormularioGastosPublicoPage() {
       valorSubtotal: 0,
       valorIva: 0,
       valorTotal: 0,
+      incluyeTransporte: 'NO',
+      medioTransporte: '',
+      origen: '',
+      destino: '',
+      numeroPasajeros: 1,
+      esIdaVuelta: false,
     };
     setLineas([...lineas, newLine]);
   };
@@ -493,6 +505,29 @@ export default function FormularioGastosPublicoPage() {
       return;
     }
 
+    // Validar datos obligatorios de transporte si aplica
+    for (let i = 0; i < lineas.length; i++) {
+      const l = lineas[i];
+      if (l.incluyeTransporte === 'SI') {
+        if (!l.medioTransporte || !l.medioTransporte.trim()) {
+          alert(`Por favor elija el Medio de transporte en el Comprobante #${i + 1}.`);
+          return;
+        }
+        if (!l.origen || !l.origen.trim()) {
+          alert(`Por favor ingrese el Origen en el Comprobante #${i + 1}.`);
+          return;
+        }
+        if (!l.destino || !l.destino.trim()) {
+          alert(`Por favor ingrese el Destino en el Comprobante #${i + 1}.`);
+          return;
+        }
+        if (!l.numeroPasajeros || l.numeroPasajeros < 1) {
+          alert(`Por favor ingrese un número válido de pasajeros en el Comprobante #${i + 1}.`);
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -608,6 +643,12 @@ export default function FormularioGastosPublicoPage() {
         valorTotal: 0,
         soporteFile: undefined,
         soporteUrl: '',
+        incluyeTransporte: 'NO',
+        medioTransporte: '',
+        origen: '',
+        destino: '',
+        numeroPasajeros: 1,
+        esIdaVuelta: false,
       },
     ]);
     if (typeof window !== 'undefined') {
@@ -1212,6 +1253,136 @@ export default function FormularioGastosPublicoPage() {
                             required
                           />
                         </div>
+                      </div>
+
+                      {/* Gastos de Transporte */}
+                      <div className="mt-3 border-t border-slate-200/80 pt-3 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-100/70 p-2.5 rounded-xl border border-slate-200">
+                          <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <span>Incluye gastos de transporte</span>
+                          </label>
+                          <select
+                            value={linea.incluyeTransporte || 'NO'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handleUpdateLinea(linea.id, 'incluyeTransporte', val);
+                              if (val === 'NO') {
+                                handleUpdateLinea(linea.id, 'medioTransporte', '');
+                                handleUpdateLinea(linea.id, 'origen', '');
+                                handleUpdateLinea(linea.id, 'destino', '');
+                                handleUpdateLinea(linea.id, 'numeroPasajeros', 1);
+                                handleUpdateLinea(linea.id, 'esIdaVuelta', false);
+                              }
+                            }}
+                            className="w-24 p-1.5 bg-white border border-blue-600 rounded-lg text-slate-900 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+                          >
+                            <option value="NO">NO</option>
+                            <option value="SI">SI</option>
+                          </select>
+                        </div>
+
+                        {linea.incluyeTransporte === 'SI' && (
+                          <div className="p-4 bg-blue-50/40 rounded-2xl border border-blue-200 space-y-3 animate-in fade-in duration-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* * Medio de transporte */}
+                              <div>
+                                <label className="block text-xs font-bold text-slate-800 mb-1">
+                                  <span className="text-blue-800 font-extrabold mr-1">*</span> Medio de transporte
+                                </label>
+                                <select
+                                  required={linea.incluyeTransporte === 'SI'}
+                                  value={linea.medioTransporte || ''}
+                                  onChange={(e) => handleUpdateLinea(linea.id, 'medioTransporte', e.target.value)}
+                                  className="w-full p-2 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:border-blue-600 font-medium shadow-2xs"
+                                >
+                                  <option value="">Elija una opción...</option>
+                                  <option value="Aéreo">Aéreo / Avión</option>
+                                  <option value="Taxi">Taxi / Plataforma (Uber, Didi, Taxi)</option>
+                                  <option value="Bus">Bus / Transporte Terrestre</option>
+                                  <option value="Vehículo Propio">Vehículo Propio / Combustible / Peajes</option>
+                                  <option value="Transporte Masivo">Metro / Transporte Masivo</option>
+                                  <option value="Alquiler de Vehículo">Alquiler de Vehículo</option>
+                                  <option value="Otro">Otro</option>
+                                </select>
+                              </div>
+
+                              {/* * # de Pasajeros */}
+                              <div>
+                                <label className="block text-xs font-bold text-slate-800 mb-1">
+                                  <span className="text-blue-800 font-extrabold mr-1">*</span> # de Pasajeros
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  required={linea.incluyeTransporte === 'SI'}
+                                  placeholder="Ej. 1"
+                                  value={linea.numeroPasajeros ?? 1}
+                                  onChange={(e) => handleUpdateLinea(linea.id, 'numeroPasajeros', Number(e.target.value) || 1)}
+                                  className="w-full p-2 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs font-mono font-medium focus:outline-none focus:border-blue-600 shadow-2xs"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* * Origen */}
+                              <div>
+                                <label className="block text-xs font-bold text-slate-800 mb-1">
+                                  <span className="text-blue-800 font-extrabold mr-1">*</span> Origen
+                                </label>
+                                <input
+                                  type="text"
+                                  required={linea.incluyeTransporte === 'SI'}
+                                  placeholder="Ciudad o lugar de origen"
+                                  value={linea.origen || ''}
+                                  onChange={(e) => handleUpdateLinea(linea.id, 'origen', e.target.value)}
+                                  className="w-full p-2 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:border-blue-600 shadow-2xs"
+                                />
+                              </div>
+
+                              {/* * Destino */}
+                              <div>
+                                <label className="block text-xs font-bold text-slate-800 mb-1">
+                                  <span className="text-blue-800 font-extrabold mr-1">*</span> Destino
+                                </label>
+                                <input
+                                  type="text"
+                                  required={linea.incluyeTransporte === 'SI'}
+                                  placeholder="Ciudad o lugar de destino"
+                                  value={linea.destino || ''}
+                                  onChange={(e) => handleUpdateLinea(linea.id, 'destino', e.target.value)}
+                                  className="w-full p-2 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:border-blue-600 shadow-2xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* * ¿Es ida y vuelta? */}
+                            <div className="flex items-center justify-between pt-1">
+                              <label className="text-xs font-bold text-slate-800 flex items-center">
+                                <span className="text-blue-800 font-extrabold mr-1">*</span> ¿Es ida y vuelta?
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-600">
+                                  {linea.esIdaVuelta ? 'Sí' : 'No'}
+                                </span>
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={Boolean(linea.esIdaVuelta)}
+                                  onClick={() => handleUpdateLinea(linea.id, 'esIdaVuelta', !linea.esIdaVuelta)}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 cursor-pointer ${
+                                    linea.esIdaVuelta ? 'bg-blue-600' : 'bg-slate-400'
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                                      linea.esIdaVuelta ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* File Upload Row */}
