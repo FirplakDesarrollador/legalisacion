@@ -1203,13 +1203,6 @@ export default function FormularioGastosPublicoPage() {
                     >
                       <FileSpreadsheet className="w-3.5 h-3.5" /> Cargar desde Excel
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleAddLinea}
-                      className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Añadir Comprobante
-                    </button>
                   </div>
                 </div>
 
@@ -1591,6 +1584,17 @@ export default function FormularioGastosPublicoPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Botón Agregar Línea en la parte inferior */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAddLinea}
+                    className="w-full sm:w-auto px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer active:scale-98"
+                  >
+                    <Plus className="w-4 h-4" /> Agregar Línea
+                  </button>
                 </div>
               </div>
 

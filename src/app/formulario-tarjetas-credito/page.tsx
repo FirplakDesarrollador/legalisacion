@@ -14,6 +14,7 @@ import {
   UploadCloud,
   Camera,
   ExternalLink,
+  Receipt,
 } from 'lucide-react';
 import {
   fetchCuentasFromSupabase,
@@ -683,23 +684,35 @@ export default function FormularioTarjetasCreditoPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                    <Calculator className="w-4 h-4 text-blue-600" /> Líneas de Gasto y Comprobantes
+                    <Calculator className="w-4 h-4 text-blue-600" /> Líneas de Gasto y Comprobantes ({lineas.length})
                   </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddLinea}
-                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Agregar Comprobante
-                  </button>
                 </div>
 
-                <div className="space-y-3">
-                  {lineas.map((linea) => (
+                <div className="space-y-4">
+                  {lineas.map((linea, index) => (
                     <div
                       key={linea.id}
                       className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3"
                     >
+                      {/* Encabezado numerado del comprobante */}
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-700 pb-2 border-b border-slate-200/80">
+                        <span className="flex items-center gap-1.5 text-blue-900">
+                          <Receipt className="w-3.5 h-3.5 text-blue-600" /> Comprobante #{index + 1}
+                          {lineas.length > 1 && (
+                            <span className="text-[10px] font-normal text-slate-500">de {lineas.length}</span>
+                          )}
+                        </span>
+                        {lineas.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLinea(linea.id)}
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Eliminar comprobante"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                          </button>
+                        )}
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
                         <div>
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Fecha Comprobante</label>
@@ -799,29 +812,17 @@ export default function FormularioTarjetasCreditoPage() {
                               }))}
                           />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                              Subtotal ({linea.moneda === 'USD' ? 'USD $' : '$ COP'})
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              value={linea.valorSubtotal || ''}
-                              onChange={(e) => handleUpdateLinea(linea.id, 'valorSubtotal', e.target.value)}
-                              className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
-                            />
-                          </div>
-                          {lineas.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveLinea(linea.id)}
-                              className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="Eliminar comprobante"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            Subtotal ({linea.moneda === 'USD' ? 'USD $' : '$ COP'})
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={linea.valorSubtotal || ''}
+                            onChange={(e) => handleUpdateLinea(linea.id, 'valorSubtotal', e.target.value)}
+                            className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono"
+                          />
                         </div>
                       </div>
 
@@ -915,6 +916,17 @@ export default function FormularioTarjetasCreditoPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Botón Agregar Línea en la parte inferior */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={handleAddLinea}
+                    className="w-full sm:w-auto px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer active:scale-98"
+                  >
+                    <Plus className="w-4 h-4" /> Agregar Línea
+                  </button>
                 </div>
               </div>
 
