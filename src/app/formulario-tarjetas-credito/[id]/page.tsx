@@ -505,7 +505,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                                 className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none"
                               >
                                 <option value="">Centro de Costo...</option>
-                                {centros.map(c => <option key={c.codigo} value={c.codigo}>{c.codigo} - {c.nombre}</option>)}
+                                {centros.map(c => <option key={c.codigo} value={c.codigo}>{c.codigo} - {c.Título}</option>)}
                               </select>
                             </div>
                           ) : (
