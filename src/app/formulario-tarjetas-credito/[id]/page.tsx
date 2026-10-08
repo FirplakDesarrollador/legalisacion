@@ -287,6 +287,35 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  const getMatchedCentroValue = (rawConcepto?: string) => {
+    if (!rawConcepto) return '';
+    const trimmed = rawConcepto.trim();
+    const match = centros.find(c =>
+      c.codigo.toLowerCase() === trimmed.toLowerCase() ||
+      `${c.codigo} - ${c.Título}`.toLowerCase() === trimmed.toLowerCase() ||
+      trimmed.toLowerCase().startsWith(c.codigo.toLowerCase() + ' -') ||
+      trimmed.toLowerCase().startsWith(c.codigo.toLowerCase() + ' ')
+    );
+    return match ? `${match.codigo} - ${match.Título}` : trimmed;
+  };
+
+  const getMatchedCuentaId = (lineId: string | number, fallbackId?: number | null, fallbackTitulo?: string) => {
+    const line = editableLineas.find(el => el.id === lineId);
+    const cId = line?.cuentaId ?? fallbackId;
+    if (cId) return String(cId);
+    const title = line?.cuentaTitulo || fallbackTitulo || '';
+    if (title) {
+      const matched = cuentas.find(c =>
+        String(c.id) === title ||
+        c.Título.toLowerCase() === title.toLowerCase() ||
+        title.toLowerCase().startsWith(c.Título.toLowerCase()) ||
+        c.Título.toLowerCase().startsWith(title.toLowerCase())
+      );
+      if (matched) return String(matched.id);
+    }
+    return '';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center font-sans">
@@ -318,7 +347,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200 py-4 px-6 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/20">
               <ShieldCheck className="w-6 h-6 stroke-[2.5]" />
@@ -339,7 +368,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
       </header>
 
       {/* Main Panel */}
-      <main className="flex-1 max-w-4xl w-full mx-auto p-6">
+      <main className="flex-1 max-w-5xl w-full mx-auto p-6">
         <div className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden">
           {/* Banner Title */}
           <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
@@ -459,56 +488,80 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
               <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">
                 Desglose de Comprobantes & Gastos ({legalizacion.lineas?.length || 0})
               </h3>
-              <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-sm">
+              <div className="rounded-2xl border border-slate-200 overflow-x-auto bg-white shadow-xs">
                 <table className="w-full text-left text-xs text-slate-700">
                   <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200">
                     <tr>
-                      <th className="py-3 px-4">Fecha</th>
-                      <th className="py-3 px-4">Cuenta Contable</th>
-                      <th className="py-3 px-4">Concepto & Soporte</th>
-                      <th className="py-3 px-4">NIT Proveedor</th>
-                      <th className="py-3 px-4 text-right">Subtotal</th>
-                      <th className="py-3 px-4 text-right">Total</th>
+                      <th className="py-3 px-4 whitespace-nowrap">Fecha</th>
+                      <th className="py-3 px-4 min-w-[300px]">Cuenta Contable</th>
+                      <th className="py-3 px-4 min-w-[240px]">Concepto & Soporte</th>
+                      <th className="py-3 px-4 whitespace-nowrap">NIT Proveedor</th>
+                      <th className="py-3 px-4 text-right whitespace-nowrap">Subtotal</th>
+                      <th className="py-3 px-4 text-right whitespace-nowrap">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {legalizacion.lineas?.map((linea) => (
                       <tr key={linea.id} className="hover:bg-slate-50">
                         <td className="py-3 px-4 whitespace-nowrap text-slate-500">{linea.fecha}</td>
-                        <td className="py-3 px-4 font-mono text-[11px] font-bold text-blue-900">
-                          {legalizacion.estado === 'pendiente' ? (
-                            <select
-                              value={editableLineas.find(el => el.id === linea.id)?.cuentaId || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                const acc = cuentas.find(c => String(c.id) === val);
-                                setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, cuentaId: val ? Number(val) : null, cuentaTitulo: acc ? `${acc.Título} - ${acc.categoria}` : '' } : l));
-                              }}
-                              className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none max-w-[180px]"
-                            >
-                              <option value="">Cuenta Contable...</option>
-                              {cuentas.map(c => <option key={c.id} value={c.id}>{c.Título} ({c.categoria})</option>)}
-                            </select>
-                          ) : (
+                        <td className="py-3 px-4 font-mono text-[11px] font-bold text-blue-900 min-w-[300px]">
+                          {legalizacion.estado === 'pendiente' ? (() => {
+                            const currentCuentaId = getMatchedCuentaId(linea.id, linea.cuentaId, linea.cuentaTitulo);
+                            const activeCuenta = cuentas.find(c => String(c.id) === currentCuentaId);
+                            return (
+                              <select
+                                value={currentCuentaId}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const acc = cuentas.find(c => String(c.id) === val);
+                                  setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, cuentaId: val ? Number(val) : null, cuentaTitulo: acc ? `${acc.Título} - ${acc.categoria}` : '' } : l));
+                                }}
+                                title={activeCuenta ? `${activeCuenta.Título} (${activeCuenta.categoria})` : 'Cuenta Contable'}
+                                className="w-full min-w-[280px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 outline-none shadow-xs font-mono font-normal"
+                              >
+                                <option value="">-- Seleccione Cuenta Contable --</option>
+                                {cuentas.map(c => (
+                                  <option key={c.id} value={c.id} title={`${c.Título} (${c.categoria})`}>
+                                    {c.Título} ({c.categoria})
+                                  </option>
+                                ))}
+                              </select>
+                            );
+                          })() : (
                             editableLineas.find(el => el.id === linea.id)?.cuentaTitulo || linea.cuentaTitulo
                           )}
                         </td>
-                        <td className="py-3 px-4">
-                          {legalizacion.estado === 'pendiente' ? (
-                            <div className="mb-1">
-                              <select
-                                value={editableLineas.find(el => el.id === linea.id)?.concepto || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, concepto: val } : l));
-                                }}
-                                className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none"
-                              >
-                                <option value="">Centro de Costo...</option>
-                                {centros.map(c => <option key={c.codigo} value={c.codigo}>{c.codigo} - {c.Título}</option>)}
-                              </select>
-                            </div>
-                          ) : (
+                        <td className="py-3 px-4 min-w-[240px]">
+                          {legalizacion.estado === 'pendiente' ? (() => {
+                            const rawVal = editableLineas.find(el => el.id === linea.id)?.concepto || linea.concepto || '';
+                            const currentVal = getMatchedCentroValue(rawVal);
+                            return (
+                              <div className="mb-1.5">
+                                <select
+                                  value={currentVal}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, concepto: val } : l));
+                                  }}
+                                  title={currentVal || 'Centro de Costo'}
+                                  className="w-full min-w-[220px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 outline-none shadow-xs font-medium"
+                                >
+                                  <option value="">-- Seleccione Centro de Costo --</option>
+                                  {centros.map(c => {
+                                    const full = `${c.codigo} - ${c.Título}`;
+                                    return (
+                                      <option key={c.codigo} value={full} title={full}>
+                                        {full}
+                                      </option>
+                                    );
+                                  })}
+                                  {currentVal && !centros.some(c => `${c.codigo} - ${c.Título}` === currentVal || c.codigo === currentVal) && (
+                                    <option value={currentVal} title={currentVal}>{currentVal}</option>
+                                  )}
+                                </select>
+                              </div>
+                            );
+                          })() : (
                             <p className="font-semibold text-slate-900">{editableLineas.find(el => el.id === linea.id)?.concepto || linea.concepto}</p>
                           )}
                           <div className="flex flex-col gap-0.5 text-[10px] text-slate-500">

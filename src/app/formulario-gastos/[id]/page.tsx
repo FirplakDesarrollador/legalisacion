@@ -222,6 +222,35 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
     }
   };
 
+  const getMatchedCentroValue = (rawConcepto?: string) => {
+    if (!rawConcepto) return '';
+    const trimmed = rawConcepto.trim();
+    const match = centros.find(c =>
+      c.codigo.toLowerCase() === trimmed.toLowerCase() ||
+      `${c.codigo} - ${c.Título}`.toLowerCase() === trimmed.toLowerCase() ||
+      trimmed.toLowerCase().startsWith(c.codigo.toLowerCase() + ' -') ||
+      trimmed.toLowerCase().startsWith(c.codigo.toLowerCase() + ' ')
+    );
+    return match ? `${match.codigo} - ${match.Título}` : trimmed;
+  };
+
+  const getMatchedCuentaId = (lineId: string | number, fallbackId?: number | null, fallbackTitulo?: string) => {
+    const line = editableLineas.find(el => el.id === lineId);
+    const cId = line?.cuentaId ?? fallbackId;
+    if (cId) return String(cId);
+    const title = line?.cuentaTitulo || fallbackTitulo || '';
+    if (title) {
+      const matched = cuentas.find(c =>
+        String(c.id) === title ||
+        c.Título.toLowerCase() === title.toLowerCase() ||
+        title.toLowerCase().startsWith(c.Título.toLowerCase()) ||
+        c.Título.toLowerCase().startsWith(title.toLowerCase())
+      );
+      if (matched) return String(matched.id);
+    }
+    return '';
+  };
+
   const handleAction = async (nuevoEstado: Legalizacion['estado']) => {
     if (!legalizacion) return;
     setIsSubmitting(true);
@@ -322,7 +351,7 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-slate-100 flex flex-col justify-between p-4 sm:p-8">
-      <div className="max-w-4xl w-full mx-auto space-y-6">
+      <div className="max-w-5xl w-full mx-auto space-y-6">
         {/* Top Header */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-3">
@@ -384,23 +413,23 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <FileText className="w-4 h-4 text-blue-600" /> Comprobantes y Líneas ({legalizacion.lineas?.length || 0})
             </h3>
-            <div className="border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="border border-slate-200 rounded-2xl overflow-x-auto shadow-xs">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
                   <tr>
-                    <th className="py-2.5 px-3">Fecha</th>
-                    <th className="py-2.5 px-3">Tipo / Factura</th>
-                    <th className="py-2.5 px-3">NIT Proveedor</th>
-                    <th className="py-2.5 px-3">Centro de Costos</th>
-                    <th className="py-2.5 px-3">Cuenta Contable</th>
-                    <th className="py-2.5 px-3 text-right">Valor Total</th>
-                    <th className="py-2.5 px-3 text-center">Soporte</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">Fecha</th>
+                    <th className="py-2.5 px-3 min-w-[130px]">Tipo / Factura</th>
+                    <th className="py-2.5 px-3 whitespace-nowrap">NIT Proveedor</th>
+                    <th className="py-2.5 px-3 min-w-[220px]">Centro de Costos</th>
+                    <th className="py-2.5 px-3 min-w-[300px]">Cuenta Contable</th>
+                    <th className="py-2.5 px-3 text-right whitespace-nowrap">Valor Total</th>
+                    <th className="py-2.5 px-3 text-center whitespace-nowrap">Soporte</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {legalizacion.lineas?.map((l) => (
                     <tr key={l.id} className="hover:bg-slate-50/70">
-                      <td className="py-2.5 px-3 text-slate-700">{l.fecha}</td>
+                      <td className="py-2.5 px-3 text-slate-700 whitespace-nowrap">{l.fecha}</td>
                       <td className="py-2.5 px-3">
                         <span className="font-semibold text-slate-800">{l.tipoDocumento || 'Factura'}</span>
                         {l.facturaNumero && <p className="text-[10px] text-slate-500 font-mono">{l.facturaNumero}</p>}
@@ -413,42 +442,66 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
                           </div>
                         )}
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 whitespace-nowrap">
                         <span className="font-mono font-bold text-slate-900">{l.proveedorNit || '-'}</span>
                       </td>
-                      <td className="py-2.5 px-3 font-semibold text-slate-700">
-                        {legalizacion.estado === 'pendiente' ? (
-                          <select
-                            value={editableLineas.find(el => el.id === l.id)?.concepto || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setEditableLineas(prev => prev.map(line => line.id === l.id ? { ...line, concepto: val } : line));
-                            }}
-                            className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none"
-                          >
-                            <option value="">Centro de Costo...</option>
-                            {centros.map(c => <option key={c.codigo} value={c.codigo}>{c.codigo} - {c.Título}</option>)}
-                          </select>
-                        ) : (
-                          editableLineas.find(el => el.id === l.id)?.concepto || legalizacion.centroCosto
+                      <td className="py-2.5 px-3 font-semibold text-slate-700 min-w-[220px]">
+                        {legalizacion.estado === 'pendiente' ? (() => {
+                          const rawVal = editableLineas.find(el => el.id === l.id)?.concepto || l.concepto || legalizacion.centroCosto || '';
+                          const currentVal = getMatchedCentroValue(rawVal);
+                          return (
+                            <select
+                              value={currentVal}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditableLineas(prev => prev.map(line => line.id === l.id ? { ...line, concepto: val } : line));
+                              }}
+                              title={currentVal || 'Centro de Costo'}
+                              className="w-full min-w-[200px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none shadow-xs font-medium"
+                            >
+                              <option value="">-- Seleccione Centro de Costo --</option>
+                              {centros.map(c => {
+                                const full = `${c.codigo} - ${c.Título}`;
+                                return (
+                                  <option key={c.codigo} value={full} title={full}>
+                                    {full}
+                                  </option>
+                                );
+                              })}
+                              {currentVal && !centros.some(c => `${c.codigo} - ${c.Título}` === currentVal || c.codigo === currentVal) && (
+                                <option value={currentVal} title={currentVal}>{currentVal}</option>
+                              )}
+                            </select>
+                          );
+                        })() : (
+                          editableLineas.find(el => el.id === l.id)?.concepto || l.concepto || legalizacion.centroCosto
                         )}
                       </td>
-                      <td className="py-2.5 px-3 text-blue-900 font-mono font-medium">
-                        {legalizacion.estado === 'pendiente' ? (
-                          <select
-                            value={editableLineas.find(el => el.id === l.id)?.cuentaId || ''}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const acc = cuentas.find(c => String(c.id) === val);
-                              setEditableLineas(prev => prev.map(line => line.id === l.id ? { ...line, cuentaId: val ? Number(val) : null, cuentaTitulo: acc ? `${acc.Título} - ${acc.categoria}` : '' } : line));
-                            }}
-                            className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none max-w-[200px]"
-                          >
-                            <option value="">Cuenta Contable...</option>
-                            {cuentas.map(c => <option key={c.id} value={c.id}>{c.Título} ({c.categoria})</option>)}
-                          </select>
-                        ) : (
-                          editableLineas.find(el => el.id === l.id)?.cuentaTitulo || 'Cuenta asociada'
+                      <td className="py-2.5 px-3 text-blue-900 font-mono font-medium min-w-[300px]">
+                        {legalizacion.estado === 'pendiente' ? (() => {
+                          const currentCuentaId = getMatchedCuentaId(l.id, l.cuentaId, l.cuentaTitulo);
+                          const activeCuenta = cuentas.find(c => String(c.id) === currentCuentaId);
+                          return (
+                            <select
+                              value={currentCuentaId}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const acc = cuentas.find(c => String(c.id) === val);
+                                setEditableLineas(prev => prev.map(line => line.id === l.id ? { ...line, cuentaId: val ? Number(val) : null, cuentaTitulo: acc ? `${acc.Título} - ${acc.categoria}` : '' } : line));
+                              }}
+                              title={activeCuenta ? `${activeCuenta.Título} (${activeCuenta.categoria})` : 'Cuenta Contable'}
+                              className="w-full min-w-[280px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none shadow-xs font-mono font-normal"
+                            >
+                              <option value="">-- Seleccione Cuenta Contable --</option>
+                              {cuentas.map(c => (
+                                <option key={c.id} value={c.id} title={`${c.Título} (${c.categoria})`}>
+                                  {c.Título} ({c.categoria})
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        })() : (
+                          editableLineas.find(el => el.id === l.id)?.cuentaTitulo || l.cuentaTitulo || 'Cuenta asociada'
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
