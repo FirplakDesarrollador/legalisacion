@@ -50,7 +50,12 @@ export const GastosList: React.FC<GastosListProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(leg),
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        throw new Error(`La respuesta del servidor no es válida (posible error 500 o timeout). Estado HTTP: ${res.status}`);
+      }
       if (data.success) {
         if (data.docEntry) {
           supabase

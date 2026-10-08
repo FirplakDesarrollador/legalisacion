@@ -2,13 +2,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database, UserCheck, X } from 'lucide-react';
-import { supabase, fetchOrganizationUsers, OrganizationUser } from '@/lib/supabase';
-import { Legalizacion } from '@/types/legalizaciones';
+import { supabase, fetchOrganizationUsers, OrganizationUser, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase } from '@/lib/supabase';
+import { Legalizacion, LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
 import { SearchableSelect } from '@/components/SearchableSelect';
 
 export default function PublicApprovalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const [legalizacion, setLegalizacion] = useState<Legalizacion | null>(null);
+  const [editableLineas, setEditableLineas] = useState<LineaGasto[]>([]);
+  const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
+  const [centros, setCentros] = useState<CentroCosto[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [observaciones, setObservaciones] = useState('');
@@ -53,6 +56,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
             updated_at: data.updated_at
           };
           setLegalizacion(mappedData as Legalizacion);
+          setEditableLineas(mappedData.lineas || []);
         }
       } catch (err: any) {
         setErrorMsg(err.message || 'Error de comunicación al buscar la legalización.');
@@ -60,7 +64,22 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
         setLoading(false);
       }
     }
+    
+    async function loadCatalogs() {
+      try {
+        const [cData, centrosData] = await Promise.all([
+          fetchCuentasFromSupabase(),
+          fetchCentrosCostoFromSupabase()
+        ]);
+        setCuentas(cData);
+        setCentros(centrosData);
+      } catch (err) {
+        console.warn('Error cargando catálogos:', err);
+      }
+    }
+    
     loadLegalizacion();
+    loadCatalogs();
   }, [id]);
 
   useEffect(() => {
@@ -174,6 +193,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
       const updateFields: any = {
         estado: nuevoEstado,
         observaciones_aprobacion: observaciones,
+        lineas: editableLineas,
         updated_at: nowIso,
       };
       if (nuevoEstado === 'aprobado') {
@@ -192,9 +212,27 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
           ...legalizacion,
           estado: nuevoEstado,
           observacionesAprobacion: observaciones,
+          lineas: editableLineas,
           fechaAprobacion: nuevoEstado === 'aprobado' ? nowIso : legalizacion.fechaAprobacion,
         };
         setLegalizacion(updatedLeg);
+
+        // Notificar al solicitante
+        try {
+          const link = typeof window !== 'undefined' ? `${window.location.origin}/formulario-tarjetas-credito/${legalizacion.id}` : '';
+          fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              correo: legalizacion.usuarioEmail,
+              titulo: `Legalización TC ${legalizacion.codigo} - ${nuevoEstado === 'aprobado' ? 'Aprobada' : 'Rechazada'}`,
+              contenido: `Tu legalización de tarjeta de crédito ${legalizacion.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
+              link: link,
+            }),
+          }).catch((e) => console.error('Error enviando notificación de estado:', e));
+        } catch (e) {
+          console.error(e);
+        }
 
         if (nuevoEstado === 'aprobado') {
           await handleEnviarSAP(updatedLeg);
@@ -218,7 +256,13 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
         body: JSON.stringify(legData),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        throw new Error(`La respuesta del servidor no es válida (posible error 500 o timeout). Estado HTTP: ${res.status}`);
+      }
+
       setSapResult({
         success: data.success,
         message: data.message || (data.success ? 'Borrador creado en SAP Service Layer' : 'Error al conectar con SAP'),
@@ -432,10 +476,41 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                       <tr key={linea.id} className="hover:bg-slate-50">
                         <td className="py-3 px-4 whitespace-nowrap text-slate-500">{linea.fecha}</td>
                         <td className="py-3 px-4 font-mono text-[11px] font-bold text-blue-900">
-                          {linea.cuentaTitulo}
+                          {legalizacion.estado === 'pendiente' ? (
+                            <select
+                              value={editableLineas.find(el => el.id === linea.id)?.cuentaId || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const acc = cuentas.find(c => String(c.id) === val);
+                                setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, cuentaId: val ? Number(val) : null, cuentaTitulo: acc ? `${acc.Título} - ${acc.categoria}` : '' } : l));
+                              }}
+                              className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none max-w-[180px]"
+                            >
+                              <option value="">Cuenta Contable...</option>
+                              {cuentas.map(c => <option key={c.id} value={c.id}>{c.Título} ({c.categoria})</option>)}
+                            </select>
+                          ) : (
+                            editableLineas.find(el => el.id === linea.id)?.cuentaTitulo || linea.cuentaTitulo
+                          )}
                         </td>
                         <td className="py-3 px-4">
-                          <p className="font-semibold text-slate-900">{linea.concepto}</p>
+                          {legalizacion.estado === 'pendiente' ? (
+                            <div className="mb-1">
+                              <select
+                                value={editableLineas.find(el => el.id === linea.id)?.concepto || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, concepto: val } : l));
+                                }}
+                                className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none"
+                              >
+                                <option value="">Centro de Costo...</option>
+                                {centros.map(c => <option key={c.codigo} value={c.codigo}>{c.codigo} - {c.nombre}</option>)}
+                              </select>
+                            </div>
+                          ) : (
+                            <p className="font-semibold text-slate-900">{editableLineas.find(el => el.id === linea.id)?.concepto || linea.concepto}</p>
+                          )}
                           <div className="flex flex-col gap-0.5 text-[10px] text-slate-500">
                             <span>Factura/Soporte: {linea.facturaNumero || 'N/A'}</span>
                             {linea.soporteUrl && (

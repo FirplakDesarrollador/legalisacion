@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { X, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt } from 'lucide-react';
-import { Legalizacion } from '@/types/legalizaciones';
+import { Legalizacion, LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
+import { supabase, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase } from '@/lib/supabase';
 
 interface GastoDetailModalProps {
   gasto: Legalizacion | null;
@@ -17,6 +18,20 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
 }) => {
   const [observaciones, setObservaciones] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editableLineas, setEditableLineas] = useState<LineaGasto[]>([]);
+  const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
+  const [centros, setCentros] = useState<CentroCosto[]>([]);
+
+  React.useEffect(() => {
+    if (gasto?.lineas) {
+      setEditableLineas(gasto.lineas);
+    }
+  }, [gasto]);
+
+  React.useEffect(() => {
+    fetchCuentasFromSupabase().then(setCuentas);
+    fetchCentrosCostoFromSupabase().then(setCentros);
+  }, []);
 
   if (!gasto) return null;
 
@@ -44,13 +59,21 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
   const handleAction = async (nuevoEstado: Legalizacion['estado']) => {
     setIsSubmitting(true);
 
+    // Update lines in DB first
+    try {
+      await supabase.from('legalizaciones_gastos').update({ lineas: editableLineas }).eq('id', gasto.id);
+    } catch (e) {
+      console.error('Error al actualizar líneas en Supabase:', e);
+    }
+    const gastoToSave = { ...gasto, lineas: editableLineas };
+
     // Automatic SAP draft creation when approved
     if (nuevoEstado === 'aprobado') {
       try {
         await fetch('/api/sap/draft', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(gasto),
+          body: JSON.stringify(gastoToSave),
         });
       } catch (sapErr) {
         console.error('Error al enviar borrador automático a SAP:', sapErr);
@@ -183,10 +206,39 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                         <span className="font-mono font-bold text-slate-900">{l.proveedorNit || '-'}</span>
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-slate-700">
-                        {l.concepto || gasto.centroCosto}
+                        {gasto.estado === 'pendiente' ? (
+                          <select
+                            value={editableLineas.find(el => el.id === l.id)?.concepto || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEditableLineas(prev => prev.map(line => line.id === l.id ? { ...line, concepto: val } : line));
+                            }}
+                            className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none"
+                          >
+                            <option value="">Centro de Costo...</option>
+                            {centros.map(c => <option key={c.codigo} value={c.codigo}>{c.codigo} - {c.nombre}</option>)}
+                          </select>
+                        ) : (
+                          editableLineas.find(el => el.id === l.id)?.concepto || gasto.centroCosto
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-blue-900 font-mono font-medium">
-                        {l.cuentaTitulo || 'Cuenta asociada'}
+                        {gasto.estado === 'pendiente' ? (
+                          <select
+                            value={editableLineas.find(el => el.id === l.id)?.cuentaId || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const acc = cuentas.find(c => String(c.id) === val);
+                              setEditableLineas(prev => prev.map(line => line.id === l.id ? { ...line, cuentaId: val ? Number(val) : null, cuentaTitulo: acc ? `${acc.Título} - ${acc.categoria}` : '' } : line));
+                            }}
+                            className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none max-w-[150px]"
+                          >
+                            <option value="">Cuenta Contable...</option>
+                            {cuentas.map(c => <option key={c.id} value={c.id}>{c.Título} ({c.categoria})</option>)}
+                          </select>
+                        ) : (
+                          editableLineas.find(el => el.id === l.id)?.cuentaTitulo || 'Cuenta asociada'
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
                         {l.moneda === 'USD' ? (

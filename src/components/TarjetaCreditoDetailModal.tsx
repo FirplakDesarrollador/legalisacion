@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database, Clock } from 'lucide-react';
 import { TarjetaCredito } from '@/types/tarjetasCredito';
-import { supabase, updateTarjetaCreditoGestionContable } from '@/lib/supabase';
+import { supabase, updateTarjetaCreditoGestionContable, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase } from '@/lib/supabase';
+import { LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
 
 interface TarjetaCreditoDetailModalProps {
   tarjetaCredito: TarjetaCredito | null;
@@ -26,12 +27,21 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
     tarjetaCredito?.gestionContable || 'Por procesar'
   );
   const [isUpdatingGestion, setIsUpdatingGestion] = useState(false);
+  const [editableLineas, setEditableLineas] = useState<LineaGasto[]>([]);
+  const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
+  const [centros, setCentros] = useState<CentroCosto[]>([]);
 
   useEffect(() => {
     if (tarjetaCredito) {
       setGestionContable(tarjetaCredito.gestionContable || 'Por procesar');
+      if (tarjetaCredito.lineas) setEditableLineas(tarjetaCredito.lineas);
     }
   }, [tarjetaCredito]);
+
+  useEffect(() => {
+    fetchCuentasFromSupabase().then(setCuentas);
+    fetchCentrosCostoFromSupabase().then(setCentros);
+  }, []);
 
   if (!tarjetaCredito) return null;
 
@@ -106,8 +116,15 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
       console.error(e);
     }
 
+    // Guardar las líneas editadas en base de datos primero
+    try {
+      await supabase.from('legalizaciones_tarjetas_credito').update({ lineas: editableLineas }).eq('id', tarjetaCredito.id);
+    } catch (e) {
+      console.error('Error guardando lineas editadas:', e);
+    }
+
     if (nuevoEstado === 'aprobado') {
-      await handleEnviarSAP();
+      await handleEnviarSAP(editableLineas);
       // wait a bit for user to see the success message before closing
       setTimeout(() => {
         onUpdateStatus(tarjetaCredito.id, nuevoEstado, observaciones);
@@ -123,17 +140,24 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
     }
   };
 
-  const handleEnviarSAP = async () => {
+  const handleEnviarSAP = async (updatedLineas?: LineaGasto[]) => {
     setSapSyncing(true);
     setSapResult(null);
+    const tcToSave = updatedLineas ? { ...tarjetaCredito, lineas: updatedLineas } : tarjetaCredito;
     try {
       const res = await fetch('/api/sap/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tarjetaCredito),
+        body: JSON.stringify(tcToSave),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        throw new Error(`La respuesta del servidor no es válida (posible error 500 o timeout). Estado HTTP: ${res.status}`);
+      }
+
       setSapResult({
         success: data.success,
         message: data.message || (data.success ? 'Borrador creado en SAP Service Layer' : 'Error al conectar con SAP'),
@@ -372,10 +396,41 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
                     <tr key={linea.id} className="hover:bg-slate-50">
                       <td className="py-3 px-4 whitespace-nowrap text-slate-500">{linea.fecha}</td>
                       <td className="py-3 px-4 font-mono text-[11px] font-bold text-blue-900">
-                        {linea.cuentaTitulo}
+                        {tarjetaCredito.estado === 'pendiente' ? (
+                          <select
+                            value={editableLineas.find(el => el.id === linea.id)?.cuentaId || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const acc = cuentas.find(c => String(c.id) === val);
+                              setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, cuentaId: val ? Number(val) : null, cuentaTitulo: acc ? `${acc.Título} - ${acc.categoria}` : '' } : l));
+                            }}
+                            className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none max-w-[150px]"
+                          >
+                            <option value="">Cuenta Contable...</option>
+                            {cuentas.map(c => <option key={c.id} value={c.id}>{c.Título} ({c.categoria})</option>)}
+                          </select>
+                        ) : (
+                          editableLineas.find(el => el.id === linea.id)?.cuentaTitulo || linea.cuentaTitulo
+                        )}
                       </td>
                       <td className="py-3 px-4">
-                        <p className="font-semibold text-slate-900">{linea.concepto}</p>
+                        {tarjetaCredito.estado === 'pendiente' ? (
+                          <div className="mb-1">
+                            <select
+                              value={editableLineas.find(el => el.id === linea.id)?.concepto || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, concepto: val } : l));
+                              }}
+                              className="w-full text-xs p-1 border border-slate-200 rounded font-normal text-slate-700 focus:border-blue-500 outline-none"
+                            >
+                              <option value="">Centro de Costo...</option>
+                              {centros.map(c => <option key={c.codigo} value={c.codigo}>{c.codigo} - {c.nombre}</option>)}
+                            </select>
+                          </div>
+                        ) : (
+                          <p className="font-semibold text-slate-900">{editableLineas.find(el => el.id === linea.id)?.concepto || linea.concepto}</p>
+                        )}
                         <span className="text-[10px] text-slate-500">Factura/Soporte: {linea.facturaNumero}</span>
                       </td>
                       <td className="py-3 px-4 font-mono font-bold text-slate-800">

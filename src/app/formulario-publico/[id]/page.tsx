@@ -170,7 +170,14 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(legalizacion),
           });
-          const sapData = await res.json();
+          
+          let sapData;
+          try {
+            sapData = await res.json();
+          } catch (parseErr) {
+            throw new Error(`La respuesta del servidor SAP no es válida (posible error 500 o timeout). Estado HTTP: ${res.status}`);
+          }
+          
           if (sapData.success && sapData.docEntry) {
             createdDocEntry = sapData.docEntry;
           }
@@ -221,6 +228,23 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
           fechaAprobacion: nuevoEstado === 'aprobado' ? now : undefined,
           sapDocEntry: finalDocEntry,
         });
+
+        // Notificar al solicitante
+        try {
+          const link = typeof window !== 'undefined' ? `${window.location.origin}/formulario-publico/${legalizacion.id}` : '';
+          fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              correo: legalizacion.usuarioEmail,
+              titulo: `Legalización ${legalizacion.codigo} - ${nuevoEstado === 'aprobado' ? 'Aprobada' : 'Rechazada'}`,
+              contenido: `Tu legalización ${legalizacion.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
+              link: link,
+            }),
+          }).catch((e) => console.error('Error enviando notificación de estado:', e));
+        } catch (e) {
+          console.error(e);
+        }
 
         if (nuevoEstado === 'aprobado') {
           alert(`✅ Legalización aprobada y enviada a SAP exitosamente${finalDocEntry ? ` (DocEntry #${finalDocEntry})` : ''}.`);

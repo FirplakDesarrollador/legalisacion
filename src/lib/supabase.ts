@@ -1122,7 +1122,10 @@ export function updateLegalizacionGastoStatus(id: string, nuevoEstado: Legalizac
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(approvedGasto),
       })
-        .then(res => res.json())
+        .then(async res => {
+          if (!res.ok) throw new Error('Respuesta no válida del servidor');
+          return res.json();
+        })
         .then(data => {
           if (data.success && data.docEntry) {
             supabase.from('legalizaciones_gastos').update({

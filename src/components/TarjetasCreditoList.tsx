@@ -94,7 +94,12 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(leg),
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        throw new Error(`La respuesta del servidor no es válida (posible error 500 o timeout). Estado HTTP: ${res.status}`);
+      }
       setSyncStatus((prev) => ({
         ...prev,
         [leg.id]: {

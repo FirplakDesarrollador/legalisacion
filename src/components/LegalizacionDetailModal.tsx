@@ -123,7 +123,13 @@ export const LegalizacionDetailModal: React.FC<LegalizacionDetailModalProps> = (
         body: JSON.stringify(legalizacion),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        throw new Error(`La respuesta del servidor no es válida (posible error 500 o timeout). Estado HTTP: ${res.status}`);
+      }
+
       setSapResult({
         success: data.success,
         message: data.message || (data.success ? 'Borrador creado en SAP Service Layer' : 'Error al conectar con SAP'),
