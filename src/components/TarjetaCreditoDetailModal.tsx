@@ -174,11 +174,16 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
     setSapResult(null);
     const tcToSave = updatedLineas ? { ...tarjetaCredito, lineas: updatedLineas } : tarjetaCredito;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
+
       const res = await fetch('/api/sap/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tcToSave),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       let data;
       try {

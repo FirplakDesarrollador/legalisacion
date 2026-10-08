@@ -96,14 +96,25 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
     }
     const gastoToSave = { ...gasto, lineas: editableLineas };
 
-    // Automatic SAP draft creation when approved
+    // Automatic SAP draft creation when approved (non-blocking with timeout)
     if (nuevoEstado === 'aprobado') {
       try {
-        await fetch('/api/sap/draft', {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        fetch('/api/sap/draft', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(gastoToSave),
-        });
+          signal: controller.signal,
+        })
+          .then(async (res) => {
+            clearTimeout(timeoutId);
+            const data = await res.json();
+            if (data?.docEntry) {
+              await supabase.from('legalizaciones_gastos').update({ sap_doc_entry: data.docEntry }).eq('id', gasto.id);
+            }
+          })
+          .catch((e) => console.error('Error enviando borrador automático a SAP:', e));
       } catch (sapErr) {
         console.error('Error al enviar borrador automático a SAP:', sapErr);
       }

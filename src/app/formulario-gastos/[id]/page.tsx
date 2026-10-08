@@ -16,6 +16,8 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
   const [errorMsg, setErrorMsg] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sapSyncing, setSapSyncing] = useState(false);
+  const [sapResult, setSapResult] = useState<{ success: boolean; message: string; docEntry?: number } | null>(null);
 
   // Reasignar Aprobación States
   const [showReasignarModal, setShowReasignarModal] = useState(false);
@@ -254,54 +256,40 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
   const handleAction = async (nuevoEstado: Legalizacion['estado']) => {
     if (!legalizacion) return;
     setIsSubmitting(true);
-    let createdDocEntry: number | undefined = undefined;
-
-    // Automatic SAP draft creation when approved
-    if (nuevoEstado === 'aprobado') {
-      try {
-        const legalizacionToSave = { ...legalizacion, lineas: editableLineas };
-        const res = await fetch('/api/sap/draft', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(legalizacionToSave),
-        });
-        
-        let sapData;
-        try {
-          sapData = await res.json();
-        } catch (parseErr) {
-          throw new Error(`La respuesta del servidor SAP no es válida (posible error 500 o timeout). Estado HTTP: ${res.status}`);
-        }
-
-        if (sapData.success && sapData.docEntry) {
-          createdDocEntry = sapData.docEntry;
-        }
-      } catch (sapErr) {
-        console.error('Error al enviar borrador automático a SAP:', sapErr);
-      }
-    }
 
     try {
-      await supabase
+      // 1. Guardar de inmediato la aprobación en la base de datos
+      const updateData = {
+        estado: nuevoEstado,
+        observaciones_aprobacion: observaciones,
+        lineas: editableLineas,
+        updated_at: new Date().toISOString(),
+      };
+
+      let { error } = await supabase
         .from('legalizaciones_gastos')
-        .update({
-          estado: nuevoEstado,
-          observaciones_aprobacion: observaciones,
-          sap_doc_entry: createdDocEntry || legalizacion.sapDocEntry,
-          lineas: editableLineas,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', legalizacion.id);
 
-      setLegalizacion({
+      if (error) {
+        await supabase
+          .from('legalizaciones gastos')
+          .update(updateData)
+          .eq('id', legalizacion.id);
+      }
+
+      const updatedLeg: Legalizacion = {
         ...legalizacion,
         estado: nuevoEstado,
         observacionesAprobacion: observaciones,
         lineas: editableLineas,
-        sapDocEntry: createdDocEntry || legalizacion.sapDocEntry,
-      });
+      };
 
-      // Notify
+      // Cambiar inmediatamente la UI a Aprobado / Rechazado
+      setLegalizacion(updatedLeg);
+      setIsSubmitting(false);
+
+      // 2. Notificación en segundo plano al solicitante
       try {
         const link = typeof window !== 'undefined' ? `${window.location.origin}/formulario-gastos/${legalizacion.id}` : '';
         fetch('/api/notify', {
@@ -310,16 +298,72 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
           body: JSON.stringify({
             correo: legalizacion.usuarioEmail,
             titulo: `Legalización de Gastos ${legalizacion.codigo} - ${nuevoEstado === 'aprobado' ? 'Aprobada' : 'Rechazada'}`,
-            contenido: `Tu legalización de gastos ${legalizacion.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada y enviada a SAP' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
+            contenido: `Tu legalización de gastos ${legalizacion.codigo} ha sido ${nuevoEstado === 'aprobado' ? 'aprobada' : 'rechazada'}.${observaciones ? ` Observaciones: ${observaciones}` : ''}`,
             link: link,
           }),
         }).catch((e) => console.error('Error enviando notificación de estado:', e));
       } catch (e) {
         console.error(e);
       }
+
+      // 3. Si es aprobado, enviar borrador a SAP con indicador en vivo y límite de tiempo
+      if (nuevoEstado === 'aprobado') {
+        setSapSyncing(true);
+        setSapResult(null);
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s max timeout
+
+          const res = await fetch('/api/sap/draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedLeg),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          let sapData;
+          try {
+            sapData = await res.json();
+          } catch {
+            throw new Error(`Respuesta inválida del servidor SAP (${res.status}).`);
+          }
+
+          if (sapData.success && sapData.docEntry) {
+            setSapResult({
+              success: true,
+              message: `Borrador registrado exitosamente en SAP Business One (#${sapData.docEntry})`,
+              docEntry: sapData.docEntry,
+            });
+            setLegalizacion(prev => prev ? { ...prev, sapDocEntry: sapData.docEntry } : null);
+
+            // Guardar docEntry en Supabase
+            try {
+              await supabase
+                .from('legalizaciones_gastos')
+                .update({ sap_doc_entry: sapData.docEntry })
+                .eq('id', legalizacion.id);
+            } catch {}
+          } else {
+            setSapResult({
+              success: false,
+              message: sapData.message || 'No fue posible registrar el borrador en SAP Service Layer',
+            });
+          }
+        } catch (sapErr: any) {
+          console.error('Error al sincronizar con SAP:', sapErr);
+          setSapResult({
+            success: false,
+            message: sapErr.name === 'AbortError'
+              ? 'Tiempo de espera agotado al conectar con SAP (Servidor tardó más de 20s en responder).'
+              : (sapErr.message || 'Error de conexión con SAP Service Layer.'),
+          });
+        } finally {
+          setSapSyncing(false);
+        }
+      }
     } catch (err: any) {
       alert('Error al actualizar estado: ' + err.message);
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -372,6 +416,43 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
 
         {/* Main Card */}
         <div className="bg-white text-slate-800 rounded-3xl shadow-2xl border border-slate-200 overflow-hidden p-6 sm:p-8 space-y-6 text-xs">
+          {/* SAP Service Layer Status Banners */}
+          {sapSyncing && (
+            <div className="p-3.5 rounded-2xl text-[11px] bg-blue-50 text-blue-800 border border-blue-200 flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <span>Sincronizando y enviando borrador automáticamente a SAP Business One...</span>
+            </div>
+          )}
+
+          {sapResult && (
+            <div
+              className={`p-3.5 rounded-2xl text-xs flex items-center justify-between border ${
+                sapResult.success
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : 'bg-rose-50 text-rose-800 border-rose-200'
+              }`}
+            >
+              <span>{sapResult.message}</span>
+              {sapResult.docEntry && (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-mono font-bold text-[10px]">
+                  DocEntry: #{sapResult.docEntry}
+                </span>
+              )}
+            </div>
+          )}
+
+          {!sapResult && legalizacion.sapDocEntry && (
+            <div className="p-3.5 rounded-2xl text-xs flex items-center justify-between border bg-emerald-50 text-emerald-800 border-emerald-200">
+              <span className="flex items-center gap-1.5 font-medium">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Legalización registrada en SAP Business One
+              </span>
+              <span className="px-2.5 py-1 rounded-full bg-emerald-200 text-emerald-900 font-mono font-bold text-[10px]">
+                DocEntry: #{legalizacion.sapDocEntry}
+              </span>
+            </div>
+          )}
+
           {/* Metadata Cards (2 columns without general Centro de Costos) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
@@ -587,8 +668,17 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
                   onClick={() => handleAction('aprobado')}
                   className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 text-xs cursor-pointer disabled:opacity-50"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Aprobar Legalización</span>
+                  {isSubmitting ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      <span>Aprobando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Aprobar Legalización</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
