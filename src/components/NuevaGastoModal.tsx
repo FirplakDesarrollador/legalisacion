@@ -176,9 +176,12 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
       return;
     }
 
-    let assignedCodigo = `LEG-${Math.floor(100 + Math.random() * 900)}`;
+    let assignedCodigo = `LEG-${Math.floor(1000 + Math.random() * 9000)}`;
     try {
-      const numRes = await fetch('/api/sap/next-number');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const numRes = await fetch('/api/sap/next-number', { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (numRes.ok) {
         const numData = await numRes.json();
         if (numData.codigo) {
@@ -186,7 +189,7 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
         }
       }
     } catch {
-      // fallback
+      // fallback inmediato
     }
 
     const nuevaLeg: Legalizacion = {

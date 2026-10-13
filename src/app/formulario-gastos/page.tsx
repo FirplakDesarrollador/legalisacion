@@ -638,9 +638,12 @@ export default function FormularioGastosPublicoPage() {
 
     try {
       const cleanLineas = lineas.map(({ soporteFile, soporteFiles, ...rest }: any) => rest);
-      let assignedCodigo = `LEG-${Math.floor(100 + Math.random() * 900)}`;
+      let assignedCodigo = `LEG-${Math.floor(1000 + Math.random() * 9000)}`;
       try {
-        const numRes = await fetch('/api/sap/next-number');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s max
+        const numRes = await fetch('/api/sap/next-number', { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (numRes.ok) {
           const numData = await numRes.json();
           if (numData.codigo) {
@@ -648,7 +651,7 @@ export default function FormularioGastosPublicoPage() {
           }
         }
       } catch {
-        // fallback
+        // fallback inmediato
       }
 
       const finalId = currentDraftId || `leg-gst-${Date.now()}`;
@@ -690,10 +693,10 @@ export default function FormularioGastosPublicoPage() {
       setCurrentDraftId(null);
       setCurrentDraftCodigo('');
 
-      // Trigger Power Automate Flow for approval notification
+      // Trigger Power Automate Flow for approval notification in background (non-blocking)
       try {
         const link = `${window.location.origin}/formulario-gastos/${nuevaLeg.id}`;
-        await fetch('/api/notify', {
+        fetch('/api/notify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -702,6 +705,8 @@ export default function FormularioGastosPublicoPage() {
             contenido: `Tienes esta legalización de gastos pendiente por aprobar de ${usuarioNombre} por valor de ${formatCOP(totalGastos)}.`,
             link: link,
           }),
+        }).catch((flowErr) => {
+          console.error('Error enviando notificación al proxy:', flowErr);
         });
       } catch (flowErr) {
         console.error('Error enviando notificación al proxy:', flowErr);

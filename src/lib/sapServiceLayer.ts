@@ -19,20 +19,29 @@ export interface SAPSessionResponse {
   cookieHeader: string;
 }
 
-export async function loginSAP(): Promise<SAPSessionResponse> {
+export async function loginSAP(timeoutMs: number = 8000): Promise<SAPSessionResponse> {
   const loginEndpoint = SAP_API_URL.endsWith('/Login')
     ? SAP_API_URL
     : `${SAP_API_URL.replace(/\/+$/, '')}/Login`;
 
-  const res = await fetch(loginEndpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      CompanyDB: SAP_COMPANY_DB,
-      UserName: SAP_USERNAME,
-      Password: SAP_PASSWORD,
-    }),
-  });
+  const controller = new AbortController();
+  const tId = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(loginEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        CompanyDB: SAP_COMPANY_DB,
+        UserName: SAP_USERNAME,
+        Password: SAP_PASSWORD,
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(tId);
+  }
 
   if (!res.ok) {
     const errText = await res.text();
