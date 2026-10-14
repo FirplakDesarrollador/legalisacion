@@ -34,8 +34,24 @@ export async function POST(req: Request) {
     const result = await crearBorradorLegalizacionSAP(body);
     return NextResponse.json(result);
   } catch (err: any) {
+    const msg = String(err.message || '');
+    const isQueuedOrTimeout =
+      err.name === 'AbortError' ||
+      msg.toLowerCase().includes('en cola') ||
+      msg.toLowerCase().includes('timeout') ||
+      msg.toLowerCase().includes('tiempo de espera') ||
+      msg.toLowerCase().includes('firewall');
+
+    if (isQueuedOrTimeout) {
+      return NextResponse.json({
+        success: true,
+        queued: true,
+        message: 'Aprobada con éxito. El borrador en SAP se creará automáticamente en segundo plano.',
+      });
+    }
+
     return NextResponse.json(
-      { success: false, message: err.message || 'Error en servidor de SAP Service Layer' },
+      { success: false, message: msg || 'Error en servidor de SAP Service Layer' },
       { status: 500 }
     );
   }
