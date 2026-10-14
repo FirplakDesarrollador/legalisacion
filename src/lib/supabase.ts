@@ -344,51 +344,18 @@ function getFallbackCuentas(): CuentaContable[] {
   ];
 }
 
-const STORAGE_KEY = 'app_legalisaciones_data_v1';
+const STORAGE_KEY = 'app_legalizaciones_data_v1';
 
-const MOCK_LEGALIZACIONES_SEED: Legalizacion[] = [
-  {
-    id: 'leg-1',
-    codigo: 'LEG-2026-001',
-    fecha: '2026-03-25',
-    usuarioNombre: 'Carlos Mier',
-    usuarioEmail: 'edgar.aguilar@firplak.com',
-    centroCosto: 'Logistica',
-    motivo: 'Fletes y mensajería logística urgente',
-    estado: 'pendiente',
-    anticipoRecibido: 800000,
-    totalGastos: 750000,
-    saldoDiferencia: -50000,
-    lineas: [
-      {
-        id: 'lin-1',
-        fecha: '2026-03-22',
-        concepto: 'Transporte y fletes de repuestos',
-        cuentaId: 6,
-        cuentaTitulo: '51350505 - SERVICIOS DE TRANSPORTE Y FLETES',
-        proveedorNombre: 'SERVIENTREGA',
-        facturaNumero: 'FE-8849',
-        valorSubtotal: 630252,
-        valorIva: 119748,
-        valorTotal: 750000
-      }
-    ],
-    created_at: '2026-03-25T10:30:00.000Z',
-    updated_at: '2026-03-25T10:30:00.000Z'
-  }
-];
+const MOCK_LEGALIZACIONES_SEED: Legalizacion[] = [];
 
 export function getLocalLegalizaciones(): Legalizacion[] {
-  if (typeof window === 'undefined') return MOCK_LEGALIZACIONES_SEED;
+  if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_LEGALIZACIONES_SEED));
-      return MOCK_LEGALIZACIONES_SEED;
-    }
+    if (!raw) return [];
     return JSON.parse(raw) as Legalizacion[];
   } catch {
-    return MOCK_LEGALIZACIONES_SEED;
+    return [];
   }
 }
 
@@ -401,11 +368,10 @@ export async function fetchLegalizacionesFromSupabase(): Promise<Legalizacion[]>
 
     if (error) {
       console.warn('Error al cargar legalizaciones:', error);
-      return [];
+      return getLocalLegalizaciones();
     }
 
-    // Return real data (may be empty array if no records yet)
-    return (data || []).map((row: any) => {
+    const parsed = (data || []).map((row: any) => {
       const gRaw = String(row.gestion_contable || row.gestionContable || '').toLowerCase().trim();
       const isProcesado = gRaw === 'procesado';
       return {
@@ -416,8 +382,14 @@ export async function fetchLegalizacionesFromSupabase(): Promise<Legalizacion[]>
         fechaProcesado: row.fecha_procesado || row.fechaProcesado || (isProcesado ? row.updated_at : undefined),
       };
     }) as Legalizacion[];
+
+    if (typeof window !== 'undefined' && parsed.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
+    return parsed;
   } catch {
-    return [];
+    return getLocalLegalizaciones();
   }
 }
 

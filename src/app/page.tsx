@@ -206,22 +206,54 @@ export default function Home() {
   };
 
   const handleUpdateStatus = (id: string, nuevoEstado: Legalizacion['estado'], observaciones?: string) => {
-    const updated = updateLegalizacionStatus(id, nuevoEstado, observaciones);
-    setLegalizaciones(updated);
+    updateLegalizacionStatus(id, nuevoEstado, observaciones);
+    setLegalizaciones((prev) => {
+      const next = prev.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              estado: nuevoEstado,
+              observacionesAprobacion: observaciones || l.observacionesAprobacion,
+              fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : l.fechaAprobacion,
+              updated_at: new Date().toISOString(),
+            }
+          : l
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('app_legalizaciones_data_v1', JSON.stringify(next));
+      }
+      return next;
+    });
     if (selectedLegalizacion && selectedLegalizacion.id === id) {
       setSelectedLegalizacion((prev) => (prev ? { ...prev, estado: nuevoEstado, observacionesAprobacion: observaciones } : null));
     }
   };
 
   const handleSaveNuevaTarjeta = (nueva: TarjetaCredito) => {
-    const updated = saveLocalTarjetaCredito(nueva);
-    setTarjetasCredito(updated);
+    saveLocalTarjetaCredito(nueva);
+    setTarjetasCredito((prev) => [nueva, ...prev.filter((t) => t.id !== nueva.id)]);
     setActiveTab('cajas_menores');
   };
 
   const handleUpdateStatusTarjeta = (id: string, nuevoEstado: TarjetaCredito['estado'], observaciones?: string) => {
-    const updated = updateTarjetaCreditoStatus(id, nuevoEstado, observaciones);
-    setTarjetasCredito(updated);
+    updateTarjetaCreditoStatus(id, nuevoEstado, observaciones);
+    setTarjetasCredito((prev) => {
+      const next = prev.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              estado: nuevoEstado,
+              observacionesAprobacion: observaciones || t.observacionesAprobacion,
+              fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : t.fechaAprobacion,
+              updated_at: new Date().toISOString(),
+            }
+          : t
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('app_tarjetas_credito_data_v1', JSON.stringify(next));
+      }
+      return next;
+    });
     if (selectedTarjetaCredito && selectedTarjetaCredito.id === id) {
       setSelectedTarjetaCredito((prev) => (prev ? { ...prev, estado: nuevoEstado, observacionesAprobacion: observaciones } : null));
     }
@@ -234,25 +266,72 @@ export default function Home() {
   };
 
   const handleUpdateGastoStatus = (id: string, nuevoEstado: Legalizacion['estado'], observaciones?: string) => {
-    const updated = updateLegalizacionGastoStatus(id, nuevoEstado, observaciones);
-    setGastos(updated);
+    updateLegalizacionGastoStatus(id, nuevoEstado, observaciones);
+    setGastos((prev) => {
+      const next = prev.map((g) =>
+        g.id === id
+          ? {
+              ...g,
+              estado: nuevoEstado,
+              observacionesAprobacion: observaciones || g.observacionesAprobacion,
+              fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : g.fechaAprobacion,
+              updated_at: new Date().toISOString(),
+            }
+          : g
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('app_legalizaciones_gastos_data_v1', JSON.stringify(next));
+      }
+      return next;
+    });
     if (selectedGasto && selectedGasto.id === id) {
       setSelectedGasto((prev) => (prev ? { ...prev, estado: nuevoEstado, observacionesAprobacion: observaciones } : null));
     }
   };
 
   const handleUpdateGastoGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado') => {
-    const updated = updateLegalizacionGastoGestionContable(id, gestion);
-    setGastos(updated);
+    const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
+    updateLegalizacionGastoGestionContable(id, gestion, nowIso);
+    setGastos((prev) => {
+      const next = prev.map((g) =>
+        g.id === id
+          ? {
+              ...g,
+              gestionContable: gestion,
+              fechaProcesado: nowIso || undefined,
+              updated_at: new Date().toISOString(),
+            }
+          : g
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('app_legalizaciones_gastos_data_v1', JSON.stringify(next));
+      }
+      return next;
+    });
     if (selectedGasto && selectedGasto.id === id) {
-      setSelectedGasto((prev) => (prev ? { ...prev, gestionContable: gestion } : null));
+      setSelectedGasto((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined } : null));
     }
   };
 
   const handleUpdateTarjetaGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado') => {
     const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
-    const updated = updateTarjetaCreditoGestionContable(id, gestion, nowIso);
-    setTarjetasCredito(updated);
+    updateTarjetaCreditoGestionContable(id, gestion, nowIso);
+    setTarjetasCredito((prev) => {
+      const next = prev.map((tc) =>
+        tc.id === id
+          ? {
+              ...tc,
+              gestionContable: gestion,
+              fechaProcesado: nowIso || undefined,
+              updated_at: new Date().toISOString(),
+            }
+          : tc
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('app_tarjetas_credito_data_v1', JSON.stringify(next));
+      }
+      return next;
+    });
     if (selectedTarjetaCredito && selectedTarjetaCredito.id === id) {
       setSelectedTarjetaCredito((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined } : null));
     }
@@ -260,8 +339,23 @@ export default function Home() {
 
   const handleUpdateLegalizacionGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado') => {
     const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
-    const updated = updateLegalizacionGestionContable(id, gestion, nowIso);
-    setLegalizaciones(updated);
+    updateLegalizacionGestionContable(id, gestion, nowIso);
+    setLegalizaciones((prev) => {
+      const next = prev.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              gestionContable: gestion,
+              fechaProcesado: nowIso || undefined,
+              updated_at: new Date().toISOString(),
+            }
+          : l
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('app_legalizaciones_data_v1', JSON.stringify(next));
+      }
+      return next;
+    });
     if (selectedLegalizacion && selectedLegalizacion.id === id) {
       setSelectedLegalizacion((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined } : null));
     }
