@@ -191,7 +191,7 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
   const isItemPorProcesar = (l: TarjetaCredito) => {
     const isAprobado = l.estado === 'aprobado' || l.estado === 'pagado';
     if (!isAprobado) return false;
-    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? 'Por procesar').toLowerCase().trim();
+    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? '').toLowerCase().trim();
     return gestion !== 'procesado';
   };
 
@@ -207,10 +207,10 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
 
     const term = searchTerm.toLowerCase();
     const matchesSearch =
-      l.codigo.toLowerCase().includes(term) ||
-      l.usuarioNombre.toLowerCase().includes(term) ||
-      l.motivo.toLowerCase().includes(term) ||
-      l.centroCosto.toLowerCase().includes(term);
+      (l.codigo || '').toLowerCase().includes(term) ||
+      (l.usuarioNombre || '').toLowerCase().includes(term) ||
+      (l.motivo || '').toLowerCase().includes(term) ||
+      (l.centroCosto || '').toLowerCase().includes(term);
     return matchesTab && matchesSearch;
   });
 
@@ -437,18 +437,23 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
                   </td>
                   <td className="py-3.5 px-4">{getStatusPill(leg.estado)}</td>
                   <td className="py-3.5 px-4">
-                    <select
-                      value={localGestion[leg.id] ?? leg.gestionContable ?? 'Por procesar'}
-                      onChange={(e) => handleGestionChange(leg.id, e.target.value as 'Por procesar' | 'Procesado')}
-                      className={`text-[11px] font-bold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none focus:ring-2 shadow-xs ${
-                        (localGestion[leg.id] ?? leg.gestionContable ?? 'Por procesar') === 'Procesado'
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-500 hover:bg-emerald-100'
-                          : 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-500 hover:bg-amber-100'
-                      }`}
-                    >
-                      <option value="Por procesar">⏳ Por procesar</option>
-                      <option value="Procesado">✅ Procesado</option>
-                    </select>
+                    {(() => {
+                      const currentGestion = String(localGestion[leg.id] ?? leg.gestionContable ?? '').toLowerCase().trim() === 'procesado' ? 'Procesado' : 'Por procesar';
+                      return (
+                        <select
+                          value={currentGestion}
+                          onChange={(e) => handleGestionChange(leg.id, e.target.value as 'Por procesar' | 'Procesado')}
+                          className={`text-[11px] font-bold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none focus:ring-2 shadow-xs ${
+                            currentGestion === 'Procesado'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-500 hover:bg-emerald-100'
+                              : 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-500 hover:bg-amber-100'
+                          }`}
+                        >
+                          <option value="Por procesar">⏳ Por procesar</option>
+                          <option value="Procesado">✅ Procesado</option>
+                        </select>
+                      );
+                    })()}
                   </td>
                   <td className="py-3.5 px-4">
                     {(() => {
@@ -476,7 +481,7 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
                     )}
                   </td>
                   <td className="py-3.5 px-4 text-slate-700">
-                    {((localGestion[leg.id] ?? leg.gestionContable) === 'Procesado') ? (
+                    {String(localGestion[leg.id] ?? leg.gestionContable ?? '').toLowerCase().trim() === 'procesado' ? (
                       <div>
                         <p className="font-semibold text-blue-900">
                           {formatFecha(localFechaProcesado[leg.id] ?? leg.fechaProcesado ?? leg.updated_at)}

@@ -130,7 +130,7 @@ export const GastosList: React.FC<GastosListProps> = ({
   const isItemPorProcesar = (l: Legalizacion) => {
     const isAprobado = l.estado === 'aprobado' || l.estado === 'pagado';
     if (!isAprobado) return false;
-    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? 'Por procesar').toLowerCase().trim();
+    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? '').toLowerCase().trim();
     return gestion !== 'procesado';
   };
 
@@ -421,22 +421,27 @@ export const GastosList: React.FC<GastosListProps> = ({
                       <td className="py-3.5 px-4">{getStatusPill(leg.estado)}</td>
 
                       <td className="py-3.5 px-4">
-                        <select
-                          value={localGestion[leg.id] ?? leg.gestionContable ?? 'Por procesar'}
-                          onChange={(e) => {
-                            const val = e.target.value as 'Por procesar' | 'Procesado';
-                            setLocalGestion((prev) => ({ ...prev, [leg.id]: val }));
-                            onUpdateGestionContable?.(leg.id, val);
-                          }}
-                          className={`text-[11px] font-bold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none focus:ring-2 shadow-xs ${
-                            (localGestion[leg.id] ?? leg.gestionContable ?? 'Por procesar') === 'Procesado'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-500 hover:bg-emerald-100'
-                              : 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-500 hover:bg-amber-100'
-                          }`}
-                        >
-                          <option value="Por procesar">⏳ Por procesar</option>
-                          <option value="Procesado">✅ Procesado</option>
-                        </select>
+                        {(() => {
+                          const currentGestion = String(localGestion[leg.id] ?? leg.gestionContable ?? '').toLowerCase().trim() === 'procesado' ? 'Procesado' : 'Por procesar';
+                          return (
+                            <select
+                              value={currentGestion}
+                              onChange={(e) => {
+                                const val = e.target.value as 'Por procesar' | 'Procesado';
+                                setLocalGestion((prev) => ({ ...prev, [leg.id]: val }));
+                                onUpdateGestionContable?.(leg.id, val);
+                              }}
+                              className={`text-[11px] font-bold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none focus:ring-2 shadow-xs ${
+                                currentGestion === 'Procesado'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-500 hover:bg-emerald-100'
+                                  : 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-500 hover:bg-amber-100'
+                              }`}
+                            >
+                              <option value="Por procesar">⏳ Por procesar</option>
+                              <option value="Procesado">✅ Procesado</option>
+                            </select>
+                          );
+                        })()}
                       </td>
 
                       <td className="py-3.5 px-4 text-slate-700">
@@ -455,13 +460,13 @@ export const GastosList: React.FC<GastosListProps> = ({
                       </td>
 
                       <td className="py-3.5 px-4 text-slate-700">
-                        {leg.gestionContable === 'Procesado' && leg.fechaProcesado ? (
+                        {String(localGestion[leg.id] ?? leg.gestionContable ?? '').toLowerCase().trim() === 'procesado' ? (
                           <div>
                             <p className="font-semibold text-blue-900">
-                              {formatFecha(leg.fechaProcesado)}
+                              {formatFecha(leg.fechaProcesado || leg.updated_at)}
                             </p>
                             <p className="text-[10px] text-slate-400">
-                              {formatHora(leg.fechaProcesado)}
+                              {formatHora(leg.fechaProcesado || leg.updated_at)}
                             </p>
                           </div>
                         ) : (

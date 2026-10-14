@@ -78,8 +78,6 @@ export async function actualizarSupabaseConDocEntry(leg: any, docEntry: number |
   const nowIso = new Date().toISOString();
   const updateData = {
     sap_doc_entry: numEntry,
-    gestion_contable: 'procesado',
-    fecha_procesado: nowIso,
     updated_at: nowIso,
   };
 

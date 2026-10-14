@@ -352,8 +352,6 @@ async function sincronizarTodo() {
             .from('legalizaciones_tarjetas_credito')
             .update({
               sap_doc_entry: result.docEntry,
-              gestion_contable: 'procesado',
-              fecha_procesado: nowIso,
               updated_at: nowIso,
             })
             .eq('id', row.id);
@@ -386,8 +384,6 @@ async function sincronizarTodo() {
             .from('legalizaciones cajas menores')
             .update({
               sap_doc_entry: result.docEntry,
-              gestion_contable: 'procesado',
-              fecha_procesado: nowIso,
               updated_at: nowIso,
             })
             .eq('id', row.id);
@@ -431,8 +427,6 @@ async function sincronizarTodo() {
             .from('legalizaciones_gastos')
             .update({
               sap_doc_entry: result.docEntry,
-              gestion_contable: 'procesado',
-              fecha_procesado: nowIso,
               updated_at: nowIso,
             })
             .eq('id', row.id);

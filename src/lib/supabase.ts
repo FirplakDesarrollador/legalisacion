@@ -433,31 +433,35 @@ export async function fetchLegalizacionesTarjetasCreditoFromSupabase(): Promise<
       return [];
     }
 
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      codigo: row.codigo,
-      fecha: row.fecha,
-      usuarioNombre: row.usuario_nombre,
-      usuarioEmail: row.usuario_email,
-      tarjeta_codigo: row.tarjeta_codigo || (row.motivo?.match(/\[TC:\s*([^\]]+)\]/)?.[1] || ''),
-      tc_en_sap: row.tc_en_sap,
-      centroCosto: row.centro_costo,
-      motivo: row.motivo,
-      estado: row.estado,
-      anticipoRecibido: row.anticipo_recibido,
-      totalGastos: row.total_gastos,
-      saldoDiferencia: row.saldo_diferencia,
-      lineas: row.lineas || [],
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      fechaAprobacion: (row.estado === 'aprobado' || row.estado === 'pagado') ? (row.fecha_aprobacion || row.updated_at) : undefined,
-      gestionContable: row.gestion_contable || 'Por procesar',
-      fechaProcesado: row.fecha_procesado || (row.gestion_contable === 'Procesado' ? row.updated_at : undefined),
-      aprobadorNombre: row.aprobador_nombre,
-      aprobadorEmail: row.aprobador_email,
-      sapDocEntry: row.sap_doc_entry,
-      observacionesAprobacion: row.observaciones_aprobacion || row.observacionesAprobacion,
-    })) as any[];
+    return (data || []).map((row: any) => {
+      const gRaw = String(row.gestion_contable || row.gestionContable || '').toLowerCase().trim();
+      const isProcesado = gRaw === 'procesado';
+      return {
+        id: row.id,
+        codigo: row.codigo,
+        fecha: row.fecha,
+        usuarioNombre: row.usuario_nombre,
+        usuarioEmail: row.usuario_email,
+        tarjeta_codigo: row.tarjeta_codigo || (row.motivo?.match(/\[TC:\s*([^\]]+)\]/)?.[1] || ''),
+        tc_en_sap: row.tc_en_sap,
+        centroCosto: row.centro_costo,
+        motivo: row.motivo,
+        estado: row.estado,
+        anticipoRecibido: row.anticipo_recibido,
+        totalGastos: row.total_gastos,
+        saldoDiferencia: row.saldo_diferencia,
+        lineas: row.lineas || [],
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        fechaAprobacion: (row.estado === 'aprobado' || row.estado === 'pagado') ? (row.fecha_aprobacion || row.updated_at) : undefined,
+        gestionContable: (isProcesado ? 'Procesado' : 'Por procesar') as 'Por procesar' | 'Procesado',
+        fechaProcesado: row.fecha_procesado || (isProcesado ? row.updated_at : undefined),
+        aprobadorNombre: row.aprobador_nombre,
+        aprobadorEmail: row.aprobador_email,
+        sapDocEntry: row.sap_doc_entry,
+        observacionesAprobacion: row.observaciones_aprobacion || row.observacionesAprobacion,
+      };
+    }) as any[];
   } catch {
     return [];
   }
@@ -581,29 +585,33 @@ export async function fetchLegalizacionesGastosFromSupabase(): Promise<Legalizac
       return getLocalLegalizacionesGastos();
     }
 
-    const parsed = (data || []).map((row: any) => ({
-      id: row.id,
-      codigo: row.codigo,
-      fecha: row.fecha,
-      usuarioNombre: row.usuario_nombre || row.usuarioNombre,
-      usuarioEmail: row.usuario_email || row.usuarioEmail,
-      centroCosto: row.centro_costo || row.centroCosto,
-      motivo: row.motivo,
-      estado: row.estado,
-      anticipoRecibido: row.anticipo_recibido ?? row.anticipoRecibido ?? 0,
-      totalGastos: row.total_gastos ?? row.totalGastos ?? 0,
-      saldoDiferencia: row.saldo_diferencia ?? row.saldoDiferencia ?? 0,
-      observacionesAprobacion: row.observaciones_aprobacion || row.observacionesAprobacion,
-      lineas: row.lineas || [],
-      gestionContable: row.gestion_contable || row.gestionContable || 'Por procesar',
-      fechaProcesado: row.fecha_procesado || row.fechaProcesado,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      fechaAprobacion: (row.estado === 'aprobado' || row.estado === 'pagado') ? (row.fecha_aprobacion || row.updated_at) : undefined,
-      aprobadorNombre: row.aprobador_nombre || row.aprobadorNombre,
-      aprobadorEmail: row.aprobador_email || row.aprobadorEmail,
-      sapDocEntry: row.sap_doc_entry || row.sapDocEntry,
-    })) as Legalizacion[];
+    const parsed = (data || []).map((row: any) => {
+      const gRaw = String(row.gestion_contable || row.gestionContable || '').toLowerCase().trim();
+      const isProcesado = gRaw === 'procesado';
+      return {
+        id: row.id,
+        codigo: row.codigo,
+        fecha: row.fecha,
+        usuarioNombre: row.usuario_nombre || row.usuarioNombre,
+        usuarioEmail: row.usuario_email || row.usuarioEmail,
+        centroCosto: row.centro_costo || row.centroCosto,
+        motivo: row.motivo,
+        estado: row.estado,
+        anticipoRecibido: row.anticipo_recibido ?? row.anticipoRecibido ?? 0,
+        totalGastos: row.total_gastos ?? row.totalGastos ?? 0,
+        saldoDiferencia: row.saldo_diferencia ?? row.saldoDiferencia ?? 0,
+        observacionesAprobacion: row.observaciones_aprobacion || row.observacionesAprobacion,
+        lineas: row.lineas || [],
+        gestionContable: (isProcesado ? 'Procesado' : 'Por procesar') as 'Por procesar' | 'Procesado',
+        fechaProcesado: row.fecha_procesado || (isProcesado ? row.updated_at : undefined),
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        fechaAprobacion: (row.estado === 'aprobado' || row.estado === 'pagado') ? (row.fecha_aprobacion || row.updated_at) : undefined,
+        aprobadorNombre: row.aprobador_nombre || row.aprobadorNombre,
+        aprobadorEmail: row.aprobador_email || row.aprobadorEmail,
+        sapDocEntry: row.sap_doc_entry || row.sapDocEntry,
+      };
+    }) as Legalizacion[];
 
     if (typeof window !== 'undefined' && parsed.length > 0) {
       localStorage.setItem('app_legalizaciones_gastos_data_v1', JSON.stringify(parsed));
