@@ -329,9 +329,13 @@ export async function leerPlantilla(
 
     const facturaNumero = tipoDocumento === 'Documento Soporte' ? '' : celdaTexto(g(3));
 
-    const nit = celdaTexto(g(4)).replace(/[.\s]/g, '').replace(/-\d$/, '');
-    if (!nit) E('NIT del proveedor es obligatorio.');
-    const prov = ctx.proveedores.find((p) => (p.numero_identificacion || '').trim().toLowerCase() === nit.toLowerCase());
+    const nit = celdaTexto(g(4)).replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+    if (!nit) E('NIT del proveedor es obligatorio (máx. 9 dígitos numéricos sin guion).');
+    const prov = ctx.proveedores.find((p) => {
+      const pId = (p.numero_identificacion || '').trim().toLowerCase();
+      const pIdClean = pId.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+      return pIdClean === nit.toLowerCase() || pId === nit.toLowerCase();
+    });
 
     const codCentro = codigoDe(celdaTexto(g(5)));
     const centro = ctx.centros.find((c) => c.codigo.trim().toUpperCase() === codCentro.toUpperCase());

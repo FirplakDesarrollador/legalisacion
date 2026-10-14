@@ -306,6 +306,20 @@ export default function FormularioTarjetasCreditoPage() {
         if (lin.id !== id) return lin;
         const updated = { ...lin, [field]: value };
 
+        if (field === 'proveedorNit') {
+          const clean = String(value || '').replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+          updated.proveedorNit = clean;
+          const matchProv = proveedores.find((p) => {
+            const pId = (p.numero_identificacion || '').trim().toLowerCase();
+            const pIdClean = pId.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+            return pIdClean === clean || pId === clean;
+          });
+          if (matchProv) {
+            updated.proveedorNombre = matchProv.razon_social || '';
+            updated.proveedorId = matchProv.id;
+          }
+        }
+
         if (field === 'concepto') {
           // Solo limpiar la cuenta si la cuenta actual no es compatible con el nuevo centro de costo
           if (updated.cuentaTitulo) {
@@ -400,6 +414,15 @@ export default function FormularioTarjetasCreditoPage() {
     const lineasSinNIT = lineas.some((l) => !l.proveedorNit || l.proveedorNit.trim() === '');
     if (lineasSinNIT) {
       alert('Por favor ingrese el NIT del Proveedor en todas las líneas de gasto.');
+      return;
+    }
+
+    const lineasNitInvalido = lineas.some((l) => {
+      const nit = (l.proveedorNit || '').trim();
+      return nit.length > 9 || /\D/.test(nit);
+    });
+    if (lineasNitInvalido) {
+      alert('El NIT del proveedor no debe superar 9 dígitos ni contener guion o dígito de verificación.');
       return;
     }
 
@@ -724,13 +747,31 @@ export default function FormularioTarjetasCreditoPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">NIT Proveedor *</label>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            NIT Proveedor * <span className="text-[9px] font-normal text-slate-400">(máx 9 dígitos, sin guion)</span>
+                          </label>
                           <input
                             required
                             type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={9}
                             placeholder="900123456"
                             value={linea.proveedorNit || ''}
-                            onChange={(e) => handleUpdateLinea(linea.id, 'proveedorNit', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (
+                                !e.ctrlKey &&
+                                !e.metaKey &&
+                                !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key) &&
+                                !/^\d$/.test(e.key)
+                              ) {
+                                e.preventDefault();
+                              }
+                            }}
+                            onChange={(e) => {
+                              const cleaned = e.target.value.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+                              handleUpdateLinea(linea.id, 'proveedorNit', cleaned);
+                            }}
                             className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
                           />
                         </div>

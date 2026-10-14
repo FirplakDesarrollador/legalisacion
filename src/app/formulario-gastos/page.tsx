@@ -280,10 +280,13 @@ export default function FormularioGastosPublicoPage() {
         const updated = { ...lin, [field]: value };
 
         if (field === 'proveedorNit') {
-          updated.proveedorNit = value;
-          const matchProv = proveedores.find(
-            (p) => (p.numero_identificacion || '').trim().toLowerCase() === (value || '').trim().toLowerCase()
-          );
+          const clean = String(value || '').replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+          updated.proveedorNit = clean;
+          const matchProv = proveedores.find((p) => {
+            const pId = (p.numero_identificacion || '').trim().toLowerCase();
+            const pIdClean = pId.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+            return pIdClean === clean || pId === clean;
+          });
           if (matchProv) {
             updated.proveedorNombre = matchProv.razon_social || '';
             updated.proveedorId = matchProv.id;
@@ -600,6 +603,21 @@ export default function FormularioGastosPublicoPage() {
     }
     if (!motivo.trim()) {
       alert('Por favor ingrese el motivo del gasto.');
+      return;
+    }
+
+    const lineasSinNIT = lineas.some((l) => !l.proveedorNit || l.proveedorNit.trim() === '');
+    if (lineasSinNIT) {
+      alert('Por favor ingrese el NIT del Proveedor en todas las líneas de gasto.');
+      return;
+    }
+
+    const lineasNitInvalido = lineas.some((l) => {
+      const nit = (l.proveedorNit || '').trim();
+      return nit.length > 9 || /\D/.test(nit);
+    });
+    if (lineasNitInvalido) {
+      alert('El NIT del proveedor no debe superar 9 dígitos ni contener guion o dígito de verificación.');
       return;
     }
 
@@ -1276,22 +1294,43 @@ export default function FormularioGastosPublicoPage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">NIT del Proveedor *</label>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            NIT del Proveedor * <span className="text-[9px] font-normal text-slate-400">(máx 9 dígitos, sin guion)</span>
+                          </label>
                           <input
                             type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={9}
                             required
                             list={`prov-nit-public-${linea.id}`}
                             placeholder="Ej. 900123456"
                             value={linea.proveedorNit || ''}
-                            onChange={(e) => handleUpdateLinea(linea.id, 'proveedorNit', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (
+                                !e.ctrlKey &&
+                                !e.metaKey &&
+                                !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key) &&
+                                !/^\d$/.test(e.key)
+                              ) {
+                                e.preventDefault();
+                              }
+                            }}
+                            onChange={(e) => {
+                              const cleaned = e.target.value.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+                              handleUpdateLinea(linea.id, 'proveedorNit', cleaned);
+                            }}
                             className="w-full p-2 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono font-semibold focus:outline-none focus:border-blue-600 text-xs"
                           />
                           <datalist id={`prov-nit-public-${linea.id}`}>
-                            {proveedores.map((p) => (
-                              <option key={p.id} value={p.numero_identificacion || ''}>
-                                {p.razon_social || ''}
-                              </option>
-                            ))}
+                            {proveedores.map((p) => {
+                              const cleanId = (p.numero_identificacion || '').replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+                              return (
+                                <option key={p.id} value={cleanId}>
+                                  {p.razon_social || ''}
+                                </option>
+                              );
+                            })}
                           </datalist>
                         </div>
 
