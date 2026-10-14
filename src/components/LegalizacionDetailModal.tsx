@@ -49,10 +49,11 @@ export const LegalizacionDetailModal: React.FC<LegalizacionDetailModalProps> = (
     }
 
     try {
+      const dbValue = nuevoValor === 'Procesado' ? 'procesado' : 'por_procesar';
       await supabase
-        .from('legalizaciones_gastos')
+        .from('legalizaciones cajas menores')
         .update({
-          gestion_contable: nuevoValor,
+          gestion_contable: dbValue,
           fecha_procesado: nowIso,
           updated_at: new Date().toISOString(),
         })
@@ -155,7 +156,7 @@ export const LegalizacionDetailModal: React.FC<LegalizacionDetailModalProps> = (
         try {
           await supabase
             .from('legalizaciones cajas menores')
-            .update({ sap_doc_entry: data.docEntry, gestion_contable: 'procesado', updated_at: new Date().toISOString() })
+            .update({ sap_doc_entry: data.docEntry, updated_at: new Date().toISOString() })
             .eq('id', legalizacion.id);
         } catch (e) {
           console.warn('Error guardando sap_doc_entry en Supabase:', e);

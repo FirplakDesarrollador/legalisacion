@@ -10,6 +10,7 @@ interface LegalizacionesListProps {
   onSelectLegalizacion: (leg: Legalizacion) => void;
   onOpenNuevaModal: () => void;
   onUpdateStatus: (id: string, estado: Legalizacion['estado']) => void;
+  onUpdateGestionContable?: (id: string, nuevoValor: 'Por procesar' | 'Procesado') => void;
   defaultTab?: 'por_aprobar' | 'por_procesar' | 'historico';
 }
 
@@ -18,6 +19,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
   onSelectLegalizacion,
   onOpenNuevaModal,
   onUpdateStatus,
+  onUpdateGestionContable,
   defaultTab = 'por_aprobar',
 }) => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -72,6 +74,7 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
     }
 
     updateLegalizacionGestionContable(id, nuevoValor, nowIso);
+    onUpdateGestionContable?.(id, nuevoValor);
 
     try {
       const { error } = await supabase

@@ -10,6 +10,7 @@ interface TarjetasCreditoListProps {
   onSelectTarjetaCredito: (leg: TarjetaCredito) => void;
   onOpenNuevaModal: () => void;
   onUpdateStatus: (id: string, estado: TarjetaCredito['estado']) => void;
+  onUpdateGestionContable?: (id: string, nuevoValor: 'Por procesar' | 'Procesado') => void;
   defaultTab?: 'por_aprobar' | 'por_procesar' | 'historico';
 }
 
@@ -18,6 +19,7 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
   onSelectTarjetaCredito,
   onOpenNuevaModal,
   onUpdateStatus,
+  onUpdateGestionContable,
   defaultTab = 'por_aprobar',
 }) => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -87,6 +89,7 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
     setLocalGestion((prev) => ({ ...prev, [id]: nuevoValor }));
     setLocalFechaProcesado((prev) => ({ ...prev, [id]: nowIso }));
     updateTarjetaCreditoGestionContable(id, nuevoValor, nowIso);
+    onUpdateGestionContable?.(id, nuevoValor);
 
     try {
       await supabase

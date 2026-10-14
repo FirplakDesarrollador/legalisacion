@@ -345,6 +345,7 @@ export default function Home() {
                   onSelectLegalizacion={setSelectedLegalizacion}
                   onOpenNuevaModal={() => setIsNuevaModalOpen(true)}
                   onUpdateStatus={(id, st) => handleUpdateStatus(id, st)}
+                  onUpdateGestionContable={handleUpdateLegalizacionGestionContable}
                   defaultTab="historico"
                 />
               </div>
@@ -357,6 +358,7 @@ export default function Home() {
               onSelectLegalizacion={setSelectedLegalizacion}
               onOpenNuevaModal={() => setIsNuevaModalOpen(true)}
               onUpdateStatus={(id, st) => handleUpdateStatus(id, st)}
+              onUpdateGestionContable={handleUpdateLegalizacionGestionContable}
             />
           )}
 
@@ -366,6 +368,7 @@ export default function Home() {
               onSelectTarjetaCredito={setSelectedTarjetaCredito}
               onOpenNuevaModal={() => window.open('/formulario-tarjetas-credito', '_blank')}
               onUpdateStatus={(id, st) => handleUpdateStatusTarjeta(id, st)}
+              onUpdateGestionContable={handleUpdateTarjetaGestionContable}
             />
           )}
 

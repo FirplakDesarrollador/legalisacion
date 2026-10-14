@@ -636,13 +636,14 @@ export async function fetchTarjetasCreditoResponsablesFromSupabase(): Promise<an
 
 export function updateTarjetaCreditoGestionContable(id: string, gestion: 'Por procesar' | 'Procesado', fechaProcesado?: string | null): Legalizacion[] {
   const current = getLocalTarjetasCredito();
+  const now = new Date().toISOString();
   const updated = current.map(item => {
     if (item.id === id) {
       return {
         ...item,
         gestionContable: gestion,
-        fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? new Date().toISOString() : undefined),
-        updated_at: new Date().toISOString()
+        fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? now : undefined),
+        updated_at: now
       };
     }
     return item;
@@ -651,18 +652,28 @@ export function updateTarjetaCreditoGestionContable(id: string, gestion: 'Por pr
   if (typeof window !== 'undefined') {
     localStorage.setItem(TARJETAS_STORAGE_KEY, JSON.stringify(updated));
   }
+
+  supabase.from('legalizaciones_tarjetas_credito').update({
+    gestion_contable: gestion,
+    fecha_procesado: fechaProcesado !== undefined ? fechaProcesado : (gestion === 'Procesado' ? now : null),
+    updated_at: now
+  }).eq('id', id).then(({ error }) => {
+    if (error) console.error('Error al actualizar gestion_contable en Supabase (tarjetas):', error);
+  });
+
   return updated;
 }
 
 export function updateLegalizacionGestionContable(id: string, gestion: 'Por procesar' | 'Procesado', fechaProcesado?: string | null): Legalizacion[] {
   const current = getLocalLegalizaciones();
+  const now = new Date().toISOString();
   const updated = current.map(item => {
     if (item.id === id) {
       return {
         ...item,
         gestionContable: gestion,
-        fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? new Date().toISOString() : undefined),
-        updated_at: new Date().toISOString()
+        fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? now : undefined),
+        updated_at: now
       };
     }
     return item;
@@ -671,6 +682,16 @@ export function updateLegalizacionGestionContable(id: string, gestion: 'Por proc
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   }
+
+  const dbValue = gestion === 'Procesado' ? 'procesado' : 'por_procesar';
+  supabase.from('legalizaciones cajas menores').update({
+    gestion_contable: dbValue,
+    fecha_procesado: fechaProcesado !== undefined ? fechaProcesado : (gestion === 'Procesado' ? now : null),
+    updated_at: now
+  }).eq('id', id).then(({ error }) => {
+    if (error) console.error('Error al actualizar gestion_contable en Supabase (cajas menores):', error);
+  });
+
   return updated;
 }
 
