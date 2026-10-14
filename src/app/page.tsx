@@ -336,6 +336,7 @@ export default function Home() {
                   onSelectLegalizacion={setSelectedLegalizacion}
                   onOpenNuevaModal={() => setIsNuevaModalOpen(true)}
                   onUpdateStatus={(id, st) => handleUpdateStatus(id, st)}
+                  defaultTab="historico"
                 />
               </div>
             </div>

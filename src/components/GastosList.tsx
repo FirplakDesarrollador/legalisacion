@@ -11,6 +11,7 @@ interface GastosListProps {
   onOpenNuevaModal: () => void;
   onUpdateStatus: (id: string, estado: Legalizacion['estado']) => void;
   onUpdateGestionContable?: (id: string, gestion: 'Por procesar' | 'Procesado') => void;
+  defaultTab?: 'por_aprobar' | 'por_procesar' | 'historico';
 }
 
 export const GastosList: React.FC<GastosListProps> = ({
@@ -19,18 +20,20 @@ export const GastosList: React.FC<GastosListProps> = ({
   onOpenNuevaModal,
   onUpdateStatus,
   onUpdateGestionContable,
+  defaultTab = 'por_aprobar',
 }) => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<'todas' | 'borrador' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
+  const [activeTab, setActiveTab] = useState<'por_aprobar' | 'por_procesar' | 'historico'>(defaultTab);
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [localGestion, setLocalGestion] = useState<{ [id: string]: 'Por procesar' | 'Procesado' }>({});
 
   const prevPendingCountRef = useRef<number>(gastos.filter((l) => l.estado === 'pendiente').length);
 
   useEffect(() => {
     const currentPending = gastos.filter((l) => l.estado === 'pendiente').length;
-    if (activeTab === 'pendiente' && prevPendingCountRef.current > 0 && currentPending === 0) {
-      setActiveTab('todas');
+    if (activeTab === 'por_aprobar' && prevPendingCountRef.current > 0 && currentPending === 0) {
+      setActiveTab('historico');
     }
     prevPendingCountRef.current = currentPending;
   }, [gastos, activeTab]);
@@ -110,8 +113,23 @@ export const GastosList: React.FC<GastosListProps> = ({
     }
   };
 
+  const isItemPorProcesar = (l: Legalizacion) => {
+    const isAprobado = l.estado === 'aprobado' || l.estado === 'pagado';
+    if (!isAprobado) return false;
+    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? 'Por procesar').toLowerCase().trim();
+    return gestion !== 'procesado';
+  };
+
   const filtered = gastos.filter((l) => {
-    const matchesTab = activeTab === 'todas' ? true : l.estado === activeTab;
+    let matchesTab = true;
+    if (activeTab === 'por_aprobar') {
+      matchesTab = l.estado === 'pendiente';
+    } else if (activeTab === 'por_procesar') {
+      matchesTab = isItemPorProcesar(l);
+    } else if (activeTab === 'historico') {
+      matchesTab = true;
+    }
+
     const term = searchTerm.toLowerCase();
     const matchesSearch =
       (l.codigo || '').toLowerCase().includes(term) ||
@@ -197,21 +215,23 @@ export const GastosList: React.FC<GastosListProps> = ({
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto overflow-x-auto shrink-0">
-          {(['todas', 'borrador', 'pendiente', 'aprobado', 'rechazado'] as const).map((tab) => (
+          {[
+            { id: 'por_aprobar', label: 'Por aprobar', count: gastos.filter((l) => l.estado === 'pendiente').length },
+            { id: 'por_procesar', label: 'Por procesar', count: gastos.filter((l) => isItemPorProcesar(l)).length },
+            { id: 'historico', label: 'Histórico', count: gastos.length },
+          ].map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all whitespace-nowrap shrink-0 ${
-                activeTab === tab
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                activeTab === tab.id
                   ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
               }`}
             >
-              {tab === 'todas' ? 'Todas' : tab === 'borrador' ? 'Borradores' : tab === 'pendiente' ? 'Pendientes' : tab === 'aprobado' ? 'Aprobadas' : 'Rechazadas'}{' '}
-              <span className={`text-[10px] ml-1 px-1.5 py-0.2 rounded-full ${
-                activeTab === tab ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {tab === 'todas' ? gastos.length : gastos.filter((l) => l.estado === tab).length}
+              <span>{tab.label}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeTab === tab.id ? 'bg-white/20 text-white font-bold' : 'bg-slate-200 text-slate-700'}`}>
+                {tab.count}
               </span>
             </button>
           ))}
@@ -283,43 +303,33 @@ export const GastosList: React.FC<GastosListProps> = ({
                       </div>
                       <div>
                         <p className="font-bold text-slate-800 text-xs">
-                          {activeTab === 'pendiente'
-                            ? '¡No hay legalizaciones de gastos pendientes!'
-                            : `No hay legalizaciones de gastos en estado "${activeTab}"`}
-                        </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {activeTab === 'pendiente'
-                            ? 'Todas las legalizaciones han sido revisadas.'
-                            : 'No se encontraron registros que coincidan con este filtro.'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 pt-1">
+                        {activeTab === 'por_aprobar'
+                          ? '¡No hay legalizaciones de gastos por aprobar!'
+                          : activeTab === 'por_procesar'
+                          ? '¡No hay legalizaciones de gastos por procesar!'
+                          : 'No se encontraron legalizaciones de gastos'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {activeTab === 'por_aprobar'
+                          ? 'Todas las legalizaciones han sido revisadas.'
+                          : activeTab === 'por_procesar'
+                          ? 'No hay legalizaciones de gastos aprobadas pendientes de gestión contable.'
+                          : 'No se encontraron registros que coincidan con este filtro o búsqueda.'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      {activeTab !== 'historico' && (
                         <button
-                          onClick={() => setActiveTab('todas')}
+                          onClick={() => setActiveTab('historico')}
                           className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
                         >
-                          Ver Todas ({gastos.length})
+                          Ver Histórico ({gastos.length})
                         </button>
-                        {gastos.filter((l) => l.estado === 'rechazado').length > 0 && activeTab !== 'rechazado' && (
-                          <button
-                            onClick={() => setActiveTab('rechazado')}
-                            className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition-all"
-                          >
-                            Ver Rechazadas ({gastos.filter((l) => l.estado === 'rechazado').length})
-                          </button>
-                        )}
-                        {gastos.filter((l) => l.estado === 'aprobado').length > 0 && activeTab !== 'aprobado' && (
-                          <button
-                            onClick={() => setActiveTab('aprobado')}
-                            className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-all"
-                          >
-                            Ver Aprobadas ({gastos.filter((l) => l.estado === 'aprobado').length})
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                </td>
+              </tr>
               ) : (
                 filtered.map((leg) => {
                   const hasSap = !!leg.sapDocEntry;
@@ -381,10 +391,14 @@ export const GastosList: React.FC<GastosListProps> = ({
 
                       <td className="py-3.5 px-4">
                         <select
-                          value={leg.gestionContable ?? 'Por procesar'}
-                          onChange={(e) => onUpdateGestionContable?.(leg.id, e.target.value as 'Por procesar' | 'Procesado')}
+                          value={localGestion[leg.id] ?? leg.gestionContable ?? 'Por procesar'}
+                          onChange={(e) => {
+                            const val = e.target.value as 'Por procesar' | 'Procesado';
+                            setLocalGestion((prev) => ({ ...prev, [leg.id]: val }));
+                            onUpdateGestionContable?.(leg.id, val);
+                          }}
                           className={`text-[11px] font-bold rounded-lg px-2.5 py-1 border transition-all cursor-pointer focus:outline-none focus:ring-2 shadow-xs ${
-                            (leg.gestionContable ?? 'Por procesar') === 'Procesado'
+                            (localGestion[leg.id] ?? leg.gestionContable ?? 'Por procesar') === 'Procesado'
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-500 hover:bg-emerald-100'
                               : 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-500 hover:bg-amber-100'
                           }`}

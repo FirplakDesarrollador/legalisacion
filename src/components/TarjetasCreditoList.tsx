@@ -10,6 +10,7 @@ interface TarjetasCreditoListProps {
   onSelectTarjetaCredito: (leg: TarjetaCredito) => void;
   onOpenNuevaModal: () => void;
   onUpdateStatus: (id: string, estado: TarjetaCredito['estado']) => void;
+  defaultTab?: 'por_aprobar' | 'por_procesar' | 'historico';
 }
 
 export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
@@ -17,9 +18,10 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
   onSelectTarjetaCredito,
   onOpenNuevaModal,
   onUpdateStatus,
+  defaultTab = 'por_aprobar',
 }) => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<'todas' | 'pendiente' | 'aprobado' | 'rechazado' | 'pagado'>('todas');
+  const [activeTab, setActiveTab] = useState<'por_aprobar' | 'por_procesar' | 'historico'>(defaultTab);
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<{ [id: string]: { success: boolean; message: string; docEntry?: number } }>({});
@@ -31,8 +33,8 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
 
   useEffect(() => {
     const currentPending = tarjetasCredito.filter((l) => l.estado === 'pendiente').length;
-    if (activeTab === 'pendiente' && prevPendingCountRef.current > 0 && currentPending === 0) {
-      setActiveTab('todas');
+    if (activeTab === 'por_aprobar' && prevPendingCountRef.current > 0 && currentPending === 0) {
+      setActiveTab('historico');
     }
     prevPendingCountRef.current = currentPending;
   }, [tarjetasCredito, activeTab]);
@@ -172,8 +174,23 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
     }
   };
 
+  const isItemPorProcesar = (l: TarjetaCredito) => {
+    const isAprobado = l.estado === 'aprobado' || l.estado === 'pagado';
+    if (!isAprobado) return false;
+    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? 'Por procesar').toLowerCase().trim();
+    return gestion !== 'procesado';
+  };
+
   const filtered = tarjetasCredito.filter((l) => {
-    const matchesTab = activeTab === 'todas' ? true : l.estado === activeTab;
+    let matchesTab = true;
+    if (activeTab === 'por_aprobar') {
+      matchesTab = l.estado === 'pendiente';
+    } else if (activeTab === 'por_procesar') {
+      matchesTab = isItemPorProcesar(l);
+    } else if (activeTab === 'historico') {
+      matchesTab = true;
+    }
+
     const term = searchTerm.toLowerCase();
     const matchesSearch =
       l.codigo.toLowerCase().includes(term) ||
@@ -217,12 +234,11 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
       {/* Top Filter Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
         {/* Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 shrink-0">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto pb-1 sm:pb-0 shrink-0">
           {[
-            { id: 'todas', label: 'Todas', count: tarjetasCredito.length },
-            { id: 'pendiente', label: 'Pendientes', count: tarjetasCredito.filter((l) => l.estado === 'pendiente').length },
-            { id: 'aprobado', label: 'Aprobadas', count: tarjetasCredito.filter((l) => l.estado === 'aprobado').length },
-            { id: 'rechazado', label: 'Rechazadas', count: tarjetasCredito.filter((l) => l.estado === 'rechazado').length },
+            { id: 'por_aprobar', label: 'Por aprobar', count: tarjetasCredito.filter((l) => l.estado === 'pendiente').length },
+            { id: 'por_procesar', label: 'Por procesar', count: tarjetasCredito.filter((l) => isItemPorProcesar(l)).length },
+            { id: 'historico', label: 'Histórico', count: tarjetasCredito.length },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -323,37 +339,27 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
                     </div>
                     <div>
                       <p className="font-bold text-slate-800 text-xs">
-                        {activeTab === 'pendiente'
-                          ? '¡No hay tarjetas de crédito pendientes!'
-                          : `No hay tarjetas de crédito en estado "${activeTab}"`}
+                        {activeTab === 'por_aprobar'
+                          ? '¡No hay tarjetas de crédito por aprobar!'
+                          : activeTab === 'por_procesar'
+                          ? '¡No hay tarjetas de crédito por procesar!'
+                          : 'No se encontraron tarjetas de crédito'}
                       </p>
                       <p className="text-[11px] text-slate-400 mt-0.5">
-                        {activeTab === 'pendiente'
-                          ? 'Todas las legalizaciones han sido revisadas.'
-                          : 'No se encontraron registros que coincidan con este filtro.'}
+                        {activeTab === 'por_aprobar'
+                          ? 'Todas las tarjetas de crédito han sido revisadas.'
+                          : activeTab === 'por_procesar'
+                          ? 'No hay tarjetas de crédito aprobadas pendientes de gestión contable.'
+                          : 'No se encontraron registros que coincidan con este filtro o búsqueda.'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 pt-1">
-                      <button
-                        onClick={() => setActiveTab('todas')}
-                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
-                      >
-                        Ver Todas ({tarjetasCredito.length})
-                      </button>
-                      {tarjetasCredito.filter((l) => l.estado === 'rechazado').length > 0 && activeTab !== 'rechazado' && (
+                      {activeTab !== 'historico' && (
                         <button
-                          onClick={() => setActiveTab('rechazado')}
-                          className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold transition-all"
+                          onClick={() => setActiveTab('historico')}
+                          className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-all"
                         >
-                          Ver Rechazadas ({tarjetasCredito.filter((l) => l.estado === 'rechazado').length})
-                        </button>
-                      )}
-                      {tarjetasCredito.filter((l) => l.estado === 'aprobado').length > 0 && activeTab !== 'aprobado' && (
-                        <button
-                          onClick={() => setActiveTab('aprobado')}
-                          className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-all"
-                        >
-                          Ver Aprobadas ({tarjetasCredito.filter((l) => l.estado === 'aprobado').length})
+                          Ver Histórico ({tarjetasCredito.length})
                         </button>
                       )}
                     </div>
