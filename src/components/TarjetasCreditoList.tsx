@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
 import { TarjetaCredito } from '@/types/tarjetasCredito';
 import { supabase, updateTarjetaCreditoGestionContable, fetchTarjetasCreditoResponsablesFromSupabase } from '@/lib/supabase';
 
@@ -28,6 +28,20 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
   const [localGestion, setLocalGestion] = useState<{ [id: string]: 'Por procesar' | 'Procesado' }>({});
   const [localFechaProcesado, setLocalFechaProcesado] = useState<{ [id: string]: string | null }>({});
   const [responsables, setResponsables] = useState<any[]>([]);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const url = `${origin}/formulario-tarjetas-credito/${id}`;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(url);
+    }
+    setCopiedId(id);
+    setTimeout(() => {
+      setCopiedId(null);
+    }, 2000);
+  };
 
   const prevPendingCountRef = useRef<number>(tarjetasCredito.filter((l) => l.estado === 'pendiente').length);
 
@@ -377,6 +391,23 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
                         title="Ver Detalle"
                       >
                         <Eye className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Botón Copiar link de aprobación */}
+                      <button
+                        onClick={(e) => handleCopyLink(leg.id, e)}
+                        className={`p-1.5 rounded-lg border transition-all ${
+                          copiedId === leg.id
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                            : 'bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 border-slate-200'
+                        }`}
+                        title={copiedId === leg.id ? '¡Link de aprobación copiado!' : 'Copiar link de aprobación'}
+                      >
+                        {copiedId === leg.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
                       </button>
 
                       {/* Botón Enviar a SAP */}
