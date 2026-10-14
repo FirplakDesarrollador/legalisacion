@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   description: "Plataforma inteligente de legalizaciones conectada a Supabase",
 };
 
+import { AutoSapSync } from "@/components/AutoSapSync";
+
 export default function RootLayout({
   children,
 }: {
@@ -20,6 +22,7 @@ export default function RootLayout({
     <html lang="es" className={`${inter.className} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 selection:bg-blue-600 selection:text-white">
         {children}
+        <AutoSapSync />
       </body>
     </html>
   );

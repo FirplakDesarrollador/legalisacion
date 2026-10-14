@@ -100,7 +100,7 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
     if (nuevoEstado === 'aprobado') {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 50000);
         fetch('/api/sap/draft', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

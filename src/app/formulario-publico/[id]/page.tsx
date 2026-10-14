@@ -165,11 +165,16 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
       // Al aprobar, enviar automáticamente el borrador a SAP Service Layer
       if (nuevoEstado === 'aprobado') {
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 50000);
+
           const res = await fetch('/api/sap/draft', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(legalizacion),
+            signal: controller.signal,
           });
+          clearTimeout(timeoutId);
           
           let sapData;
           try {
@@ -195,6 +200,8 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
 
       if (createdDocEntry) {
         updatePayload.sap_doc_entry = createdDocEntry;
+        updatePayload.gestion_contable = 'procesado';
+        updatePayload.fecha_procesado = now;
       }
 
       let { error } = await supabase

@@ -251,7 +251,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
     setSapResult(null);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const timeoutId = setTimeout(() => controller.abort(), 50000);
 
       const res = await fetch('/api/sap/draft', {
         method: 'POST',
@@ -278,7 +278,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
         try {
           await supabase
             .from('legalizaciones_tarjetas_credito')
-            .update({ sap_doc_entry: data.docEntry, updated_at: new Date().toISOString() })
+            .update({ sap_doc_entry: data.docEntry, gestion_contable: 'procesado', updated_at: new Date().toISOString() })
             .eq('id', legData.id);
         } catch (e) {}
       }

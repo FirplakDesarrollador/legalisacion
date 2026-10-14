@@ -87,7 +87,7 @@ export const LegalizacionDetailModal: React.FC<LegalizacionDetailModalProps> = (
     }
   };
 
-  const handleAction = (nuevoEstado: Legalizacion['estado']) => {
+  const handleAction = async (nuevoEstado: Legalizacion['estado']) => {
     setIsSubmitting(true);
 
     try {
@@ -106,22 +106,36 @@ export const LegalizacionDetailModal: React.FC<LegalizacionDetailModalProps> = (
       console.error(e);
     }
 
-    setTimeout(() => {
-      onUpdateStatus(legalizacion.id, nuevoEstado, observaciones);
-      setIsSubmitting(false);
-      onClose();
-    }, 300);
+    if (nuevoEstado === 'aprobado') {
+      await handleEnviarSAP();
+      setTimeout(() => {
+        onUpdateStatus(legalizacion.id, nuevoEstado, observaciones);
+        setIsSubmitting(false);
+        onClose();
+      }, 1000);
+    } else {
+      setTimeout(() => {
+        onUpdateStatus(legalizacion.id, nuevoEstado, observaciones);
+        setIsSubmitting(false);
+        onClose();
+      }, 300);
+    }
   };
 
   const handleEnviarSAP = async () => {
     setSapSyncing(true);
     setSapResult(null);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+
       const res = await fetch('/api/sap/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(legalizacion),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       let data;
       try {
@@ -140,8 +154,8 @@ export const LegalizacionDetailModal: React.FC<LegalizacionDetailModalProps> = (
         legalizacion.sapDocEntry = data.docEntry;
         try {
           await supabase
-            .from('legalizaciones_gastos')
-            .update({ sap_doc_entry: data.docEntry, updated_at: new Date().toISOString() })
+            .from('legalizaciones cajas menores')
+            .update({ sap_doc_entry: data.docEntry, gestion_contable: 'procesado', updated_at: new Date().toISOString() })
             .eq('id', legalizacion.id);
         } catch (e) {
           console.warn('Error guardando sap_doc_entry en Supabase:', e);

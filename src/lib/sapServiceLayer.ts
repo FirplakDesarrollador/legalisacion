@@ -72,10 +72,67 @@ export interface SAPDraftResult {
   sapResponse?: any;
 }
 
-export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): Promise<SAPDraftResult> {
+export async function actualizarSupabaseConDocEntry(leg: any, docEntry: number | string) {
+  if (!leg || !leg.id) return;
+  const numEntry = parseInt(String(docEntry), 10) || docEntry;
+  const nowIso = new Date().toISOString();
+  const updateData = {
+    sap_doc_entry: numEntry,
+    gestion_contable: 'procesado',
+    fecha_procesado: nowIso,
+    updated_at: nowIso,
+  };
+
+  const codigo = String(leg.codigo || leg.id || '').toUpperCase();
+  const isTC =
+    codigo.startsWith('TC-') ||
+    Boolean(leg.tarjeta_codigo) ||
+    Boolean(leg.tc_en_sap) ||
+    leg.table === 'legalizaciones_tarjetas_credito';
+  const isCM =
+    codigo.startsWith('LEG-PUB-') ||
+    leg.table === 'legalizaciones cajas menores';
+
   try {
-    const session = await loginSAP();
+    if (isTC) {
+      await supabase.from('legalizaciones_tarjetas_credito').update(updateData).eq('id', leg.id);
+    } else if (isCM) {
+      await supabase.from('legalizaciones cajas menores').update(updateData).eq('id', leg.id);
+    } else {
+      const { error } = await supabase.from('legalizaciones_gastos').update(updateData).eq('id', leg.id);
+      if (error) {
+        await supabase.from('legalizaciones gastos').update(updateData).eq('id', leg.id);
+      }
+    }
+  } catch (e) {
+    console.error('Error al actualizar sap_doc_entry en Supabase:', e);
+  }
+}
+
+export async function crearBorradorLegalizacionSAP(
+  rawLeg: any,
+  existingSession?: SAPSessionResponse
+): Promise<SAPDraftResult> {
+  try {
+    const session = existingSession || (await loginSAP());
     const baseUrl = SAP_API_URL.replace(/\/Login\/?$/, '');
+
+    // Normalizar propiedades tanto si vienen en camelCase como en snake_case
+    const legalizacion = {
+      id: rawLeg.id,
+      codigo: rawLeg.codigo || rawLeg.id || '',
+      fecha: rawLeg.fecha || new Date().toISOString(),
+      usuarioNombre: rawLeg.usuarioNombre || rawLeg.usuario_nombre || 'Responsable Firplak',
+      usuarioEmail: rawLeg.usuarioEmail || rawLeg.usuario_email || '',
+      usuarioNit: rawLeg.usuarioNit || rawLeg.usuario_nit || '',
+      tarjeta_codigo: rawLeg.tarjeta_codigo,
+      tc_en_sap: rawLeg.tc_en_sap,
+      centroCosto: rawLeg.centroCosto || rawLeg.centro_costo || '',
+      motivo: rawLeg.motivo || '',
+      totalGastos: rawLeg.totalGastos ?? rawLeg.total_gastos ?? 0,
+      lineas: Array.isArray(rawLeg.lineas) ? rawLeg.lineas : [],
+      table: rawLeg.table,
+    };
 
     // 1. Obtener siguiente Code para U_HBT_LEGENC
     const resMaxEnc = await fetch(`${baseUrl}/U_HBT_LEGENC?$top=1&$orderby=Code desc`, {
@@ -241,7 +298,7 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
     // 1.9 Pre-calcular totales convertidos a COP con TRM si vienen en USD
     let totalGastosCOP = 0;
     const lineasConvertidas = await Promise.all(
-      legalizacion.lineas.map(async (l) => {
+      legalizacion.lineas.map(async (l: any) => {
         const isUSD = l.moneda === 'USD';
         let subCOP = l.valorSubtotal;
         let totCOP = l.valorTotal || l.valorSubtotal;
@@ -403,10 +460,10 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
         if (!acc[cardCode]) acc[cardCode] = [];
         acc[cardCode].push(linea);
         return acc;
-      }, {} as Record<string, typeof lineasSoporte>);
+      }, {} as Record<string, any[]>);
 
       // Crear un Draft por cada Proveedor
-      for (const [cardCode, lineasProv] of Object.entries(lineasPorProveedor)) {
+      for (const [cardCode, lineasProv] of Object.entries(lineasPorProveedor) as [string, any[]][]) {
         const resolvedDocumentLines = [];
         let lineIdx = 0;
 
@@ -479,9 +536,12 @@ export async function crearBorradorLegalizacionSAP(legalizacion: Legalizacion): 
       }
     }
 
+    const finalDocEntry = parseInt(udoData.DocEntry, 10) || udoData.DocEntry;
+    await actualizarSupabaseConDocEntry(legalizacion, finalDocEntry);
+
     return {
       success: true,
-      docEntry: udoData.DocEntry,
+      docEntry: finalDocEntry,
       docNum: udoData.DocNum,
       message: draftsErrors.length > 0 
         ? `Legalización creada (DocEntry: ${udoData.DocEntry}), pero hubieron errores en Facturas Preliminares: ${draftsErrors.join(' | ')}`

@@ -190,6 +190,15 @@ export default function Home() {
     }
   }, [currentUser, loadSupabaseData]);
 
+  // Escuchar cuando el sincronizador automático procesa registros para refrescar las listas
+  useEffect(() => {
+    const handleSapSynced = () => {
+      loadSupabaseData();
+    };
+    window.addEventListener('sap-records-synced', handleSapSynced);
+    return () => window.removeEventListener('sap-records-synced', handleSapSynced);
+  }, [loadSupabaseData]);
+
   const handleSaveNueva = (nueva: Legalizacion) => {
     setLegalizaciones((prev) => [nueva, ...prev.filter((l) => l.id !== nueva.id)]);
     saveLocalLegalizacion(nueva);

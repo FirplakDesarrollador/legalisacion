@@ -312,7 +312,7 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
         setSapResult(null);
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s max timeout
+          const timeoutId = setTimeout(() => controller.abort(), 50000); // 50s max timeout
 
           const res = await fetch('/api/sap/draft', {
             method: 'POST',

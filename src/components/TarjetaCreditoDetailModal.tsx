@@ -175,7 +175,7 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
     const tcToSave = updatedLineas ? { ...tarjetaCredito, lineas: updatedLineas } : tarjetaCredito;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const timeoutId = setTimeout(() => controller.abort(), 50000);
 
       const res = await fetch('/api/sap/draft', {
         method: 'POST',
@@ -203,7 +203,7 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
         try {
           await supabase
             .from('legalizaciones_tarjetas_credito')
-            .update({ sap_doc_entry: data.docEntry, updated_at: new Date().toISOString() })
+            .update({ sap_doc_entry: data.docEntry, gestion_contable: 'procesado', updated_at: new Date().toISOString() })
             .eq('id', tarjetaCredito.id);
         } catch (e) {
           console.warn('Error guardando sap_doc_entry en Supabase:', e);
