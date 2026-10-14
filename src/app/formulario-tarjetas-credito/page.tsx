@@ -307,11 +307,11 @@ export default function FormularioTarjetasCreditoPage() {
         const updated = { ...lin, [field]: value };
 
         if (field === 'proveedorNit') {
-          const clean = String(value || '').replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+          const clean = String(value || '').replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
           updated.proveedorNit = clean;
           const matchProv = proveedores.find((p) => {
             const pId = (p.numero_identificacion || '').trim().toLowerCase();
-            const pIdClean = pId.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+            const pIdClean = pId.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
             return pIdClean === clean || pId === clean;
           });
           if (matchProv) {
@@ -419,10 +419,10 @@ export default function FormularioTarjetasCreditoPage() {
 
     const lineasNitInvalido = lineas.some((l) => {
       const nit = (l.proveedorNit || '').trim();
-      return nit.length > 9 || /\D/.test(nit);
+      return nit.length > 10 || /\D/.test(nit);
     });
     if (lineasNitInvalido) {
-      alert('El NIT del proveedor no debe superar 9 dígitos ni contener guion o dígito de verificación.');
+      alert('El NIT/Cédula del proveedor no debe superar 10 dígitos ni contener guion o dígito de verificación.');
       return;
     }
 
@@ -748,14 +748,14 @@ export default function FormularioTarjetasCreditoPage() {
                         </div>
                         <div>
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                            NIT Proveedor * <span className="text-[9px] font-normal text-slate-400">(máx 9 dígitos, sin guion)</span>
+                            NIT / Cédula Proveedor * <span className="text-[9px] font-normal text-slate-400">(máx 10 dígitos, sin guion)</span>
                           </label>
                           <input
                             required
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
-                            maxLength={9}
+                            maxLength={10}
                             placeholder="900123456"
                             value={linea.proveedorNit || ''}
                             onKeyDown={(e) => {
@@ -769,7 +769,7 @@ export default function FormularioTarjetasCreditoPage() {
                               }
                             }}
                             onChange={(e) => {
-                              const cleaned = e.target.value.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+                              const cleaned = e.target.value.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
                               handleUpdateLinea(linea.id, 'proveedorNit', cleaned);
                             }}
                             className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"

@@ -329,11 +329,11 @@ export async function leerPlantilla(
 
     const facturaNumero = tipoDocumento === 'Documento Soporte' ? '' : celdaTexto(g(3));
 
-    const nit = celdaTexto(g(4)).replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
-    if (!nit) E('NIT del proveedor es obligatorio (máx. 9 dígitos numéricos sin guion).');
+    const nit = celdaTexto(g(4)).replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
+    if (!nit) E('NIT/Cédula del proveedor es obligatorio (máx. 10 dígitos numéricos sin guion).');
     const prov = ctx.proveedores.find((p) => {
       const pId = (p.numero_identificacion || '').trim().toLowerCase();
-      const pIdClean = pId.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 9);
+      const pIdClean = pId.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
       return pIdClean === nit.toLowerCase() || pId === nit.toLowerCase();
     });
 
