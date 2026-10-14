@@ -39,6 +39,11 @@ export async function loginSAP(timeoutMs: number = 8000): Promise<SAPSessionResp
       }),
       signal: controller.signal,
     });
+  } catch (err: any) {
+    if (err.name === 'AbortError' || String(err.message).toLowerCase().includes('abort')) {
+      throw new Error(`Tiempo de espera agotado (${timeoutMs / 1000}s) al conectar con SAP Service Layer (${loginEndpoint}). El servidor no respondió o el firewall de Firplak no permite conexiones entrantes desde la nube de Vercel.`);
+    }
+    throw err;
   } finally {
     clearTimeout(tId);
   }
