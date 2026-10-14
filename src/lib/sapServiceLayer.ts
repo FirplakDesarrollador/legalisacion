@@ -19,7 +19,7 @@ export interface SAPSessionResponse {
   cookieHeader: string;
 }
 
-export async function loginSAP(timeoutMs: number = 8000): Promise<SAPSessionResponse> {
+export async function loginSAP(timeoutMs: number = 25000): Promise<SAPSessionResponse> {
   const loginEndpoint = SAP_API_URL.endsWith('/Login')
     ? SAP_API_URL
     : `${SAP_API_URL.replace(/\/+$/, '')}/Login`;
@@ -41,7 +41,7 @@ export async function loginSAP(timeoutMs: number = 8000): Promise<SAPSessionResp
     });
   } catch (err: any) {
     if (err.name === 'AbortError' || String(err.message).toLowerCase().includes('abort')) {
-      throw new Error(`Tiempo de espera agotado (${timeoutMs / 1000}s) al conectar con SAP Service Layer (${loginEndpoint}). El servidor no respondió o el firewall de Firplak no permite conexiones entrantes desde la nube de Vercel.`);
+      throw new Error(`Tiempo de espera agotado (${timeoutMs / 1000}s) al conectar con SAP Service Layer. El firewall de Firplak no permite conexiones entrantes desde los servidores de Vercel (nube). Para sincronizar las legalizaciones aprobadas con SAP, ejecuta el archivo 'sincronizar_sap.bat' en tu computador.`);
     }
     throw err;
   } finally {
