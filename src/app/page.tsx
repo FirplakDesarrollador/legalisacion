@@ -75,7 +75,14 @@ export default function Home() {
   const [selectedGasto, setSelectedGasto] = useState<Legalizacion | null>(null);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeDigitador, setActiveDigitador] = useState<'Julian' | 'Mateo' | 'Jesus'>('Mateo');
+
+  // Helper: Identificar el digitador activo a partir del usuario autenticado
+  const getDigitadorFromCurrentUser = (): string => {
+    if (!currentUser) return 'Mateo';
+    const norm = normalizeDigitador(currentUser.name || currentUser.email);
+    if (norm) return norm;
+    return currentUser.name || currentUser.email?.split('@')[0] || 'Mateo';
+  };
 
   // Check active Supabase session on mount
   useEffect(() => {
@@ -90,15 +97,11 @@ export default function Home() {
             role: 'Administrador Tesorería',
           };
           setCurrentUser(userObj);
-          const norm = normalizeDigitador(userObj.name || userObj.email);
-          if (norm) setActiveDigitador(norm);
         } else {
           const savedLocalUser = localStorage.getItem('legalisa_active_user');
           if (savedLocalUser) {
             const parsed = JSON.parse(savedLocalUser);
             setCurrentUser(parsed);
-            const norm = normalizeDigitador(parsed.name || parsed.email);
-            if (norm) setActiveDigitador(norm);
           }
         }
       } catch (err) {
@@ -113,8 +116,6 @@ export default function Home() {
   const handleLoginSuccess = (userObj: { email: string; name: string; role: string }) => {
     setCurrentUser(userObj);
     localStorage.setItem('legalisa_active_user', JSON.stringify(userObj));
-    const norm = normalizeDigitador(userObj.name || userObj.email);
-    if (norm) setActiveDigitador(norm);
   };
 
   // Setup deep linking for Tarjetas de Crédito and Gastos
@@ -301,7 +302,7 @@ export default function Home() {
 
   const handleUpdateGastoGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado', customDigitador?: string) => {
     const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
-    const digitador = gestion === 'Procesado' ? (customDigitador || activeDigitador || 'Mateo') : undefined;
+    const digitador = gestion === 'Procesado' ? (customDigitador || getDigitadorFromCurrentUser()) : undefined;
     updateLegalizacionGastoGestionContable(id, gestion, nowIso, digitador);
     setGastos((prev) => {
       const next = prev.map((g) =>
@@ -327,7 +328,7 @@ export default function Home() {
 
   const handleUpdateTarjetaGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado', customDigitador?: string) => {
     const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
-    const digitador = gestion === 'Procesado' ? (customDigitador || activeDigitador || 'Mateo') : undefined;
+    const digitador = gestion === 'Procesado' ? (customDigitador || getDigitadorFromCurrentUser()) : undefined;
     updateTarjetaCreditoGestionContable(id, gestion, nowIso, digitador);
     setTarjetasCredito((prev) => {
       const next = prev.map((tc) =>
@@ -353,7 +354,7 @@ export default function Home() {
 
   const handleUpdateLegalizacionGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado', customDigitador?: string) => {
     const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
-    const digitador = gestion === 'Procesado' ? (customDigitador || activeDigitador || 'Mateo') : undefined;
+    const digitador = gestion === 'Procesado' ? (customDigitador || getDigitadorFromCurrentUser()) : undefined;
     updateLegalizacionGestionContable(id, gestion, nowIso, digitador);
     setLegalizaciones((prev) => {
       const next = prev.map((l) =>
@@ -404,8 +405,6 @@ export default function Home() {
         onLogout={handleLogout}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-        activeDigitador={activeDigitador}
-        onDigitadorChange={setActiveDigitador}
       />
 
       {/* Main Layout Area */}

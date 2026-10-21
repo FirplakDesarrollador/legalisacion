@@ -141,6 +141,22 @@ export function normalizeDigitador(nameOrEmail?: string | null): 'Julian' | 'Mat
   return null;
 }
 
+export function getFallbackDigitador(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('legalisa_active_user');
+      if (saved) {
+        const u = JSON.parse(saved);
+        const norm = normalizeDigitador(u?.name || u?.email);
+        if (norm) return norm;
+        if (u?.name) return u.name;
+        if (u?.email) return u.email.split('@')[0];
+      }
+    } catch {}
+  }
+  return 'Mateo';
+}
+
 // Interface matching public."Cajas_menores" in Supabase
 export interface SupabaseCajaMenorRow {
   Responsable: string;
@@ -672,13 +688,14 @@ export function updateTarjetaCreditoGestionContable(
 ): Legalizacion[] {
   const current = getLocalTarjetasCredito();
   const now = new Date().toISOString();
+  const activeDigitador = procesadoPor || (typeof window !== 'undefined' ? getFallbackDigitador() : 'Mateo');
   const updated = current.map(item => {
     if (item.id === id) {
       return {
         ...item,
         gestionContable: gestion,
         fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? now : undefined),
-        procesadoPor: gestion === 'Procesado' ? (procesadoPor || item.procesadoPor || 'Mateo') : undefined,
+        procesadoPor: gestion === 'Procesado' ? activeDigitador : undefined,
         updated_at: now
       };
     }
@@ -694,8 +711,8 @@ export function updateTarjetaCreditoGestionContable(
     fecha_procesado: fechaProcesado !== undefined ? fechaProcesado : (gestion === 'Procesado' ? now : null),
     updated_at: now
   };
-  if (gestion === 'Procesado' && procesadoPor) {
-    updateData.procesado_por = procesadoPor;
+  if (gestion === 'Procesado' && activeDigitador) {
+    updateData.procesado_por = activeDigitador;
   }
 
   supabase.from('legalizaciones_tarjetas_credito').update(updateData).eq('id', id).then(async ({ error }) => {
@@ -705,7 +722,7 @@ export function updateTarjetaCreditoGestionContable(
         try {
           const { data: curr } = await supabase.from('legalizaciones_tarjetas_credito').select('observaciones_aprobacion').eq('id', id).single();
           const cleanObs = (curr?.observaciones_aprobacion || '').replace(/\[Digitado por:\s*[^\]]+\]/gi, '').trim();
-          updateData.observaciones_aprobacion = cleanObs ? `${cleanObs}\n[Digitado por: ${procesadoPor}]` : `[Digitado por: ${procesadoPor}]`;
+          updateData.observaciones_aprobacion = cleanObs ? `${cleanObs}\n[Digitado por: ${activeDigitador}]` : `[Digitado por: ${activeDigitador}]`;
           await supabase.from('legalizaciones_tarjetas_credito').update(updateData).eq('id', id);
         } catch {}
       } else {
@@ -725,13 +742,14 @@ export function updateLegalizacionGestionContable(
 ): Legalizacion[] {
   const current = getLocalLegalizaciones();
   const now = new Date().toISOString();
+  const activeDigitador = procesadoPor || (typeof window !== 'undefined' ? getFallbackDigitador() : 'Mateo');
   const updated = current.map(item => {
     if (item.id === id) {
       return {
         ...item,
         gestionContable: gestion,
         fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? now : undefined),
-        procesadoPor: gestion === 'Procesado' ? (procesadoPor || item.procesadoPor || 'Mateo') : undefined,
+        procesadoPor: gestion === 'Procesado' ? activeDigitador : undefined,
         updated_at: now
       };
     }
@@ -748,8 +766,8 @@ export function updateLegalizacionGestionContable(
     fecha_procesado: fechaProcesado !== undefined ? fechaProcesado : (gestion === 'Procesado' ? now : null),
     updated_at: now
   };
-  if (gestion === 'Procesado' && procesadoPor) {
-    updateData.procesado_por = procesadoPor;
+  if (gestion === 'Procesado' && activeDigitador) {
+    updateData.procesado_por = activeDigitador;
   }
 
   supabase.from('legalizaciones cajas menores').update(updateData).eq('id', id).then(async ({ error }) => {
@@ -759,7 +777,7 @@ export function updateLegalizacionGestionContable(
         try {
           const { data: curr } = await supabase.from('legalizaciones cajas menores').select('observaciones_aprobacion').eq('id', id).single();
           const cleanObs = (curr?.observaciones_aprobacion || '').replace(/\[Digitado por:\s*[^\]]+\]/gi, '').trim();
-          updateData.observaciones_aprobacion = cleanObs ? `${cleanObs}\n[Digitado por: ${procesadoPor}]` : `[Digitado por: ${procesadoPor}]`;
+          updateData.observaciones_aprobacion = cleanObs ? `${cleanObs}\n[Digitado por: ${activeDigitador}]` : `[Digitado por: ${activeDigitador}]`;
           await supabase.from('legalizaciones cajas menores').update(updateData).eq('id', id);
         } catch {}
       } else {
@@ -1149,13 +1167,14 @@ export function updateLegalizacionGastoGestionContable(
 ): Legalizacion[] {
   const current = getLocalLegalizacionesGastos();
   const now = new Date().toISOString();
+  const activeDigitador = procesadoPor || (typeof window !== 'undefined' ? getFallbackDigitador() : 'Mateo');
   const updated = current.map(item => {
     if (item.id === id) {
       return {
         ...item,
         gestionContable: gestion,
         fechaProcesado: fechaProcesado !== undefined ? (fechaProcesado || undefined) : (gestion === 'Procesado' ? now : undefined),
-        procesadoPor: gestion === 'Procesado' ? (procesadoPor || item.procesadoPor || 'Mateo') : undefined,
+        procesadoPor: gestion === 'Procesado' ? activeDigitador : undefined,
         updated_at: now
       };
     }
@@ -1171,8 +1190,8 @@ export function updateLegalizacionGastoGestionContable(
     fecha_procesado: fechaProcesado !== undefined ? fechaProcesado : (gestion === 'Procesado' ? now : null),
     updated_at: now
   };
-  if (gestion === 'Procesado' && procesadoPor) {
-    updateData.procesado_por = procesadoPor;
+  if (gestion === 'Procesado' && activeDigitador) {
+    updateData.procesado_por = activeDigitador;
   }
 
   supabase.from('legalizaciones_gastos').update(updateData).eq('id', id).then(async ({ error }) => {
@@ -1182,7 +1201,7 @@ export function updateLegalizacionGastoGestionContable(
         try {
           const { data: curr } = await supabase.from('legalizaciones_gastos').select('observaciones_aprobacion').eq('id', id).single();
           const cleanObs = (curr?.observaciones_aprobacion || '').replace(/\[Digitado por:\s*[^\]]+\]/gi, '').trim();
-          updateData.observaciones_aprobacion = cleanObs ? `${cleanObs}\n[Digitado por: ${procesadoPor}]` : `[Digitado por: ${procesadoPor}]`;
+          updateData.observaciones_aprobacion = cleanObs ? `${cleanObs}\n[Digitado por: ${activeDigitador}]` : `[Digitado por: ${activeDigitador}]`;
           await supabase.from('legalizaciones_gastos').update(updateData).eq('id', id);
         } catch {}
       } else {
