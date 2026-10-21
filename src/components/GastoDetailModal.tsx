@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt, Check } from 'lucide-react';
+import { X, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt, Check, Clock } from 'lucide-react';
 import { Legalizacion, LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
-import { supabase, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase } from '@/lib/supabase';
+import { supabase, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase, updateLegalizacionGastoGestionContable } from '@/lib/supabase';
 
 interface GastoDetailModalProps {
   gasto: Legalizacion | null;
   onClose: () => void;
   onUpdateStatus: (id: string, nuevoEstado: Legalizacion['estado'], observaciones?: string) => void;
   onUpdatePagoCruce?: (id: string, gestionado: boolean) => void;
+  onUpdateGestionContable?: (id: string, nuevoGestion: 'Por procesar' | 'Procesado') => void;
 }
 
 export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
@@ -17,18 +18,42 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
   onClose,
   onUpdateStatus,
   onUpdatePagoCruce,
+  onUpdateGestionContable,
 }) => {
   const [observaciones, setObservaciones] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdatingGestion, setIsUpdatingGestion] = useState(false);
+  const [gestionContable, setGestionContable] = useState<'Por procesar' | 'Procesado'>(
+    gasto?.gestionContable || 'Por procesar'
+  );
   const [editableLineas, setEditableLineas] = useState<LineaGasto[]>([]);
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [centros, setCentros] = useState<CentroCosto[]>([]);
 
   React.useEffect(() => {
-    if (gasto?.lineas) {
-      setEditableLineas(gasto.lineas);
+    if (gasto) {
+      if (gasto.lineas) setEditableLineas(gasto.lineas);
+      setGestionContable(gasto.gestionContable || 'Por procesar');
     }
   }, [gasto]);
+
+  const handleChangeGestionContable = async (nuevoValor: 'Por procesar' | 'Procesado') => {
+    if (!gasto) return;
+    setIsUpdatingGestion(true);
+    const nowIso = nuevoValor === 'Procesado' ? new Date().toISOString() : null;
+    setGestionContable(nuevoValor);
+    gasto.gestionContable = nuevoValor;
+    if (nuevoValor === 'Procesado') {
+      gasto.fechaProcesado = nowIso || undefined;
+    }
+    updateLegalizacionGastoGestionContable(gasto.id, nuevoValor, nowIso);
+    if (onUpdateGestionContable) {
+      onUpdateGestionContable(gasto.id, nuevoValor);
+    }
+    setTimeout(() => {
+      setIsUpdatingGestion(false);
+    }, 400);
+  };
 
   React.useEffect(() => {
     fetchCuentasFromSupabase().then(setCuentas);
@@ -245,6 +270,73 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
             </div>
           </div>
 
+          {/* Status Banner: Gestión Contable */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-3">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
+                  gestionContable === 'Procesado'
+                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }`}
+              >
+                {gestionContable === 'Procesado' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                ) : (
+                  <Clock className="w-5 h-5 text-amber-600" />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-800">Gestión Contable:</span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
+                      gestionContable === 'Procesado'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : 'bg-amber-50 text-amber-800 border-amber-300'
+                    }`}
+                  >
+                    {gestionContable === 'Procesado' ? '✅ Procesado' : '⏳ Por procesar'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {gestionContable === 'Procesado'
+                    ? `Marcado como procesado${gasto.fechaProcesado ? ` (${new Date(gasto.fechaProcesado).toLocaleDateString('es-CO')})` : ''}${gasto.procesadoPor ? ` por ${gasto.procesadoPor}` : ''}`
+                    : 'Pendiente de registrar o asentar en contabilidad'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={isUpdatingGestion}
+              onClick={() =>
+                handleChangeGestionContable(
+                  gestionContable === 'Procesado' ? 'Por procesar' : 'Procesado'
+                )
+              }
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${
+                gestionContable === 'Procesado'
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+              } disabled:opacity-50`}
+            >
+              {isUpdatingGestion ? (
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+              ) : gestionContable === 'Procesado' ? (
+                <>
+                  <Clock className="w-4 h-4" />
+                  Cambiar a Por procesar
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                  Marcar como Procesado
+                </>
+              )}
+            </button>
+          </div>
+
           {/* Lines Table */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
@@ -382,7 +474,7 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
@@ -391,29 +483,60 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
             Cerrar
           </button>
 
-          {gasto.estado === 'pendiente' && (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => handleAction('rechazado')}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold shadow-md shadow-rose-600/20 transition-all flex items-center gap-1.5 text-xs disabled:opacity-50"
-              >
-                <XCircle className="w-4 h-4" />
-                <span>Rechazar</span>
-              </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isUpdatingGestion}
+              onClick={() =>
+                handleChangeGestionContable(
+                  gestionContable === 'Procesado' ? 'Por procesar' : 'Procesado'
+                )
+              }
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                gestionContable === 'Procesado'
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white border-transparent shadow-emerald-600/20'
+              } disabled:opacity-50`}
+            >
+              {isUpdatingGestion ? (
+                <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+              ) : gestionContable === 'Procesado' ? (
+                <>
+                  <Clock className="w-3.5 h-3.5" />
+                  Cambiar a Por procesar
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Marcar como Procesado
+                </>
+              )}
+            </button>
 
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => handleAction('aprobado')}
-                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 text-xs disabled:opacity-50"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Aprobar Legalización</span>
-              </button>
-            </div>
-          )}
+            {gasto.estado === 'pendiente' && (
+              <>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleAction('rechazado')}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold shadow-md shadow-rose-600/20 transition-all flex items-center gap-1.5 text-xs disabled:opacity-50 cursor-pointer"
+                >
+                  <XCircle className="w-4 h-4" />
+                  <span>Rechazar</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleAction('aprobado')}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 text-xs disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Aprobar Legalización</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

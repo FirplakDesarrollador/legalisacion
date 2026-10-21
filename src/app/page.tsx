@@ -575,6 +575,7 @@ export default function Home() {
           onClose={() => setSelectedGasto(null)}
           onUpdateStatus={handleUpdateGastoStatus}
           onUpdatePagoCruce={handleUpdateGastoPagoCruce}
+          onUpdateGestionContable={handleUpdateGastoGestionContable}
         />
       )}
     </div>
