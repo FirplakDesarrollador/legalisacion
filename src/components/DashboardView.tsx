@@ -80,6 +80,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return item.fechaAprobacion || (item as any).fecha_aprobacion || item.updated_at;
   };
 
+  // Helper: Format date string as YYYY-MM-DD in Colombia timezone (America/Bogota, UTC-5)
+  const toColombiaDateString = (dateStr?: string | null): string => {
+    if (!dateStr) return '';
+    const trimmed = dateStr.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed;
+    }
+    const d = new Date(trimmed);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+  };
+
   // Compute stats per module
   const stats = useMemo(() => {
     // 1. Cajas Menores
@@ -323,86 +335,93 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Historical Daily Table Data
   const dailyHistory = useMemo(() => {
-    const allItems = [
+    const allItems: Array<any> = [
       ...legalizaciones.map((l) => ({ ...l, tipo: 'CM' })),
       ...tarjetasCredito.map((t) => ({ ...t, tipo: 'TC' })),
       ...gastos.map((g) => ({ ...g, tipo: 'Gasto' })),
     ];
 
-    // Group items by date string (YYYY-MM-DD)
-    const byDate: {
-      [dateKey: string]: {
-        nuevas: number;
-        porAprobar: number;
-        porProcesar: number;
-        vencidas: number;
-        procesadas: number;
-      };
-    } = {};
+    const targetMonthPrefix = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+    const dateSet = new Set<string>();
 
     allItems.forEach((item) => {
-      const dStr = item.created_at || item.fecha;
-      if (!dStr) return;
-      try {
-        const d = new Date(dStr);
-        if (isNaN(d.getTime())) return;
-        const year = d.getFullYear();
-        const month = d.getMonth() + 1;
+      // 1. Creation date in Colombia time
+      const cDate = toColombiaDateString(item.created_at || item.fecha);
+      if (cDate && cDate.startsWith(targetMonthPrefix)) {
+        dateSet.add(cDate);
+      }
 
-        if (year === selectedYear && month === selectedMonth) {
-          const key = d.toISOString().split('T')[0];
-          if (!byDate[key]) {
-            byDate[key] = {
-              nuevas: 0,
-              porAprobar: 0,
-              porProcesar: 0,
-              vencidas: 0,
-              procesadas: 0,
-            };
-          }
-          byDate[key].nuevas += 1;
-          if (item.estado === 'pendiente') {
-            byDate[key].porAprobar += 1;
-            if (isOlderThan2Days(item.created_at || item.fecha)) {
-              byDate[key].vencidas += 1;
-            }
-          }
-          if (isItemPorProcesar(item)) {
-            byDate[key].porProcesar += 1;
-          }
-          if (String(item.gestionContable ?? '').toLowerCase().trim() === 'procesado') {
-            byDate[key].procesadas += 1;
-          }
+      // 2. Processed date in Colombia time
+      const isProc = String(item.gestionContable ?? item.gestion_contable ?? '').toLowerCase().trim() === 'procesado';
+      if (isProc) {
+        const pRaw = item.fechaProcesado || item.fecha_procesado || item.updated_at;
+        const pDate = toColombiaDateString(pRaw);
+        if (pDate && pDate.startsWith(targetMonthPrefix)) {
+          dateSet.add(pDate);
         }
-      } catch {
-        // ignore parse error
       }
     });
 
-    const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+    const sortedDatesAsc = Array.from(dateSet).sort((a, b) => a.localeCompare(b));
 
     let accumulatedNuevas = 0;
-    let accumulatedProcesadas = 0;
+    let accumulatedGestionadas = 0;
 
-    // Sort ascending temporarily to calculate accumulated, then reverse
-    const ascendingDates = [...dates].reverse();
-    const rows = ascendingDates.map((dateKey) => {
-      const row = byDate[dateKey];
-      accumulatedNuevas += row.nuevas;
-      accumulatedProcesadas += row.procesadas;
+    const rows = sortedDatesAsc.map((dateStr) => {
+      // 1. Nuevas hoy: created on this day in Colombia time
+      const nuevasHoyItems = allItems.filter(
+        (item) => toColombiaDateString(item.created_at || item.fecha) === dateStr
+      );
+      const nuevasHoy = nuevasHoyItems.length;
+      accumulatedNuevas += nuevasHoy;
+
+      // 2. Gestionadas hoy: marked as 'Procesado' on this day in Colombia time
+      const gestionadasHoyItems = allItems.filter((item) => {
+        const isProc = String(item.gestionContable ?? item.gestion_contable ?? '').toLowerCase().trim() === 'procesado';
+        if (!isProc) return false;
+        const pRaw = item.fechaProcesado || item.fecha_procesado || item.updated_at;
+        return toColombiaDateString(pRaw) === dateStr;
+      });
+      const gestionadasHoy = gestionadasHoyItems.length;
+      accumulatedGestionadas += gestionadasHoy;
+
+      // 3. Total por aprobar created on this date
+      const porAprobarItems = nuevasHoyItems.filter((item) => item.estado === 'pendiente');
+      const porAprobar = porAprobarItems.length;
+
+      // 4. Alertas +2 días: por aprobar pending > 2 business days
+      const alertasVencidas = porAprobarItems.filter((item) =>
+        isOlderThan2Days(item.created_at || item.fecha)
+      ).length;
+
+      // 5. Total por procesar created on this date
+      const porProcesarItems = nuevasHoyItems.filter(isItemPorProcesar);
+      const porProcesar = porProcesarItems.length;
+
+      // 6. Por procesar + 2 días: pending processing > 2 business days from approval date
+      const porProcesarVencidas = porProcesarItems.filter((item) => {
+        const fApr = getFechaAprobacion(item);
+        return fApr ? isOlderThan2Days(fApr) : false;
+      }).length;
+
+      // 7. Total digitadas: processed on that day
+      const totalDigitadas = gestionadasHoy;
+
       return {
-        fecha: dateKey,
-        nuevasHoy: row.nuevas,
+        fecha: dateStr,
+        nuevasHoy,
         acumuladasMes: accumulatedNuevas,
-        gestionadasHoy: row.procesadas,
-        totalGestionadasMes: accumulatedProcesadas,
-        totalPorAprobar: row.porAprobar,
-        alertasVencidas: row.vencidas,
-        totalPorProcesar: row.porProcesar,
-        totalDigitadas: row.procesadas,
+        gestionadasHoy,
+        totalGestionadasMes: accumulatedGestionadas,
+        totalPorAprobar: porAprobar,
+        alertasVencidas,
+        totalPorProcesar: porProcesar,
+        porProcesarVencidas,
+        totalDigitadas,
       };
     });
 
+    // Return reversed so newest dates appear first at top of table
     return rows.reverse();
   }, [legalizaciones, tarjetasCredito, gastos, selectedYear, selectedMonth]);
 
@@ -702,9 +721,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Bottom Section: Registro Diario (Historial) */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-            Registro Diario (Historial)
-          </h3>
+          <div className="flex items-center gap-2.5">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Registro Diario (Historial)
+            </h3>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 border border-blue-200 text-blue-700">
+              <Clock className="w-3 h-3 text-blue-500" />
+              Corte diario: 11:55 PM (Colombia)
+            </span>
+          </div>
 
           <div className="flex items-center gap-2">
             {/* Year Selector */}
@@ -766,13 +791,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="px-3 py-3 text-center">Total Por Aprobar</th>
                 <th className="px-3 py-3 text-center">Alertas (+2 Días)</th>
                 <th className="px-3 py-3 text-center">Total Por Procesar</th>
+                <th className="px-3 py-3 text-center">Por Procesar (+2 Días)</th>
                 <th className="px-3 py-3 text-center">Total Digitadas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {dailyHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400 text-xs">
+                  <td colSpan={10} className="px-4 py-8 text-center text-slate-400 text-xs">
                     No hay registros de movimientos para {monthNames[selectedMonth - 1]} de {selectedYear}.
                   </td>
                 </tr>
@@ -820,6 +846,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                         {row.totalPorProcesar}
                       </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      {row.porProcesarVencidas > 0 ? (
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                          ⚠️ {row.porProcesarVencidas}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">0</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
