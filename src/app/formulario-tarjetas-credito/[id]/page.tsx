@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database, UserCheck, X } from 'lucide-react';
+import Link from 'next/link';
+import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database, UserCheck, X, Home } from 'lucide-react';
 import { supabase, fetchOrganizationUsers, OrganizationUser, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase } from '@/lib/supabase';
 import { Legalizacion, LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
 import { SearchableSelect } from '@/components/SearchableSelect';
@@ -9,6 +10,7 @@ import { SearchableSelect } from '@/components/SearchableSelect';
 export default function PublicApprovalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const [legalizacion, setLegalizacion] = useState<Legalizacion | null>(null);
+  const [approverEmail, setApproverEmail] = useState<string>('');
   const [editableLineas, setEditableLineas] = useState<LineaGasto[]>([]);
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [centros, setCentros] = useState<CentroCosto[]>([]);
@@ -57,6 +59,21 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
           };
           setLegalizacion(mappedData as Legalizacion);
           setEditableLineas(mappedData.lineas || []);
+
+          let currentApprover = (data.aprobador_email || '').toLowerCase().trim();
+          const obs = data.observaciones_aprobacion || '';
+          const reassignMatch = obs.match(/\[Reasignado a [^\]]*\(([^)]+)\)\]/gi);
+          if (reassignMatch && reassignMatch.length > 0) {
+            const last = reassignMatch[reassignMatch.length - 1];
+            const m = last.match(/\(([^)]+)\)/);
+            if (m && m[1]) currentApprover = m[1].toLowerCase().trim();
+          }
+          setApproverEmail(currentApprover);
+          if (currentApprover && typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('legalisa_approver_email', currentApprover);
+            } catch {}
+          }
         }
       } catch (err: any) {
         setErrorMsg(err.message || 'Error de comunicación al buscar la legalización.');
@@ -156,6 +173,13 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
       setShowReasignarModal(false);
       setMotivoReasignacion('');
       setSelectedNewApproverEmail('');
+      const newEmailClean = newApprover.email.toLowerCase().trim();
+      setApproverEmail(newEmailClean);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('legalisa_approver_email', newEmailClean);
+        } catch {}
+      }
       alert(`✅ Aprobación reasignada exitosamente a ${newApprover.nombre} (${newApprover.email}). Se ha enviado la notificación correspondiente.`);
     } catch (err: any) {
       alert('Error al reasignar: ' + err.message);
@@ -365,9 +389,19 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-500">
-            <Database className="w-4 h-4 text-blue-600" />
-            <span>Supabase Database Connected</span>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/aprobaciones${approverEmail ? `?email=${encodeURIComponent(approverEmail)}` : ''}`}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs border border-slate-200 hover:border-blue-300 transition-all shadow-sm"
+              title="Ir a Mis Aprobaciones (Pendientes e Histórico)"
+            >
+              <Home className="w-4 h-4 text-blue-600" />
+              <span>Mis Aprobaciones</span>
+            </Link>
+            <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-500">
+              <Database className="w-4 h-4 text-blue-600" />
+              <span>Supabase Database Connected</span>
+            </div>
           </div>
         </div>
       </header>

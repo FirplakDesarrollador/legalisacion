@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt, UserCheck, X } from 'lucide-react';
+import Link from 'next/link';
+import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt, UserCheck, X, Home } from 'lucide-react';
 import { supabase, getLocalLegalizacionesGastos, fetchOrganizationUsers, OrganizationUser, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase } from '@/lib/supabase';
 import { Legalizacion, LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
 import { SearchableSelect } from '@/components/SearchableSelect';
@@ -9,6 +10,7 @@ import { SearchableSelect } from '@/components/SearchableSelect';
 export default function PublicGastoApprovalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const [legalizacion, setLegalizacion] = useState<Legalizacion | null>(null);
+  const [approverEmail, setApproverEmail] = useState<string>('');
   const [editableLineas, setEditableLineas] = useState<LineaGasto[]>([]);
   const [cuentas, setCuentas] = useState<CuentaContable[]>([]);
   const [centros, setCentros] = useState<CentroCosto[]>([]);
@@ -92,6 +94,21 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
         } else {
           setLegalizacion(found);
           setEditableLineas(found.lineas || []);
+
+          let currentApprover = (found.aprobadorEmail || '').toLowerCase().trim();
+          const obs = found.observacionesAprobacion || '';
+          const reassignMatch = obs.match(/\[Reasignado a [^\]]*\(([^)]+)\)\]/gi);
+          if (reassignMatch && reassignMatch.length > 0) {
+            const last = reassignMatch[reassignMatch.length - 1];
+            const m = last.match(/\(([^)]+)\)/);
+            if (m && m[1]) currentApprover = m[1].toLowerCase().trim();
+          }
+          setApproverEmail(currentApprover);
+          if (currentApprover && typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('legalisa_approver_email', currentApprover);
+            } catch {}
+          }
         }
       } catch (err: any) {
         setErrorMsg(err.message || 'Error de comunicación al buscar la legalización.');
@@ -195,6 +212,13 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
       setShowReasignarModal(false);
       setMotivoReasignacion('');
       setSelectedNewApproverEmail('');
+      const newEmailClean = newApprover.email.toLowerCase().trim();
+      setApproverEmail(newEmailClean);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('legalisa_approver_email', newEmailClean);
+        } catch {}
+      }
       alert(`✅ Aprobación reasignada exitosamente a ${newApprover.nombre} (${newApprover.email}). Se ha enviado la notificación correspondiente.`);
     } catch (err: any) {
       alert('Error al reasignar: ' + err.message);
@@ -415,7 +439,17 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
               </p>
             </div>
           </div>
-          <div>{getStatusBadge(legalizacion.estado)}</div>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/aprobaciones${approverEmail ? `?email=${encodeURIComponent(approverEmail)}` : ''}`}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition-all shadow-sm"
+              title="Ir a Mis Aprobaciones (Pendientes e Histórico)"
+            >
+              <Home className="w-4 h-4 text-blue-400" />
+              <span>Mis Aprobaciones</span>
+            </Link>
+            <div>{getStatusBadge(legalizacion.estado)}</div>
+          </div>
         </div>
 
         {/* Main Card */}
