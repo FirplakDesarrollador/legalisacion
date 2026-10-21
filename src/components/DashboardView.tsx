@@ -219,12 +219,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       'tesoreria': 'Claudia Lorena Duque Alzate',
       'maria elena perez ospina': 'Héctor Jose Chinchilla Trigos',
       'mantenimiento': 'Héctor Jose Chinchilla Trigos',
-      'natalia gomez usme': 'Ider Alejandro Sandoval Hernandez',
-      'behome medellin': 'Ider Alejandro Sandoval Hernandez',
-      'hernando tovar mendoza': 'Ider Alejandro Sandoval Hernandez',
-      'behome cali': 'Ider Alejandro Sandoval Hernandez',
-      'victor julio hernandez gonzalez': 'Ider Alejandro Sandoval Hernandez',
-      'firplak home bogota': 'Ider Alejandro Sandoval Hernandez',
+      'natalia gomez usme': 'Daniela Castro Correa',
+      'behome medellin': 'Daniela Castro Correa',
+      'hernando tovar mendoza': 'Daniela Castro Correa',
+      'behome cali': 'Daniela Castro Correa',
+      'victor julio hernandez gonzalez': 'Daniela Castro Correa',
+      'firplak home bogota': 'Daniela Castro Correa',
       'analista desarrollo test': 'Analista Desarrollo',
       'mateo benavides test': 'Mateo Benavides',
     };
@@ -284,7 +284,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         return 'Alejandro S.';
       }
       if (trimmed.toLowerCase().includes('isaza')) {
-        return 'Alejandro I.';
+        return 'Alejandro';
       }
 
       const parts = trimmed.split(/\s+/);
