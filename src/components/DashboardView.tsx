@@ -43,14 +43,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return gestion !== 'procesado';
   };
 
-  // Helper: Determine if item is older than 2 days (> 48h)
-  const isOlderThan2Days = (dateStr?: string) => {
+  // Helper: Determine if item is older than 2 business days (excluding Saturdays and Sundays)
+  const isOlderThan2BusinessDays = (dateStr?: string) => {
     if (!dateStr) return false;
-    const d = new Date(dateStr).getTime();
-    if (isNaN(d)) return false;
-    const now = Date.now();
-    return (now - d) >= 2 * 24 * 60 * 60 * 1000;
+    const start = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr + 'T00:00:00');
+    if (isNaN(start.getTime())) return false;
+    const now = new Date();
+    if (start >= now) return false;
+
+    // Fast-path: if more than 10 calendar days have passed, it's definitely > 2 business days
+    const totalMs = now.getTime() - start.getTime();
+    if (totalMs >= 10 * 24 * 60 * 60 * 1000) {
+      return true;
+    }
+
+    // Count business hours excluding weekends (Saturday = 6, Sunday = 0)
+    let businessHours = 0;
+    const cur = new Date(start);
+
+    while (cur < now) {
+      const day = cur.getDay(); // 0 = Sunday, 6 = Saturday
+      if (day !== 0 && day !== 6) {
+        businessHours++;
+      }
+      cur.setTime(cur.getTime() + 60 * 60 * 1000);
+    }
+
+    // 2 business days = 48 business hours
+    return businessHours >= 48;
   };
+
+  const isOlderThan2Days = isOlderThan2BusinessDays;
 
   // Compute stats per module
   const stats = useMemo(() => {
