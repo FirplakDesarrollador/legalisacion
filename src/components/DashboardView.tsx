@@ -75,15 +75,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const isOlderThan2Days = isOlderThan2BusinessDays;
 
+  // Helper: Get approval date strictly from approval timestamp (never creation date)
+  const getFechaAprobacion = (item: Legalizacion | TarjetaCredito): string | undefined => {
+    return item.fechaAprobacion || (item as any).fecha_aprobacion || item.updated_at;
+  };
+
   // Compute stats per module
   const stats = useMemo(() => {
     // 1. Cajas Menores
     const cmPorAprobar = legalizaciones.filter((l) => l.estado === 'pendiente');
     const cmPorProcesar = legalizaciones.filter(isItemPorProcesar);
     const cmPorAprobarVencidas = cmPorAprobar.filter((l) => isOlderThan2Days(l.created_at || l.fecha));
-    const cmPorProcesarVencidas = cmPorProcesar.filter((l) =>
-      isOlderThan2Days(l.fechaAprobacion || l.updated_at || l.created_at || l.fecha)
-    );
+    const cmPorProcesarVencidas = cmPorProcesar.filter((l) => {
+      const fApr = getFechaAprobacion(l);
+      return fApr ? isOlderThan2Days(fApr) : false;
+    });
     const cmProcesadas = legalizaciones.filter(
       (l) => String(l.gestionContable ?? '').toLowerCase().trim() === 'procesado'
     );
@@ -92,9 +98,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const tcPorAprobar = tarjetasCredito.filter((t) => t.estado === 'pendiente');
     const tcPorProcesar = tarjetasCredito.filter(isItemPorProcesar);
     const tcPorAprobarVencidas = tcPorAprobar.filter((t) => isOlderThan2Days(t.created_at || t.fecha));
-    const tcPorProcesarVencidas = tcPorProcesar.filter((t) =>
-      isOlderThan2Days(t.fechaAprobacion || t.updated_at || t.created_at || t.fecha)
-    );
+    const tcPorProcesarVencidas = tcPorProcesar.filter((t) => {
+      const fApr = getFechaAprobacion(t);
+      return fApr ? isOlderThan2Days(fApr) : false;
+    });
     const tcProcesadas = tarjetasCredito.filter(
       (t) => String(t.gestionContable ?? '').toLowerCase().trim() === 'procesado'
     );
@@ -103,9 +110,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const gPorAprobar = gastos.filter((g) => g.estado === 'pendiente');
     const gPorProcesar = gastos.filter(isItemPorProcesar);
     const gPorAprobarVencidas = gPorAprobar.filter((g) => isOlderThan2Days(g.created_at || g.fecha));
-    const gPorProcesarVencidas = gPorProcesar.filter((g) =>
-      isOlderThan2Days(g.fechaAprobacion || g.updated_at || g.created_at || g.fecha)
-    );
+    const gPorProcesarVencidas = gPorProcesar.filter((g) => {
+      const fApr = getFechaAprobacion(g);
+      return fApr ? isOlderThan2Days(fApr) : false;
+    });
     const gProcesadas = gastos.filter(
       (g) => String(g.gestionContable ?? '').toLowerCase().trim() === 'procesado'
     );

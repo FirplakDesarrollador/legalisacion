@@ -259,11 +259,13 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
 
     try {
       // 1. Guardar de inmediato la aprobación en la base de datos
+      const nowIso = new Date().toISOString();
       const updateData = {
         estado: nuevoEstado,
         observaciones_aprobacion: observaciones,
         lineas: editableLineas,
-        updated_at: new Date().toISOString(),
+        fecha_aprobacion: nuevoEstado === 'aprobado' ? nowIso : null,
+        updated_at: nowIso,
       };
 
       let { error } = await supabase
@@ -283,6 +285,8 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
         estado: nuevoEstado,
         observacionesAprobacion: observaciones,
         lineas: editableLineas,
+        fechaAprobacion: nuevoEstado === 'aprobado' ? nowIso : legalizacion.fechaAprobacion,
+        updated_at: nowIso,
       };
 
       // Cambiar inmediatamente la UI a Aprobado / Rechazado
