@@ -203,19 +203,107 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     },
   ];
 
-  // Group pending documents by Person (aprobadorNombre / usuarioNombre)
+  // Group pending documents strictly by Approver (Responsable por Aprobar, NEVER Solicitante)
   const personsRanking = useMemo(() => {
-    const map: { [key: string]: number } = {};
+    // Known Cajas Menores mappings by custodian or cost center
+    const CAJAS_MAP: { [key: string]: string } = {
+      'carlos mier': 'Edgar Javier Aguilar Rosero',
+      'logistica': 'Edgar Javier Aguilar Rosero',
+      'renata lainez': 'Maria Camila Jiménez Ochoa',
+      'talento': 'Maria Camila Jiménez Ochoa',
+      'paula guevara': 'Isabel Cristina Jaramillo Castro',
+      'servicio al cliente': 'Isabel Cristina Jaramillo Castro',
+      'marcela gomez': 'Juan Esteban Marín Gañan',
+      'emergencias sst': 'Juan Esteban Marín Gañan',
+      'laura duque': 'Claudia Lorena Duque Alzate',
+      'tesoreria': 'Claudia Lorena Duque Alzate',
+      'maria elena perez ospina': 'Héctor Jose Chinchilla Trigos',
+      'mantenimiento': 'Héctor Jose Chinchilla Trigos',
+      'natalia gomez usme': 'Ider Alejandro Sandoval Hernandez',
+      'behome medellin': 'Ider Alejandro Sandoval Hernandez',
+      'hernando tovar mendoza': 'Ider Alejandro Sandoval Hernandez',
+      'behome cali': 'Ider Alejandro Sandoval Hernandez',
+      'victor julio hernandez gonzalez': 'Ider Alejandro Sandoval Hernandez',
+      'firplak home bogota': 'Ider Alejandro Sandoval Hernandez',
+      'analista desarrollo test': 'Analista Desarrollo',
+      'mateo benavides test': 'Mateo Benavides',
+    };
+
+    // Known Tarjetas mappings by card code
+    const TC_MAP: { [code: string]: string } = {
+      '1735': 'Luis Escobar Borjas',
+      '1738': 'Alejandro Isaza',
+      '1597': 'Ismael Correa Restrepo',
+      '9472': 'Isabel Cristina Jaramillo Castro',
+      '9876': 'Mateo Benavides Rios',
+      '4962': 'Mateo Benavides Rios',
+      '3680': 'Luis Escobar Borjas',
+      '4769': 'Luis Escobar Borjas',
+      '9837': 'Luis Escobar Borjas',
+      '2354': 'Alejandro Isaza',
+      '9463': 'Isabel Isaza',
+      '2108': 'Isabel Isaza',
+      '9314': 'Ismael Correa Restrepo',
+      '8443': 'Gabriel Molina Isaza',
+      '8180': 'Edgar Javier Aguilar Rosero',
+      '6284': 'Juan Esteban Marín Gañan',
+      '0732': 'Omar Cepero',
+      '3870': 'Héctor Jose Chinchilla Trigos',
+      '5336': 'Maria Camila Jiménez Ochoa',
+      '1404': 'Pablo Carrizosa',
+      '6171': 'Laura Isabel Duque Lopez',
+    };
+
+    const getItemAprobador = (item: Legalizacion | TarjetaCredito): string => {
+      // 1. Direct approver if already set on item
+      if (item.aprobadorNombre && item.aprobadorNombre.trim() !== '' && item.aprobadorNombre.trim().toLowerCase() !== 'sin asignar') {
+        return item.aprobadorNombre.trim();
+      }
+
+      // 2. Lookup in Cajas Menores mapping
+      const uName = (item.usuarioNombre || '').trim().toLowerCase();
+      const cCosto = (item.centroCosto || '').trim().toLowerCase();
+      if (CAJAS_MAP[uName]) return CAJAS_MAP[uName];
+      if (CAJAS_MAP[cCosto]) return CAJAS_MAP[cCosto];
+
+      // 3. Lookup in Tarjetas mapping
+      const tcItem = item as TarjetaCredito;
+      const tcCode = tcItem.tarjeta_codigo || (item.motivo?.match(/\[TC:\s*([^\]]+)\]/)?.[1] || '');
+      if (tcCode && TC_MAP[tcCode]) return TC_MAP[tcCode];
+
+      // NEVER return item.usuarioNombre (which is the applicant)
+      return 'Sin Asignar';
+    };
+
+    const formatFriendlyName = (fullName: string): string => {
+      const trimmed = fullName.trim();
+      if (!trimmed || trimmed.toLowerCase() === 'sin asignar') return 'Sin Asignar';
+
+      // Distinguish clearly between Alejandro Sandoval and Alejandro Isaza
+      if (trimmed.toLowerCase().includes('sandoval') || trimmed.toLowerCase().startsWith('ider')) {
+        return 'Alejandro S.';
+      }
+      if (trimmed.toLowerCase().includes('isaza')) {
+        return 'Alejandro I.';
+      }
+
+      const parts = trimmed.split(/\s+/);
+      return parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase() : 'Sin Asignar';
+    };
+
+    const map: { [key: string]: { count: number; fullName: string } } = {};
+
     stats.allPending.forEach((item) => {
-      let raw = (item.aprobadorNombre || item.usuarioNombre || 'Sin Asignar').trim();
-      // Clean name: take first name or short name
-      const parts = raw.split(/\s+/);
-      const name = parts[0] ? parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase() : 'Sin Asignar';
-      map[name] = (map[name] || 0) + 1;
+      const full = getItemAprobador(item);
+      const friendly = formatFriendlyName(full);
+      if (!map[friendly]) {
+        map[friendly] = { count: 0, fullName: full };
+      }
+      map[friendly].count += 1;
     });
 
     return Object.entries(map)
-      .map(([name, count]) => ({ name, count }))
+      .map(([name, data]) => ({ name, count: data.count, fullName: data.fullName }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 12);
   }, [stats.allPending]);
@@ -589,7 +677,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <div
                         style={{ height: `${Math.max(pct, 6)}%` }}
                         className="w-5 sm:w-6 bg-amber-500 rounded-t-sm hover:bg-amber-600 transition-all shadow-xs cursor-pointer"
-                        title={`${person.name}: ${person.count} pendientes`}
+                        title={`${person.fullName || person.name}: ${person.count} pendientes`}
                       />
                       <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex items-center justify-center">
                         <span className="text-[10px] font-semibold text-slate-600 whitespace-nowrap transform -rotate-45 origin-top-left">

@@ -371,15 +371,60 @@ export async function fetchLegalizacionesFromSupabase(): Promise<Legalizacion[]>
       return getLocalLegalizaciones();
     }
 
+    // Attempt to load Cajas_menores config to resolve actual approvers
+    let cmConfig: any[] = [];
+    try {
+      const { data: cmData } = await supabase.from('Cajas_menores').select('*');
+      if (cmData && cmData.length > 0) cmConfig = cmData;
+    } catch {
+      // fallback handled below
+    }
+    const fallbacks = getFallbackResponsables();
+
     const parsed = (data || []).map((row: any) => {
       const gRaw = String(row.gestion_contable || row.gestionContable || '').toLowerCase().trim();
       const isProcesado = gRaw === 'procesado';
+
+      let aprobadorNombre = row.aprobador_nombre || row.aprobadorNombre;
+      let aprobadorEmail = row.aprobador_email || row.aprobadorEmail;
+
+      if (!aprobadorNombre) {
+        const rName = String(row.usuarioNombre || '').trim().toLowerCase();
+        const rArea = String(row.centroCosto || '').trim().toLowerCase();
+
+        const matchTable = cmConfig.find((c: any) =>
+          (c.Responsable && rName && c.Responsable.trim().toLowerCase() === rName) ||
+          (c.Area && rArea && c.Area.trim().toLowerCase() === rArea)
+        );
+
+        if (matchTable && matchTable.Aprobador) {
+          if (matchTable.Aprobador.includes('#')) {
+            const parts = matchTable.Aprobador.split('#');
+            aprobadorNombre = parts[0].replace(/,$/, '').trim();
+            aprobadorEmail = parts[1].trim();
+          } else {
+            aprobadorNombre = matchTable.Aprobador.trim();
+          }
+        } else {
+          const matchFb = fallbacks.find((f) =>
+            (f.nombre && rName && f.nombre.trim().toLowerCase() === rName) ||
+            (f.centro_costo && rArea && f.centro_costo.trim().toLowerCase() === rArea)
+          );
+          if (matchFb) {
+            aprobadorNombre = matchFb.aprobadorNombre;
+            aprobadorEmail = matchFb.aprobadorEmail;
+          }
+        }
+      }
+
       return {
         ...row,
         sapDocEntry: row.sap_doc_entry || row.sapDocEntry || row.sap_docentry || row.sapDocentry,
         gestionContable: (isProcesado ? 'Procesado' : 'Por procesar') as 'Por procesar' | 'Procesado',
         fechaAprobacion: (row.estado === 'aprobado' || row.estado === 'pagado') ? (row.fecha_aprobacion || row.fechaAprobacion || row.updated_at) : undefined,
         fechaProcesado: row.fecha_procesado || row.fechaProcesado || (isProcesado ? row.updated_at : undefined),
+        aprobadorNombre: aprobadorNombre || undefined,
+        aprobadorEmail: aprobadorEmail || undefined,
       };
     }) as Legalizacion[];
 
