@@ -95,6 +95,9 @@ async function handleDailyCapture() {
       ...(gRes.data || []).map((x) => ({ ...x, _tipo: 'Gasto' })),
     ];
 
+    // Start tracking strictly from today onwards (2026-10-21)
+    const START_DATE = '2026-10-21';
+
     // Today in Colombia timezone (America/Bogota)
     const todayColombia = toColombiaDateString(new Date().toISOString());
     const currentMonthPrefix = todayColombia.slice(0, 7); // YYYY-MM
@@ -105,10 +108,10 @@ async function handleDailyCapture() {
     );
     const nuevasHoy = nuevasHoyItems.length;
 
-    // 2. Acumuladas mes (todas las creadas en el mes hasta hoy)
+    // 2. Acumuladas mes (todas las creadas en el mes desde START_DATE hasta hoy)
     const acumuladasMesItems = allItems.filter((item) => {
       const d = toColombiaDateString(item.created_at || item.fecha);
-      return d && d.startsWith(currentMonthPrefix) && d <= todayColombia;
+      return d && d.startsWith(currentMonthPrefix) && d >= START_DATE && d <= todayColombia;
     });
     const acumuladasMes = acumuladasMesItems.length;
 
@@ -121,13 +124,13 @@ async function handleDailyCapture() {
     });
     const gestionadasHoy = gestionadasHoyItems.length;
 
-    // 4. Total gestionadas mes (todas las procesadas en el mes hasta hoy)
+    // 4. Total gestionadas mes (todas las procesadas en el mes desde START_DATE hasta hoy)
     const totalGestionadasMesItems = allItems.filter((item) => {
       const isProc = String(item.gestion_contable || item.gestionContable || '').toLowerCase().trim() === 'procesado';
       if (!isProc) return false;
       const pRaw = item.fecha_procesado || item.fechaProcesado || item.updated_at;
       const d = toColombiaDateString(pRaw);
-      return d && d.startsWith(currentMonthPrefix) && d <= todayColombia;
+      return d && d.startsWith(currentMonthPrefix) && d >= START_DATE && d <= todayColombia;
     });
     const totalGestionadasMes = totalGestionadasMesItems.length;
 

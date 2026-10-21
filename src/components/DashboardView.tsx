@@ -345,10 +345,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const targetMonthPrefix = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     const dateSet = new Set<string>();
 
+    // Start tracking strictly from today onwards (2026-10-21)
+    const START_DATE = '2026-10-21';
+
+    // Always include today's date if viewing the current month/year
+    const todayColombia = toColombiaDateString(new Date().toISOString());
+    if (todayColombia.startsWith(targetMonthPrefix) && todayColombia >= START_DATE) {
+      dateSet.add(todayColombia);
+    }
+
     allItems.forEach((item) => {
       // 1. Creation date in Colombia time
       const cDate = toColombiaDateString(item.created_at || item.fecha);
-      if (cDate && cDate.startsWith(targetMonthPrefix)) {
+      if (cDate && cDate.startsWith(targetMonthPrefix) && cDate >= START_DATE) {
         dateSet.add(cDate);
       }
 
@@ -357,7 +366,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       if (isProc) {
         const pRaw = item.fechaProcesado || item.fecha_procesado || item.updated_at;
         const pDate = toColombiaDateString(pRaw);
-        if (pDate && pDate.startsWith(targetMonthPrefix)) {
+        if (pDate && pDate.startsWith(targetMonthPrefix) && pDate >= START_DATE) {
           dateSet.add(pDate);
         }
       }
@@ -742,9 +751,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Registro Diario (Historial)
             </h3>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 border border-blue-200 text-blue-700">
-              <Clock className="w-3 h-3 text-blue-500" />
-              Corte diario: 11:55 PM (Colombia)
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 border border-emerald-200 text-emerald-700">
+              <Clock className="w-3 h-3 text-emerald-600" />
+              Inicia: 21 Oct 2026 • Corte diario: 11:55 PM (Colombia)
             </span>
           </div>
 
