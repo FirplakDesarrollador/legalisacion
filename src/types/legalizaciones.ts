@@ -115,6 +115,8 @@ export interface Legalizacion {
   aprobadorEmail?: string;
   sapDocEntry?: number;
   observacionesAprobacion?: string;
+  procesadoPor?: string;
+  digitadoPor?: string;
 }
 
 export interface TarjetaCredito extends Legalizacion {

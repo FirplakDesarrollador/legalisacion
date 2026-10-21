@@ -42,6 +42,7 @@ import {
   agregarMovimientoCaja,
   HealthCheckResult,
   supabase,
+  normalizeDigitador,
 } from '@/lib/supabase';
 import { Legalizacion, CuentaContable, Proveedor, CajaMenor, MovimientoCaja, TarjetaCredito } from '@/types/legalizaciones';
 
@@ -74,6 +75,7 @@ export default function Home() {
   const [selectedGasto, setSelectedGasto] = useState<Legalizacion | null>(null);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [activeDigitador, setActiveDigitador] = useState<'Julian' | 'Mateo' | 'Jesus'>('Mateo');
 
   // Check active Supabase session on mount
   useEffect(() => {
@@ -82,15 +84,21 @@ export default function Home() {
         const { data } = await supabase.auth.getSession();
         if (data?.session?.user) {
           const u = data.session.user;
-          setCurrentUser({
+          const userObj = {
             email: u.email || 'usuario@firplak.com',
             name: u.user_metadata?.nombre || u.email?.split('@')[0] || 'Usuario Autenticado',
             role: 'Administrador Tesorería',
-          });
+          };
+          setCurrentUser(userObj);
+          const norm = normalizeDigitador(userObj.name || userObj.email);
+          if (norm) setActiveDigitador(norm);
         } else {
           const savedLocalUser = localStorage.getItem('legalisa_active_user');
           if (savedLocalUser) {
-            setCurrentUser(JSON.parse(savedLocalUser));
+            const parsed = JSON.parse(savedLocalUser);
+            setCurrentUser(parsed);
+            const norm = normalizeDigitador(parsed.name || parsed.email);
+            if (norm) setActiveDigitador(norm);
           }
         }
       } catch (err) {
@@ -105,6 +113,8 @@ export default function Home() {
   const handleLoginSuccess = (userObj: { email: string; name: string; role: string }) => {
     setCurrentUser(userObj);
     localStorage.setItem('legalisa_active_user', JSON.stringify(userObj));
+    const norm = normalizeDigitador(userObj.name || userObj.email);
+    if (norm) setActiveDigitador(norm);
   };
 
   // Setup deep linking for Tarjetas de Crédito and Gastos
@@ -289,9 +299,10 @@ export default function Home() {
     }
   };
 
-  const handleUpdateGastoGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado') => {
+  const handleUpdateGastoGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado', customDigitador?: string) => {
     const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
-    updateLegalizacionGastoGestionContable(id, gestion, nowIso);
+    const digitador = gestion === 'Procesado' ? (customDigitador || activeDigitador || 'Mateo') : undefined;
+    updateLegalizacionGastoGestionContable(id, gestion, nowIso, digitador);
     setGastos((prev) => {
       const next = prev.map((g) =>
         g.id === id
@@ -299,6 +310,7 @@ export default function Home() {
               ...g,
               gestionContable: gestion,
               fechaProcesado: nowIso || undefined,
+              procesadoPor: digitador,
               updated_at: new Date().toISOString(),
             }
           : g
@@ -309,13 +321,14 @@ export default function Home() {
       return next;
     });
     if (selectedGasto && selectedGasto.id === id) {
-      setSelectedGasto((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined } : null));
+      setSelectedGasto((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined, procesadoPor: digitador } : null));
     }
   };
 
-  const handleUpdateTarjetaGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado') => {
+  const handleUpdateTarjetaGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado', customDigitador?: string) => {
     const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
-    updateTarjetaCreditoGestionContable(id, gestion, nowIso);
+    const digitador = gestion === 'Procesado' ? (customDigitador || activeDigitador || 'Mateo') : undefined;
+    updateTarjetaCreditoGestionContable(id, gestion, nowIso, digitador);
     setTarjetasCredito((prev) => {
       const next = prev.map((tc) =>
         tc.id === id
@@ -323,6 +336,7 @@ export default function Home() {
               ...tc,
               gestionContable: gestion,
               fechaProcesado: nowIso || undefined,
+              procesadoPor: digitador,
               updated_at: new Date().toISOString(),
             }
           : tc
@@ -333,13 +347,14 @@ export default function Home() {
       return next;
     });
     if (selectedTarjetaCredito && selectedTarjetaCredito.id === id) {
-      setSelectedTarjetaCredito((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined } : null));
+      setSelectedTarjetaCredito((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined, procesadoPor: digitador } : null));
     }
   };
 
-  const handleUpdateLegalizacionGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado') => {
+  const handleUpdateLegalizacionGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado', customDigitador?: string) => {
     const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
-    updateLegalizacionGestionContable(id, gestion, nowIso);
+    const digitador = gestion === 'Procesado' ? (customDigitador || activeDigitador || 'Mateo') : undefined;
+    updateLegalizacionGestionContable(id, gestion, nowIso, digitador);
     setLegalizaciones((prev) => {
       const next = prev.map((l) =>
         l.id === id
@@ -347,6 +362,7 @@ export default function Home() {
               ...l,
               gestionContable: gestion,
               fechaProcesado: nowIso || undefined,
+              procesadoPor: digitador,
               updated_at: new Date().toISOString(),
             }
           : l
@@ -357,7 +373,7 @@ export default function Home() {
       return next;
     });
     if (selectedLegalizacion && selectedLegalizacion.id === id) {
-      setSelectedLegalizacion((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined } : null));
+      setSelectedLegalizacion((prev) => (prev ? { ...prev, gestionContable: gestion, fechaProcesado: nowIso || undefined, procesadoPor: digitador } : null));
     }
   };
 
@@ -388,6 +404,8 @@ export default function Home() {
         onLogout={handleLogout}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+        activeDigitador={activeDigitador}
+        onDigitadorChange={setActiveDigitador}
       />
 
       {/* Main Layout Area */}

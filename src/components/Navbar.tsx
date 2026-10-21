@@ -13,6 +13,8 @@ interface NavbarProps {
   onLogout: () => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  activeDigitador?: 'Julian' | 'Mateo' | 'Jesus';
+  onDigitadorChange?: (digitador: 'Julian' | 'Mateo' | 'Jesus') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -24,6 +26,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   isSidebarOpen = true,
   onToggleSidebar,
+  activeDigitador = 'Mateo',
+  onDigitadorChange,
 }) => {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-3.5 bg-white border-b border-slate-200 shadow-sm text-slate-800">
@@ -97,6 +101,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Bell className="w-4 h-4" />
           <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full"></span>
         </button>
+
+        {/* Digitador Activo Selector */}
+        {onDigitadorChange && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/70 border border-blue-200/80 shadow-2xs">
+            <span className="text-[10px] uppercase font-bold text-blue-900 hidden md:inline">Digitador:</span>
+            <select
+              value={activeDigitador}
+              onChange={(e) => onDigitadorChange(e.target.value as any)}
+              className="bg-transparent text-xs font-bold text-blue-700 cursor-pointer focus:outline-none"
+              title="Usuario activo digitando / procesando legalizaciones"
+            >
+              <option value="Julian">Julian</option>
+              <option value="Mateo">Mateo</option>
+              <option value="Jesus">Jesus</option>
+            </select>
+          </div>
+        )}
 
         {/* User Badge */}
         <div className="flex items-center gap-3 pl-3 border-l border-slate-200">

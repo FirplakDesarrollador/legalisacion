@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Legalizacion, TarjetaCredito } from '@/types/legalizaciones';
 import { TabType } from '@/components/Sidebar';
+import { normalizeDigitador } from '@/lib/supabase';
 
 interface DashboardViewProps {
   legalizaciones?: Legalizacion[];
@@ -407,6 +408,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       // 7. Total digitadas: processed on that day
       const totalDigitadas = gestionadasHoy;
 
+      // 8. Digitadas por persona
+      const digitadoJulian = gestionadasHoyItems.filter(
+        (item) => normalizeDigitador((item as any).procesadoPor || (item as any).procesado_por || (item as any).digitado_por || (item as any).observacionesAprobacion || (item as any).observaciones_aprobacion) === 'Julian'
+      ).length;
+
+      const digitadoMateo = gestionadasHoyItems.filter(
+        (item) => normalizeDigitador((item as any).procesadoPor || (item as any).procesado_por || (item as any).digitado_por || (item as any).observacionesAprobacion || (item as any).observaciones_aprobacion) === 'Mateo'
+      ).length;
+
+      const digitadoJesus = gestionadasHoyItems.filter(
+        (item) => normalizeDigitador((item as any).procesadoPor || (item as any).procesado_por || (item as any).digitado_por || (item as any).observacionesAprobacion || (item as any).observaciones_aprobacion) === 'Jesus'
+      ).length;
+
       return {
         fecha: dateStr,
         nuevasHoy,
@@ -418,6 +432,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         totalPorProcesar: porProcesar,
         porProcesarVencidas,
         totalDigitadas,
+        digitadoJulian,
+        digitadoMateo,
+        digitadoJesus,
       };
     });
 
@@ -793,12 +810,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="px-3 py-3 text-center">Total Por Procesar</th>
                 <th className="px-3 py-3 text-center">Por Procesar (+2 Días)</th>
                 <th className="px-3 py-3 text-center">Total Digitadas</th>
+                <th className="px-3 py-3 text-center text-teal-700">Digitado por Julian</th>
+                <th className="px-3 py-3 text-center text-blue-700">Digitado por Mateo</th>
+                <th className="px-3 py-3 text-center text-indigo-700">Digitado por Jesus</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
               {dailyHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-slate-400 text-xs">
+                  <td colSpan={13} className="px-4 py-8 text-center text-slate-400 text-xs">
                     No hay registros de movimientos para {monthNames[selectedMonth - 1]} de {selectedYear}.
                   </td>
                 </tr>
@@ -860,6 +880,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                         {row.totalDigitadas}
                       </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      {row.digitadoJulian > 0 ? (
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                          {row.digitadoJulian}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">0</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      {row.digitadoMateo > 0 ? (
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                          {row.digitadoMateo}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">0</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      {row.digitadoJesus > 0 ? (
+                        <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {row.digitadoJesus}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">0</span>
+                      )}
                     </td>
                   </tr>
                 ))

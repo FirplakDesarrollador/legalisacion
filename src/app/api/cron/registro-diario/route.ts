@@ -51,6 +51,15 @@ function getFechaAprobacion(item: any): string | null {
   return item.fecha_aprobacion || item.fechaAprobacion || item.updated_at || null;
 }
 
+function normalizeDigitador(nameOrEmail?: string | null): 'Julian' | 'Mateo' | 'Jesus' | null {
+  if (!nameOrEmail) return null;
+  const s = String(nameOrEmail).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (s.includes('julian')) return 'Julian';
+  if (s.includes('mateo')) return 'Mateo';
+  if (s.includes('jesus')) return 'Jesus';
+  return null;
+}
+
 export async function GET() {
   return handleDailyCapture();
 }
@@ -144,6 +153,19 @@ async function handleDailyCapture() {
     // 9. Total digitadas hoy
     const totalDigitadas = gestionadasHoy;
 
+    // 10. Digitadas por persona hoy
+    const digitadoJulian = gestionadasHoyItems.filter(
+      (item) => normalizeDigitador(item.procesado_por || item.procesadoPor || item.digitado_por || item.observaciones_aprobacion) === 'Julian'
+    ).length;
+
+    const digitadoMateo = gestionadasHoyItems.filter(
+      (item) => normalizeDigitador(item.procesado_por || item.procesadoPor || item.digitado_por || item.observaciones_aprobacion) === 'Mateo'
+    ).length;
+
+    const digitadoJesus = gestionadasHoyItems.filter(
+      (item) => normalizeDigitador(item.procesado_por || item.procesadoPor || item.digitado_por || item.observaciones_aprobacion) === 'Jesus'
+    ).length;
+
     const snapshot = {
       fecha: todayColombia,
       nuevas_hoy: nuevasHoy,
@@ -155,6 +177,9 @@ async function handleDailyCapture() {
       total_por_procesar: totalPorProcesar,
       por_procesar_2dias: porProcesar2Dias,
       total_digitadas: totalDigitadas,
+      digitado_julian: digitadoJulian,
+      digitado_mateo: digitadoMateo,
+      digitado_jesus: digitadoJesus,
       captured_at: new Date().toISOString(),
     };
 
