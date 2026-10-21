@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Database, Search, Bell, ShieldCheck, UserCheck, RefreshCw, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, ShieldCheck, UserCheck, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { HealthCheckResult } from '@/lib/supabase';
 
 interface NavbarProps {
-  health: HealthCheckResult | null;
-  onRefreshHealth: () => void;
+  health?: HealthCheckResult | null;
+  onRefreshHealth?: () => void;
   searchTerm: string;
   onSearchChange: (val: string) => void;
   currentUser: { email: string; name: string; role: string } | null;
@@ -16,8 +16,6 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  health,
-  onRefreshHealth,
   searchTerm,
   onSearchChange,
   currentUser,
@@ -27,7 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-3.5 bg-white border-b border-slate-200 shadow-sm text-slate-800">
-      {/* Brand & Supabase Status */}
+      {/* Brand */}
       <div className="flex items-center gap-3">
         {onToggleSidebar && (
           <button
@@ -59,25 +57,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <p className="text-xs text-slate-500">Sistema Inteligente de Legalización de Gastos & Viáticos</p>
           </div>
         </div>
-
-        {/* Supabase Live Badge */}
-        <div className="hidden lg:flex items-center gap-2 ml-4 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-xs">
-          <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${health?.connected ? 'bg-blue-500' : 'bg-amber-500'} opacity-75`}></span>
-            <span className={`relative inline-flex rounded-full h-2 w-2 ${health?.connected ? 'bg-blue-600' : 'bg-amber-600'}`}></span>
-          </span>
-          <Database className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-slate-600 font-mono text-[11px] truncate max-w-[220px]">
-            {health?.connected ? 'zohdtksgxhbheaftgmsi.supabase.co' : 'Conectando...'}
-          </span>
-          <button
-            onClick={onRefreshHealth}
-            title="Recargar estado Supabase"
-            className="text-slate-400 hover:text-blue-600 transition-colors ml-1"
-          >
-            <RefreshCw className="w-3 h-3" />
-          </button>
-        </div>
       </div>
 
       {/* Global Search & User Actions */}
@@ -92,11 +71,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-50 text-slate-900 placeholder-slate-400 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-600 transition-all"
           />
         </div>
-
-        <button className="relative p-2 text-slate-500 hover:text-blue-600 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all">
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-blue-600 rounded-full"></span>
-        </button>
 
         {/* User Badge */}
         <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
