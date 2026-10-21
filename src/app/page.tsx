@@ -415,7 +415,12 @@ export default function Home() {
         {/* Dynamic Main Workspace */}
         <main className="flex-1 p-6 overflow-y-auto w-full min-w-0">
           {activeTab === 'dashboard' && (
-            <DashboardView />
+            <DashboardView
+              legalizaciones={legalizaciones}
+              tarjetasCredito={tarjetasCredito}
+              gastos={gastos}
+              onSelectTab={setActiveTab}
+            />
           )}
 
           {activeTab === 'legalizaciones' && (
