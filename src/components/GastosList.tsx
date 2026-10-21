@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, UserPlus, Receipt, Loader2, Send, ChevronLeft, ChevronRight, FileText, Copy, Check } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
-import { supabase } from '@/lib/supabase';
+import { supabase, updateLegalizacionGastoPagoCruce } from '@/lib/supabase';
 
 interface GastosListProps {
   gastos: Legalizacion[];
@@ -11,6 +11,7 @@ interface GastosListProps {
   onOpenNuevaModal: () => void;
   onUpdateStatus: (id: string, estado: Legalizacion['estado']) => void;
   onUpdateGestionContable?: (id: string, gestion: 'Por procesar' | 'Procesado') => void;
+  onUpdatePagoCruce?: (id: string, gestionado: boolean) => void;
   defaultTab?: 'por_aprobar' | 'por_procesar' | 'historico';
 }
 
@@ -20,6 +21,7 @@ export const GastosList: React.FC<GastosListProps> = ({
   onOpenNuevaModal,
   onUpdateStatus,
   onUpdateGestionContable,
+  onUpdatePagoCruce,
   defaultTab = 'por_aprobar',
 }) => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -27,7 +29,19 @@ export const GastosList: React.FC<GastosListProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [localGestion, setLocalGestion] = useState<{ [id: string]: 'Por procesar' | 'Procesado' }>({});
+  const [localPagoCruce, setLocalPagoCruce] = useState<{ [id: string]: boolean }>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleTogglePagoCruce = (id: string, currentVal: boolean, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const newVal = !currentVal;
+    setLocalPagoCruce((prev) => ({ ...prev, [id]: newVal }));
+    if (onUpdatePagoCruce) {
+      onUpdatePagoCruce(id, newVal);
+    } else {
+      updateLegalizacionGastoPagoCruce(id, newVal);
+    }
+  };
 
   const handleCopyLink = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -302,6 +316,7 @@ export const GastosList: React.FC<GastosListProps> = ({
                 <th className="py-3.5 px-4 text-right">Saldo Neto</th>
                 <th className="py-3.5 px-4">Estado</th>
                 <th className="py-3.5 px-4">Gestión Contable</th>
+                <th className="py-3.5 px-4 text-center">Se gestionó el pago o el cruce</th>
                 <th className="py-3.5 px-4">Fecha de Aprobación</th>
                 <th className="py-3.5 px-4">Fecha de Procesado</th>
                 <th className="py-3.5 px-4 text-center">Borrador / Fecha Creación</th>
@@ -310,7 +325,7 @@ export const GastosList: React.FC<GastosListProps> = ({
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center">
+                  <td colSpan={12} className="py-12 text-center">
                     <div className="flex flex-col items-center justify-center space-y-3 max-w-md mx-auto text-slate-500">
                       <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
                         <Clock className="w-5 h-5" />
@@ -440,6 +455,35 @@ export const GastosList: React.FC<GastosListProps> = ({
                               <option value="Por procesar">⏳ Por procesar</option>
                               <option value="Procesado">✅ Procesado</option>
                             </select>
+                          );
+                        })()}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        {(() => {
+                          const isChecked = localPagoCruce[leg.id] !== undefined ? localPagoCruce[leg.id] : !!leg.pagoCruceGestionado;
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => handleTogglePagoCruce(leg.id, isChecked, e)}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer shadow-xs select-none ${
+                                isChecked
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
+                                  : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 hover:text-slate-700 hover:border-slate-300'
+                              }`}
+                              title={isChecked ? 'Clic para desmarcar (Pendiente)' : 'Clic para marcar (Gestionado)'}
+                            >
+                              <div
+                                className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                                  isChecked
+                                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-2xs'
+                                    : 'bg-white border-slate-300'
+                                }`}
+                              >
+                                {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                              </div>
+                              <span className="font-semibold">{isChecked ? 'Gestionado' : 'Pendiente'}</span>
+                            </button>
                           );
                         })()}
                       </td>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt } from 'lucide-react';
+import { X, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt, Check } from 'lucide-react';
 import { Legalizacion, LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
 import { supabase, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase } from '@/lib/supabase';
 
@@ -9,12 +9,14 @@ interface GastoDetailModalProps {
   gasto: Legalizacion | null;
   onClose: () => void;
   onUpdateStatus: (id: string, nuevoEstado: Legalizacion['estado'], observaciones?: string) => void;
+  onUpdatePagoCruce?: (id: string, gestionado: boolean) => void;
 }
 
 export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
   gasto,
   onClose,
   onUpdateStatus,
+  onUpdatePagoCruce,
 }) => {
   const [observaciones, setObservaciones] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -211,6 +213,33 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                   <span className={`font-mono font-bold ${gasto.saldoDiferencia >= 0 ? 'text-emerald-600' : 'text-blue-600'}`}>
                     {formatCOP(gasto.saldoDiferencia)}
                   </span>
+                </div>
+                <div className="flex justify-between items-center pt-2 mt-1 border-t border-slate-200">
+                  <span className="font-semibold text-slate-700">Se gestionó el pago o el cruce:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newVal = !gasto.pagoCruceGestionado;
+                      onUpdatePagoCruce?.(gasto.id, newVal);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer shadow-xs select-none ${
+                      gasto.pagoCruceGestionado
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400'
+                        : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 hover:text-slate-700'
+                    }`}
+                    title={gasto.pagoCruceGestionado ? 'Clic para desmarcar' : 'Clic para marcar como gestionado'}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                        gasto.pagoCruceGestionado
+                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-2xs'
+                          : 'bg-white border-slate-300'
+                      }`}
+                    >
+                      {gasto.pagoCruceGestionado && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                    <span>{gasto.pagoCruceGestionado ? 'Gestionado' : 'Pendiente'}</span>
+                  </button>
                 </div>
               </div>
             </div>

@@ -36,6 +36,7 @@ import {
   saveLocalLegalizacionGasto,
   updateLegalizacionGastoStatus,
   updateLegalizacionGastoGestionContable,
+  updateLegalizacionGastoPagoCruce,
   updateLegalizacionGestionContable,
   getLocalCajasMenores,
   saveLocalCajaMenor,
@@ -326,6 +327,29 @@ export default function Home() {
     }
   };
 
+  const handleUpdateGastoPagoCruce = (id: string, gestionado: boolean) => {
+    updateLegalizacionGastoPagoCruce(id, gestionado);
+    setGastos((prev) => {
+      const next = prev.map((g) =>
+        g.id === id
+          ? {
+              ...g,
+              pagoCruceGestionado: gestionado,
+              fechaPagoCruce: gestionado ? new Date().toISOString() : undefined,
+              updated_at: new Date().toISOString(),
+            }
+          : g
+      );
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('app_legalizaciones_gastos_data_v1', JSON.stringify(next));
+      }
+      return next;
+    });
+    if (selectedGasto && selectedGasto.id === id) {
+      setSelectedGasto((prev) => (prev ? { ...prev, pagoCruceGestionado: gestionado, fechaPagoCruce: gestionado ? new Date().toISOString() : undefined } : null));
+    }
+  };
+
   const handleUpdateTarjetaGestionContable = (id: string, gestion: 'Por procesar' | 'Procesado', customDigitador?: string) => {
     const nowIso = gestion === 'Procesado' ? new Date().toISOString() : null;
     const digitador = gestion === 'Procesado' ? (customDigitador || getDigitadorFromCurrentUser()) : undefined;
@@ -467,6 +491,7 @@ export default function Home() {
               onOpenNuevaModal={() => setIsNuevaGastoModalOpen(true)}
               onUpdateStatus={(id, st) => handleUpdateGastoStatus(id, st)}
               onUpdateGestionContable={(id, g) => handleUpdateGastoGestionContable(id, g)}
+              onUpdatePagoCruce={handleUpdateGastoPagoCruce}
             />
           )}
 
@@ -549,6 +574,7 @@ export default function Home() {
           gasto={selectedGasto}
           onClose={() => setSelectedGasto(null)}
           onUpdateStatus={handleUpdateGastoStatus}
+          onUpdatePagoCruce={handleUpdateGastoPagoCruce}
         />
       )}
     </div>

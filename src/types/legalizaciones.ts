@@ -117,6 +117,8 @@ export interface Legalizacion {
   observacionesAprobacion?: string;
   procesadoPor?: string;
   digitadoPor?: string;
+  pagoCruceGestionado?: boolean;
+  fechaPagoCruce?: string;
 }
 
 export interface TarjetaCredito extends Legalizacion {

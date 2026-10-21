@@ -656,6 +656,8 @@ export async function fetchLegalizacionesGastosFromSupabase(): Promise<Legalizac
         aprobadorNombre: row.aprobador_nombre || row.aprobadorNombre,
         aprobadorEmail: row.aprobador_email || row.aprobadorEmail,
         sapDocEntry: row.sap_doc_entry || row.sapDocEntry,
+        pagoCruceGestionado: row.pago_cruce_gestionado === true || row.pago_cruce_gestionado === 'true' || row.se_gestiono_pago_cruce === true || /\[Pago\/Cruce gestionado:\s*SI\]/i.test(row.observaciones_aprobacion || ''),
+        fechaPagoCruce: row.fecha_pago_cruce || row.fechaPagoCruce || undefined,
       };
     }) as Legalizacion[];
 
@@ -1202,6 +1204,56 @@ export function updateLegalizacionGastoGestionContable(
           const { data: curr } = await supabase.from('legalizaciones_gastos').select('observaciones_aprobacion').eq('id', id).single();
           const cleanObs = (curr?.observaciones_aprobacion || '').replace(/\[Digitado por:\s*[^\]]+\]/gi, '').trim();
           updateData.observaciones_aprobacion = cleanObs ? `${cleanObs}\n[Digitado por: ${activeDigitador}]` : `[Digitado por: ${activeDigitador}]`;
+          await supabase.from('legalizaciones_gastos').update(updateData).eq('id', id);
+        } catch {}
+      } else {
+        supabase.from('legalizaciones gastos').update(updateData).eq('id', id).then(() => {});
+      }
+    }
+  });
+
+  return updated;
+}
+
+export function updateLegalizacionGastoPagoCruce(
+  id: string,
+  gestionado: boolean
+): Legalizacion[] {
+  const current = getLocalLegalizacionesGastos();
+  const now = new Date().toISOString();
+  const updated = current.map(item => {
+    if (item.id === id) {
+      return {
+        ...item,
+        pagoCruceGestionado: gestionado,
+        fechaPagoCruce: gestionado ? now : undefined,
+        updated_at: now
+      };
+    }
+    return item;
+  });
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(GASTOS_STORAGE_KEY, JSON.stringify(updated));
+  }
+
+  const updateData: any = {
+    pago_cruce_gestionado: gestionado,
+    fecha_pago_cruce: gestionado ? now : null,
+    updated_at: now
+  };
+
+  supabase.from('legalizaciones_gastos').update(updateData).eq('id', id).then(async ({ error }) => {
+    if (error) {
+      if (error.message.includes('pago_cruce_gestionado') || error.message.includes('column')) {
+        delete updateData.pago_cruce_gestionado;
+        delete updateData.fecha_pago_cruce;
+        try {
+          const { data: curr } = await supabase.from('legalizaciones_gastos').select('observaciones_aprobacion').eq('id', id).single();
+          const cleanObs = (curr?.observaciones_aprobacion || '').replace(/\[Pago\/Cruce gestionado:\s*[^\]]+\]/gi, '').trim();
+          updateData.observaciones_aprobacion = cleanObs 
+            ? `${cleanObs}\n[Pago/Cruce gestionado: ${gestionado ? 'SI' : 'NO'}]` 
+            : `[Pago/Cruce gestionado: ${gestionado ? 'SI' : 'NO'}]`;
           await supabase.from('legalizaciones_gastos').update(updateData).eq('id', id);
         } catch {}
       } else {
