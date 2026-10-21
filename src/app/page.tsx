@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { Sidebar, TabType } from '@/components/Sidebar';
-import { KpiStats } from '@/components/KpiStats';
+import { DashboardView } from '@/components/DashboardView';
 import { LegalizacionesList } from '@/components/LegalizacionesList';
 import { LegalizacionDetailModal } from '@/components/LegalizacionDetailModal';
 import { NuevaLegalizacionModal } from '@/components/NuevaLegalizacionModal';
@@ -415,35 +415,7 @@ export default function Home() {
         {/* Dynamic Main Workspace */}
         <main className="flex-1 p-6 overflow-y-auto w-full min-w-0">
           {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              <KpiStats
-                legalizaciones={legalizaciones}
-                cuentasCount={cuentas.length}
-                proveedoresCount={proveedores.length}
-                health={health}
-              />
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Últimas Cajas Menores Registradas
-                  </h2>
-                  <button
-                    onClick={() => setActiveTab('legalizaciones')}
-                    className="text-xs text-blue-600 hover:underline font-semibold"
-                  >
-                    Ver todas ({legalizaciones.length}) &rarr;
-                  </button>
-                </div>
-                <LegalizacionesList
-                  legalizaciones={legalizaciones.slice(0, 5)}
-                  onSelectLegalizacion={setSelectedLegalizacion}
-                  onOpenNuevaModal={() => setIsNuevaModalOpen(true)}
-                  onUpdateStatus={(id, st) => handleUpdateStatus(id, st)}
-                  onUpdateGestionContable={handleUpdateLegalizacionGestionContable}
-                  defaultTab="historico"
-                />
-              </div>
-            </div>
+            <DashboardView />
           )}
 
           {activeTab === 'legalizaciones' && (

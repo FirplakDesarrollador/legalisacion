@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Wallet, PlusCircle, SlidersHorizontal, Copy, ExternalLink, Check, PanelLeftClose, Receipt } from 'lucide-react';
+import { LayoutDashboard, Wallet, PlusCircle, SlidersHorizontal, Copy, ExternalLink, Check, PanelLeftClose, Receipt } from 'lucide-react';
 
 export type TabType = 'cajas_menores' | 'dashboard' | 'legalizaciones' | 'gastos' | 'cuentas' | 'proveedores' | 'reportes';
 
@@ -35,6 +35,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   const menuItems = [
+    {
+      id: 'dashboard' as TabType,
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      badge: null,
+    },
     {
       id: 'legalizaciones' as TabType,
       label: 'Cajas Menores',
