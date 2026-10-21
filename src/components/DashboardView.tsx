@@ -57,7 +57,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     // 1. Cajas Menores
     const cmPorAprobar = legalizaciones.filter((l) => l.estado === 'pendiente');
     const cmPorProcesar = legalizaciones.filter(isItemPorProcesar);
-    const cmVencidas = cmPorAprobar.filter((l) => isOlderThan2Days(l.created_at || l.fecha));
+    const cmPorAprobarVencidas = cmPorAprobar.filter((l) => isOlderThan2Days(l.created_at || l.fecha));
+    const cmPorProcesarVencidas = cmPorProcesar.filter((l) =>
+      isOlderThan2Days(l.fechaAprobacion || l.updated_at || l.created_at || l.fecha)
+    );
     const cmProcesadas = legalizaciones.filter(
       (l) => String(l.gestionContable ?? '').toLowerCase().trim() === 'procesado'
     );
@@ -65,7 +68,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     // 2. Tarjetas de Crédito
     const tcPorAprobar = tarjetasCredito.filter((t) => t.estado === 'pendiente');
     const tcPorProcesar = tarjetasCredito.filter(isItemPorProcesar);
-    const tcVencidas = tcPorAprobar.filter((t) => isOlderThan2Days(t.created_at || t.fecha));
+    const tcPorAprobarVencidas = tcPorAprobar.filter((t) => isOlderThan2Days(t.created_at || t.fecha));
+    const tcPorProcesarVencidas = tcPorProcesar.filter((t) =>
+      isOlderThan2Days(t.fechaAprobacion || t.updated_at || t.created_at || t.fecha)
+    );
     const tcProcesadas = tarjetasCredito.filter(
       (t) => String(t.gestionContable ?? '').toLowerCase().trim() === 'procesado'
     );
@@ -73,7 +79,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     // 3. Legalización de Gastos
     const gPorAprobar = gastos.filter((g) => g.estado === 'pendiente');
     const gPorProcesar = gastos.filter(isItemPorProcesar);
-    const gVencidas = gPorAprobar.filter((g) => isOlderThan2Days(g.created_at || g.fecha));
+    const gPorAprobarVencidas = gPorAprobar.filter((g) => isOlderThan2Days(g.created_at || g.fecha));
+    const gPorProcesarVencidas = gPorProcesar.filter((g) =>
+      isOlderThan2Days(g.fechaAprobacion || g.updated_at || g.created_at || g.fecha)
+    );
     const gProcesadas = gastos.filter(
       (g) => String(g.gestionContable ?? '').toLowerCase().trim() === 'procesado'
     );
@@ -81,7 +90,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     // Totals
     const totalPorAprobar = cmPorAprobar.length + tcPorAprobar.length + gPorAprobar.length;
     const totalPorProcesar = cmPorProcesar.length + tcPorProcesar.length + gPorProcesar.length;
-    const totalVencidas = cmVencidas.length + tcVencidas.length + gVencidas.length;
+    const totalPorProcesarVencidas =
+      cmPorProcesarVencidas.length + tcPorProcesarVencidas.length + gPorProcesarVencidas.length;
+    const totalVencidas = cmPorAprobarVencidas.length + tcPorAprobarVencidas.length + gPorAprobarVencidas.length;
     const totalProcesadas = cmProcesadas.length + tcProcesadas.length + gProcesadas.length;
 
     // All pending items across modules
@@ -92,25 +103,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         total: legalizaciones.length,
         porAprobar: cmPorAprobar.length,
         porProcesar: cmPorProcesar.length,
-        vencidas: cmVencidas.length,
+        porProcesarVencidas: cmPorProcesarVencidas.length,
+        vencidas: cmPorAprobarVencidas.length,
         procesadas: cmProcesadas.length,
       },
       tarjetasCredito: {
         total: tarjetasCredito.length,
         porAprobar: tcPorAprobar.length,
         porProcesar: tcPorProcesar.length,
-        vencidas: tcVencidas.length,
+        porProcesarVencidas: tcPorProcesarVencidas.length,
+        vencidas: tcPorAprobarVencidas.length,
         procesadas: tcProcesadas.length,
       },
       gastos: {
         total: gastos.length,
         porAprobar: gPorAprobar.length,
         porProcesar: gPorProcesar.length,
-        vencidas: gVencidas.length,
+        porProcesarVencidas: gPorProcesarVencidas.length,
+        vencidas: gPorAprobarVencidas.length,
         procesadas: gProcesadas.length,
       },
       totalPorAprobar,
       totalPorProcesar,
+      totalPorProcesarVencidas,
       totalVencidas,
       totalProcesadas,
       allPending,
@@ -125,6 +140,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       icon: SlidersHorizontal,
       porAprobar: stats.cajasMenores.porAprobar,
       porProcesar: stats.cajasMenores.porProcesar,
+      porProcesarVencidas: stats.cajasMenores.porProcesarVencidas,
       vencidas: stats.cajasMenores.vencidas,
     },
     {
@@ -133,6 +149,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       icon: Wallet,
       porAprobar: stats.tarjetasCredito.porAprobar,
       porProcesar: stats.tarjetasCredito.porProcesar,
+      porProcesarVencidas: stats.tarjetasCredito.porProcesarVencidas,
       vencidas: stats.tarjetasCredito.vencidas,
     },
     {
@@ -141,6 +158,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       icon: Receipt,
       porAprobar: stats.gastos.porAprobar,
       porProcesar: stats.gastos.porProcesar,
+      porProcesarVencidas: stats.gastos.porProcesarVencidas,
       vencidas: stats.gastos.vencidas,
     },
   ];
@@ -267,8 +285,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top 2 Main Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      {/* Top 3 Main Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Card 1: TOTAL POR APROBAR */}
         <div className="bg-gradient-to-br from-amber-50/50 via-white to-white border border-amber-200/80 rounded-2xl p-6 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
@@ -302,6 +320,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="w-14 h-14 rounded-full border-2 border-blue-200 bg-blue-50/50 flex items-center justify-center text-blue-500 shadow-xs shrink-0">
             <CheckCircle2 className="w-7 h-7 stroke-[2]" />
+          </div>
+        </div>
+
+        {/* Card 3: POR PROCESAR (+2 DÍAS) */}
+        <div className="bg-gradient-to-br from-rose-50/50 via-white to-white border border-rose-200/80 rounded-2xl p-6 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600 block">
+              Por Procesar (+2 Días)
+            </span>
+            <div className="text-4xl md:text-5xl font-extrabold text-rose-600 tracking-tight">
+              {stats.totalPorProcesarVencidas}
+            </div>
+            <p className="text-xs text-rose-700/80 font-medium pt-1">
+              Aprobados esperando gestión hace más de 48h
+            </p>
+          </div>
+          <div className="w-14 h-14 rounded-full border-2 border-rose-200 bg-rose-50/50 flex items-center justify-center text-rose-500 shadow-xs shrink-0">
+            <AlertCircle className="w-7 h-7 stroke-[2]" />
           </div>
         </div>
       </div>
@@ -352,14 +388,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </span>
                   </div>
 
-                  {/* +2 Días (Vencidas) */}
+                  {/* +2 Días (Por Procesar) */}
                   <div className="bg-rose-50/70 border border-rose-200/60 rounded-xl px-3 py-2 flex items-center justify-between text-xs">
                     <span className="text-[11px] font-medium text-rose-800 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-rose-500" />
-                      +2 Días (Vencidas)
+                      +2 Días (Por Procesar)
                     </span>
                     <span className="font-bold text-rose-600 text-sm">
-                      {m.vencidas}
+                      {m.porProcesarVencidas}
                     </span>
                   </div>
                 </div>
