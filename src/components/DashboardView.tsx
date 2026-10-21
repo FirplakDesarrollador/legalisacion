@@ -112,10 +112,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     // Totals
     const totalPorAprobar = cmPorAprobar.length + tcPorAprobar.length + gPorAprobar.length;
+    const totalPorAprobarVencidas =
+      cmPorAprobarVencidas.length + tcPorAprobarVencidas.length + gPorAprobarVencidas.length;
     const totalPorProcesar = cmPorProcesar.length + tcPorProcesar.length + gPorProcesar.length;
     const totalPorProcesarVencidas =
       cmPorProcesarVencidas.length + tcPorProcesarVencidas.length + gPorProcesarVencidas.length;
-    const totalVencidas = cmPorAprobarVencidas.length + tcPorAprobarVencidas.length + gPorAprobarVencidas.length;
+    const totalVencidas = totalPorAprobarVencidas;
     const totalProcesadas = cmProcesadas.length + tcProcesadas.length + gProcesadas.length;
 
     // All pending items across modules
@@ -125,6 +127,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       cajasMenores: {
         total: legalizaciones.length,
         porAprobar: cmPorAprobar.length,
+        porAprobarVencidas: cmPorAprobarVencidas.length,
         porProcesar: cmPorProcesar.length,
         porProcesarVencidas: cmPorProcesarVencidas.length,
         vencidas: cmPorAprobarVencidas.length,
@@ -133,6 +136,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       tarjetasCredito: {
         total: tarjetasCredito.length,
         porAprobar: tcPorAprobar.length,
+        porAprobarVencidas: tcPorAprobarVencidas.length,
         porProcesar: tcPorProcesar.length,
         porProcesarVencidas: tcPorProcesarVencidas.length,
         vencidas: tcPorAprobarVencidas.length,
@@ -141,12 +145,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       gastos: {
         total: gastos.length,
         porAprobar: gPorAprobar.length,
+        porAprobarVencidas: gPorAprobarVencidas.length,
         porProcesar: gPorProcesar.length,
         porProcesarVencidas: gPorProcesarVencidas.length,
         vencidas: gPorAprobarVencidas.length,
         procesadas: gProcesadas.length,
       },
       totalPorAprobar,
+      totalPorAprobarVencidas,
       totalPorProcesar,
       totalPorProcesarVencidas,
       totalVencidas,
@@ -162,6 +168,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       title: 'Cajas Menores',
       icon: SlidersHorizontal,
       porAprobar: stats.cajasMenores.porAprobar,
+      porAprobarVencidas: stats.cajasMenores.porAprobarVencidas,
       porProcesar: stats.cajasMenores.porProcesar,
       porProcesarVencidas: stats.cajasMenores.porProcesarVencidas,
       vencidas: stats.cajasMenores.vencidas,
@@ -171,6 +178,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       title: 'Tarjetas de crédito',
       icon: Wallet,
       porAprobar: stats.tarjetasCredito.porAprobar,
+      porAprobarVencidas: stats.tarjetasCredito.porAprobarVencidas,
       porProcesar: stats.tarjetasCredito.porProcesar,
       porProcesarVencidas: stats.tarjetasCredito.porProcesarVencidas,
       vencidas: stats.tarjetasCredito.vencidas,
@@ -180,6 +188,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       title: 'Legalizaciones de gastos',
       icon: Receipt,
       porAprobar: stats.gastos.porAprobar,
+      porAprobarVencidas: stats.gastos.porAprobarVencidas,
       porProcesar: stats.gastos.porProcesar,
       porProcesarVencidas: stats.gastos.porProcesarVencidas,
       vencidas: stats.gastos.vencidas,
@@ -308,59 +317,77 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top 3 Main Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      {/* Top 4 Main Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: TOTAL POR APROBAR */}
-        <div className="bg-gradient-to-br from-amber-50/50 via-white to-white border border-amber-200/80 rounded-2xl p-6 shadow-xs flex items-center justify-between">
+        <div className="bg-gradient-to-br from-amber-50/50 via-white to-white border border-amber-200/80 rounded-2xl p-5 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 block">
               Total Por Aprobar
             </span>
-            <div className="text-4xl md:text-5xl font-extrabold text-amber-600 tracking-tight">
+            <div className="text-3xl md:text-4xl font-extrabold text-amber-600 tracking-tight">
               {stats.totalPorAprobar}
             </div>
-            <p className="text-xs text-amber-700/80 font-medium pt-1">
-              Documentos esperando revisión del doliente
+            <p className="text-[11px] text-amber-700/80 font-medium pt-0.5 truncate">
+              Esperando revisión del doliente
             </p>
           </div>
-          <div className="w-14 h-14 rounded-full border-2 border-amber-200 bg-amber-50/50 flex items-center justify-center text-amber-500 shadow-xs shrink-0">
-            <Clock className="w-7 h-7 stroke-[2]" />
+          <div className="w-12 h-12 rounded-full border-2 border-amber-200 bg-amber-50/50 flex items-center justify-center text-amber-500 shadow-xs shrink-0">
+            <Clock className="w-6 h-6 stroke-[2]" />
           </div>
         </div>
 
-        {/* Card 2: TOTAL POR PROCESAR */}
-        <div className="bg-gradient-to-br from-blue-50/50 via-white to-white border border-blue-200/80 rounded-2xl p-6 shadow-xs flex items-center justify-between">
+        {/* Card 2: POR APROBAR (+2 DÍAS) */}
+        <div className="bg-gradient-to-br from-orange-50/50 via-white to-white border border-orange-200/80 rounded-2xl p-5 shadow-xs flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-orange-600 block">
+              Por Aprobar (+2 Días)
+            </span>
+            <div className="text-3xl md:text-4xl font-extrabold text-orange-600 tracking-tight">
+              {stats.totalPorAprobarVencidas}
+            </div>
+            <p className="text-[11px] text-orange-700/80 font-medium pt-0.5 truncate">
+              Pendientes hace +48h hábiles
+            </p>
+          </div>
+          <div className="w-12 h-12 rounded-full border-2 border-orange-200 bg-orange-50/50 flex items-center justify-center text-orange-500 shadow-xs shrink-0">
+            <Clock className="w-6 h-6 stroke-[2]" />
+          </div>
+        </div>
+
+        {/* Card 3: TOTAL POR PROCESAR */}
+        <div className="bg-gradient-to-br from-blue-50/50 via-white to-white border border-blue-200/80 rounded-2xl p-5 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 block">
               Total Por Procesar
             </span>
-            <div className="text-4xl md:text-5xl font-extrabold text-blue-600 tracking-tight">
+            <div className="text-3xl md:text-4xl font-extrabold text-blue-600 tracking-tight">
               {stats.totalPorProcesar}
             </div>
-            <p className="text-xs text-blue-700/80 font-medium pt-1">
-              Documentos listos para contabilidad o SAP
+            <p className="text-[11px] text-blue-700/80 font-medium pt-0.5 truncate">
+              Listos para contabilidad o SAP
             </p>
           </div>
-          <div className="w-14 h-14 rounded-full border-2 border-blue-200 bg-blue-50/50 flex items-center justify-center text-blue-500 shadow-xs shrink-0">
-            <CheckCircle2 className="w-7 h-7 stroke-[2]" />
+          <div className="w-12 h-12 rounded-full border-2 border-blue-200 bg-blue-50/50 flex items-center justify-center text-blue-500 shadow-xs shrink-0">
+            <CheckCircle2 className="w-6 h-6 stroke-[2]" />
           </div>
         </div>
 
-        {/* Card 3: POR PROCESAR (+2 DÍAS) */}
-        <div className="bg-gradient-to-br from-rose-50/50 via-white to-white border border-rose-200/80 rounded-2xl p-6 shadow-xs flex items-center justify-between">
+        {/* Card 4: POR PROCESAR (+2 DÍAS) */}
+        <div className="bg-gradient-to-br from-rose-50/50 via-white to-white border border-rose-200/80 rounded-2xl p-5 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[11px] font-bold uppercase tracking-wider text-rose-600 block">
               Por Procesar (+2 Días)
             </span>
-            <div className="text-4xl md:text-5xl font-extrabold text-rose-600 tracking-tight">
+            <div className="text-3xl md:text-4xl font-extrabold text-rose-600 tracking-tight">
               {stats.totalPorProcesarVencidas}
             </div>
-            <p className="text-xs text-rose-700/80 font-medium pt-1">
-              Aprobados esperando gestión hace más de 48h
+            <p className="text-[11px] text-rose-700/80 font-medium pt-0.5 truncate">
+              Aprobados hace +48h hábiles
             </p>
           </div>
-          <div className="w-14 h-14 rounded-full border-2 border-rose-200 bg-rose-50/50 flex items-center justify-center text-rose-500 shadow-xs shrink-0">
-            <AlertCircle className="w-7 h-7 stroke-[2]" />
+          <div className="w-12 h-12 rounded-full border-2 border-rose-200 bg-rose-50/50 flex items-center justify-center text-rose-500 shadow-xs shrink-0">
+            <AlertCircle className="w-6 h-6 stroke-[2]" />
           </div>
         </div>
       </div>
@@ -401,6 +428,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </span>
                   </div>
 
+                  {/* +2 Días (Por Aprobar) */}
+                  <div className="bg-orange-50/70 border border-orange-200/60 rounded-xl px-3 py-2 flex items-center justify-between text-xs">
+                    <span className="text-[11px] font-medium text-orange-900 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-orange-500" />
+                      +2 Días (Por Aprobar)
+                    </span>
+                    <span className="font-bold text-orange-600 text-sm">
+                      {m.porAprobarVencidas}
+                    </span>
+                  </div>
+
                   {/* Por Procesar */}
                   <div className="bg-blue-50/70 border border-blue-200/60 rounded-xl px-3 py-2 flex items-center justify-between text-xs">
                     <span className="text-[11px] font-medium text-blue-900">
@@ -414,7 +452,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {/* +2 Días (Por Procesar) */}
                   <div className="bg-rose-50/70 border border-rose-200/60 rounded-xl px-3 py-2 flex items-center justify-between text-xs">
                     <span className="text-[11px] font-medium text-rose-800 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-rose-500" />
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
                       +2 Días (Por Procesar)
                     </span>
                     <span className="font-bold text-rose-600 text-sm">
