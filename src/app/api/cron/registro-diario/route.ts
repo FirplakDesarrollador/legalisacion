@@ -54,9 +54,9 @@ function getFechaAprobacion(item: any): string | null {
 function normalizeDigitador(nameOrEmail?: string | null): 'Julian' | 'Mateo' | 'Jesus' | null {
   if (!nameOrEmail) return null;
   const s = String(nameOrEmail).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (s.includes('julian')) return 'Julian';
+  if (s.includes('julian') || s.includes('auxiliarcontabilidad')) return 'Julian';
   if (s.includes('mateo')) return 'Mateo';
-  if (s.includes('jesus')) return 'Jesus';
+  if (s.includes('jesus') || s.includes('practicontabilidad')) return 'Jesus';
   return null;
 }
 

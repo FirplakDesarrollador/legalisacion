@@ -348,11 +348,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     // Start tracking strictly from today onwards (2026-10-21)
     const START_DATE = '2026-10-21';
 
-    // Always include today's date if viewing the current month/year
+    // Hoy no se muestra: la captura del día se cierra a las 11:55 PM (Colombia)
     const todayColombia = toColombiaDateString(new Date().toISOString());
-    if (todayColombia.startsWith(targetMonthPrefix) && todayColombia >= START_DATE) {
-      dateSet.add(todayColombia);
-    }
+    const colombiaHour = Number(
+      new Date().toLocaleString('en-GB', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit', hour12: false }).replace(':', '')
+    );
+    const dayClosed = colombiaHour >= 2355;
+    const isOpenDay = (d: string) => d === todayColombia && !dayClosed;
 
     allItems.forEach((item) => {
       // 1. Creation date in Colombia time
@@ -372,7 +374,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       }
     });
 
-    const sortedDatesAsc = Array.from(dateSet).sort((a, b) => a.localeCompare(b));
+    const sortedDatesAsc = Array.from(dateSet).filter((d) => !isOpenDay(d)).sort((a, b) => a.localeCompare(b));
 
     let accumulatedNuevas = 0;
     let accumulatedGestionadas = 0;
