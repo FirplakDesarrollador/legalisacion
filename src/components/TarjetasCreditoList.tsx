@@ -80,10 +80,18 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
     }, 2000);
   };
 
-  const prevPendingCountRef = useRef<number>(tarjetasCredito.filter((l) => l.estado === 'pendiente').length);
+  const isItemPorProcesar = (l: TarjetaCredito) => {
+    if (!l) return false;
+    const isAprobado = l.estado === 'aprobado' || l.estado === 'pagado';
+    if (!isAprobado) return false;
+    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? '').toLowerCase().trim();
+    return gestion !== 'procesado';
+  };
+
+  const prevPendingCountRef = useRef<number>((tarjetasCredito || []).filter((l) => l && l.estado === 'pendiente').length);
 
   useEffect(() => {
-    const currentPending = tarjetasCredito.filter((l) => l.estado === 'pendiente').length;
+    const currentPending = (tarjetasCredito || []).filter((l) => l && l.estado === 'pendiente').length;
     if (activeTab === 'por_aprobar' && prevPendingCountRef.current > 0 && currentPending === 0) {
       setActiveTab('historico');
     }
@@ -92,14 +100,15 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
 
   useEffect(() => {
     if (globalSearch && globalSearch.trim()) {
-      const activeMatches = tarjetasCredito.filter((l) => {
+      const activeMatches = (tarjetasCredito || []).filter((l) => {
+        if (!l) return false;
         let mTab = true;
         if (activeTab === 'por_aprobar') mTab = l.estado === 'pendiente';
         else if (activeTab === 'por_procesar') mTab = isItemPorProcesar(l);
         return mTab && matchesItemSearch(l, globalSearch);
       });
       if (activeMatches.length === 0) {
-        const hasHistoricoMatches = tarjetasCredito.some((l) => matchesItemSearch(l, globalSearch));
+        const hasHistoricoMatches = (tarjetasCredito || []).some((l) => l && matchesItemSearch(l, globalSearch));
         if (hasHistoricoMatches) {
           setActiveTab('historico');
         }
@@ -243,14 +252,9 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
     }
   };
 
-  const isItemPorProcesar = (l: TarjetaCredito) => {
-    const isAprobado = l.estado === 'aprobado' || l.estado === 'pagado';
-    if (!isAprobado) return false;
-    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? '').toLowerCase().trim();
-    return gestion !== 'procesado';
-  };
 
-  const filtered = tarjetasCredito.filter((l) => {
+  const filtered = (tarjetasCredito || []).filter((l) => {
+    if (!l) return false;
     let matchesTab = true;
     if (activeTab === 'por_aprobar') {
       matchesTab = l.estado === 'pendiente';
@@ -353,9 +357,9 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
         {/* Tabs */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto pb-1 sm:pb-0 shrink-0">
           {[
-            { id: 'por_aprobar', label: 'Por aprobar', count: tarjetasCredito.filter((l) => l.estado === 'pendiente' && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
-            { id: 'por_procesar', label: 'Por procesar', count: tarjetasCredito.filter((l) => isItemPorProcesar(l) && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
-            { id: 'historico', label: 'Histórico', count: tarjetasCredito.filter((l) => (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'por_aprobar', label: 'Por aprobar', count: (tarjetasCredito || []).filter((l) => l && l.estado === 'pendiente' && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'por_procesar', label: 'Por procesar', count: (tarjetasCredito || []).filter((l) => l && isItemPorProcesar(l) && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'historico', label: 'Histórico', count: (tarjetasCredito || []).filter((l) => l && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
           ].map((tab) => (
             <button
               key={tab.id}

@@ -79,6 +79,25 @@ export default function Home() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
+  // Count matching items for sidebar badges when searchTerm is active (MUST BE AT TOP LEVEL BEFORE RETURNS)
+  const matchingLegsCount = useMemo(() => {
+    if (!Array.isArray(legalizaciones)) return 0;
+    if (!searchTerm.trim()) return legalizaciones.length;
+    return legalizaciones.filter((l) => matchesItemSearch(l, searchTerm)).length;
+  }, [legalizaciones, searchTerm]);
+
+  const matchingTCCount = useMemo(() => {
+    if (!Array.isArray(tarjetasCredito)) return 0;
+    if (!searchTerm.trim()) return tarjetasCredito.length;
+    return tarjetasCredito.filter((t) => matchesItemSearch(t, searchTerm)).length;
+  }, [tarjetasCredito, searchTerm]);
+
+  const matchingGastosCount = useMemo(() => {
+    if (!Array.isArray(gastos)) return 0;
+    if (!searchTerm.trim()) return gastos.length;
+    return gastos.filter((g) => matchesItemSearch(g, searchTerm)).length;
+  }, [gastos, searchTerm]);
+
   // Helper: Identificar el digitador activo a partir del usuario autenticado
   const getDigitadorFromCurrentUser = (): string => {
     if (!currentUser) return 'Mateo';
@@ -418,25 +437,6 @@ export default function Home() {
   if (!currentUser) {
     return <LoginView onLoginSuccess={handleLoginSuccess} />;
   }
-
-  // Count matching items for sidebar badges when searchTerm is active
-  const matchingLegsCount = useMemo(() => {
-    if (!Array.isArray(legalizaciones)) return 0;
-    if (!searchTerm.trim()) return legalizaciones.length;
-    return legalizaciones.filter((l) => matchesItemSearch(l, searchTerm)).length;
-  }, [legalizaciones, searchTerm]);
-
-  const matchingTCCount = useMemo(() => {
-    if (!Array.isArray(tarjetasCredito)) return 0;
-    if (!searchTerm.trim()) return tarjetasCredito.length;
-    return tarjetasCredito.filter((t) => matchesItemSearch(t, searchTerm)).length;
-  }, [tarjetasCredito, searchTerm]);
-
-  const matchingGastosCount = useMemo(() => {
-    if (!Array.isArray(gastos)) return 0;
-    if (!searchTerm.trim()) return gastos.length;
-    return gastos.filter((g) => matchesItemSearch(g, searchTerm)).length;
-  }, [gastos, searchTerm]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white">

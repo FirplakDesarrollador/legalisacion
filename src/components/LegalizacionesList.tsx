@@ -81,10 +81,18 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
     }, 2000);
   };
 
-  const prevPendingCountRef = useRef<number>(legalizaciones.filter((l) => l.estado === 'pendiente').length);
+  const isItemPorProcesar = (l: Legalizacion) => {
+    if (!l) return false;
+    const isAprobado = l.estado === 'aprobado' || l.estado === 'pagado';
+    if (!isAprobado) return false;
+    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? '').toLowerCase().trim();
+    return gestion !== 'procesado';
+  };
+
+  const prevPendingCountRef = useRef<number>((legalizaciones || []).filter((l) => l && l.estado === 'pendiente').length);
 
   useEffect(() => {
-    const currentPending = legalizaciones.filter((l) => l.estado === 'pendiente').length;
+    const currentPending = (legalizaciones || []).filter((l) => l && l.estado === 'pendiente').length;
     if (activeTab === 'por_aprobar' && prevPendingCountRef.current > 0 && currentPending === 0) {
       setActiveTab('historico');
     }
@@ -93,14 +101,15 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
 
   useEffect(() => {
     if (globalSearch && globalSearch.trim()) {
-      const activeMatches = legalizaciones.filter((l) => {
+      const activeMatches = (legalizaciones || []).filter((l) => {
+        if (!l) return false;
         let mTab = true;
         if (activeTab === 'por_aprobar') mTab = l.estado === 'pendiente';
         else if (activeTab === 'por_procesar') mTab = isItemPorProcesar(l);
         return mTab && matchesItemSearch(l, globalSearch);
       });
       if (activeMatches.length === 0) {
-        const hasHistoricoMatches = legalizaciones.some((l) => matchesItemSearch(l, globalSearch));
+        const hasHistoricoMatches = (legalizaciones || []).some((l) => l && matchesItemSearch(l, globalSearch));
         if (hasHistoricoMatches) {
           setActiveTab('historico');
         }
@@ -232,14 +241,9 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
     }
   };
 
-  const isItemPorProcesar = (l: Legalizacion) => {
-    const isAprobado = l.estado === 'aprobado' || l.estado === 'pagado';
-    if (!isAprobado) return false;
-    const gestion = String(localGestion[l.id] ?? l.gestionContable ?? '').toLowerCase().trim();
-    return gestion !== 'procesado';
-  };
 
-  const filtered = legalizaciones.filter((l) => {
+  const filtered = (legalizaciones || []).filter((l) => {
+    if (!l) return false;
     let matchesTab = true;
     if (activeTab === 'por_aprobar') {
       matchesTab = l.estado === 'pendiente';
@@ -345,9 +349,9 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
         {/* Status Tabs */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto shrink-0">
           {[
-            { id: 'por_aprobar', label: 'Por aprobar', count: legalizaciones.filter((l) => l.estado === 'pendiente' && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
-            { id: 'por_procesar', label: 'Por procesar', count: legalizaciones.filter((l) => isItemPorProcesar(l) && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
-            { id: 'historico', label: 'Histórico', count: legalizaciones.filter((l) => (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'por_aprobar', label: 'Por aprobar', count: (legalizaciones || []).filter((l) => l && l.estado === 'pendiente' && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'por_procesar', label: 'Por procesar', count: (legalizaciones || []).filter((l) => l && isItemPorProcesar(l) && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'historico', label: 'Histórico', count: (legalizaciones || []).filter((l) => l && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
           ].map((tab) => (
             <button
               key={tab.id}
