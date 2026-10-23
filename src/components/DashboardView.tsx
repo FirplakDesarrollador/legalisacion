@@ -395,8 +395,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const gestionadasHoy = gestionadasHoyItems.length;
       accumulatedGestionadas += gestionadasHoy;
 
-      // 3. Total por aprobar created on this date
-      const porAprobarItems = nuevasHoyItems.filter((item) => item.estado === 'pendiente');
+      // 3. Total por aprobar: backlog al cierre de ese día (creadas <= día y aún sin decisión ese día)
+      const porAprobarItems = allItems.filter((item) => {
+        const cDate = toColombiaDateString(item.created_at || item.fecha);
+        if (!cDate || cDate > dateStr) return false;
+        if (item.estado === 'pendiente') return true;
+        const decided = toColombiaDateString(getFechaAprobacion(item));
+        return !!decided && decided > dateStr;
+      });
       const porAprobar = porAprobarItems.length;
 
       // 4. Alertas +2 días: por aprobar pending > 2 business days
@@ -404,8 +410,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         isOlderThan2Days(item.created_at || item.fecha)
       ).length;
 
-      // 5. Total por procesar created on this date
-      const porProcesarItems = nuevasHoyItems.filter(isItemPorProcesar);
+      // 5. Total por procesar: backlog al cierre de ese día (aprobadas <= día y no procesadas ese día)
+      const porProcesarItems = allItems.filter((item) => {
+        if (item.estado !== 'aprobado' && item.estado !== 'pagado') return false;
+        const aDate = toColombiaDateString(getFechaAprobacion(item));
+        if (!aDate || aDate > dateStr) return false;
+        const isProc = String(item.gestionContable ?? item.gestion_contable ?? '').toLowerCase().trim() === 'procesado';
+        if (!isProc) return true;
+        const pDate = toColombiaDateString(item.fechaProcesado || item.fecha_procesado || item.updated_at);
+        return !!pDate && pDate > dateStr;
+      });
       const porProcesar = porProcesarItems.length;
 
       // 6. Por procesar + 2 días: pending processing > 2 business days from approval date

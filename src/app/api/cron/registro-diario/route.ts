@@ -135,7 +135,7 @@ async function handleDailyCapture() {
     const totalGestionadasMes = totalGestionadasMesItems.length;
 
     // 5. Total por aprobar hoy
-    const porAprobarItems = nuevasHoyItems.filter((item) => item.estado === 'pendiente');
+    const porAprobarItems = allItems.filter((item) => item.estado === 'pendiente');
     const totalPorAprobar = porAprobarItems.length;
 
     // 6. Alertas +2 días (por aprobar > 2 días hábiles)
@@ -144,7 +144,7 @@ async function handleDailyCapture() {
     ).length;
 
     // 7. Total por procesar hoy
-    const porProcesarItems = nuevasHoyItems.filter(isItemPorProcesar);
+    const porProcesarItems = allItems.filter(isItemPorProcesar);
     const totalPorProcesar = porProcesarItems.length;
 
     // 8. Por procesar + 2 días (desde fecha de aprobación)
