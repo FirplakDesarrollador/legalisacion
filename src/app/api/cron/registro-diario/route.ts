@@ -115,24 +115,24 @@ async function handleDailyCapture() {
     });
     const acumuladasMes = acumuladasMesItems.length;
 
-    // 3. Gestionadas hoy (marcadas como procesado hoy)
-    const gestionadasHoyItems = allItems.filter((item) => {
-      const isProc = String(item.gestion_contable || item.gestionContable || '').toLowerCase().trim() === 'procesado';
-      if (!isProc) return false;
-      const pRaw = item.fecha_procesado || item.fechaProcesado || item.updated_at;
-      return toColombiaDateString(pRaw) === todayColombia;
+    // 3. Aprobadas hoy (aprobadas hoy en hora Colombia)
+    const aprobadasHoyItems = allItems.filter((item) => {
+      const isAprob = item.estado === 'aprobado' || item.estado === 'pagado';
+      if (!isAprob) return false;
+      const aRaw = getFechaAprobacion(item);
+      return toColombiaDateString(aRaw) === todayColombia;
     });
-    const gestionadasHoy = gestionadasHoyItems.length;
+    const aprobadasHoy = aprobadasHoyItems.length;
 
-    // 4. Total gestionadas mes (todas las procesadas en el mes desde START_DATE hasta hoy)
-    const totalGestionadasMesItems = allItems.filter((item) => {
-      const isProc = String(item.gestion_contable || item.gestionContable || '').toLowerCase().trim() === 'procesado';
-      if (!isProc) return false;
-      const pRaw = item.fecha_procesado || item.fechaProcesado || item.updated_at;
-      const d = toColombiaDateString(pRaw);
+    // 4. Total aprobadas mes (todas las aprobadas en el mes desde START_DATE hasta hoy)
+    const totalAprobadasMesItems = allItems.filter((item) => {
+      const isAprob = item.estado === 'aprobado' || item.estado === 'pagado';
+      if (!isAprob) return false;
+      const aRaw = getFechaAprobacion(item);
+      const d = toColombiaDateString(aRaw);
       return d && d.startsWith(currentMonthPrefix) && d >= START_DATE && d <= todayColombia;
     });
-    const totalGestionadasMes = totalGestionadasMesItems.length;
+    const totalAprobadasMes = totalAprobadasMesItems.length;
 
     // 5. Total por aprobar hoy
     const porAprobarItems = allItems.filter((item) => item.estado === 'pendiente');
@@ -153,19 +153,25 @@ async function handleDailyCapture() {
       return fApr ? isOlderThan2BusinessDays(fApr) : false;
     }).length;
 
-    // 9. Total digitadas hoy
-    const totalDigitadas = gestionadasHoy;
+    // 9. Total digitadas hoy (marcadas como 'Procesado' hoy)
+    const procesadasHoyItems = allItems.filter((item) => {
+      const isProc = String(item.gestion_contable || item.gestionContable || '').toLowerCase().trim() === 'procesado';
+      if (!isProc) return false;
+      const pRaw = item.fecha_procesado || item.fechaProcesado || item.updated_at;
+      return toColombiaDateString(pRaw) === todayColombia;
+    });
+    const totalDigitadas = procesadasHoyItems.length;
 
     // 10. Digitadas por persona hoy
-    const digitadoJulian = gestionadasHoyItems.filter(
+    const digitadoJulian = procesadasHoyItems.filter(
       (item) => normalizeDigitador(item.procesado_por || item.procesadoPor || item.digitado_por || item.observaciones_aprobacion) === 'Julian'
     ).length;
 
-    const digitadoMateo = gestionadasHoyItems.filter(
+    const digitadoMateo = procesadasHoyItems.filter(
       (item) => normalizeDigitador(item.procesado_por || item.procesadoPor || item.digitado_por || item.observaciones_aprobacion) === 'Mateo'
     ).length;
 
-    const digitadoJesus = gestionadasHoyItems.filter(
+    const digitadoJesus = procesadasHoyItems.filter(
       (item) => normalizeDigitador(item.procesado_por || item.procesadoPor || item.digitado_por || item.observaciones_aprobacion) === 'Jesus'
     ).length;
 
@@ -173,8 +179,10 @@ async function handleDailyCapture() {
       fecha: todayColombia,
       nuevas_hoy: nuevasHoy,
       acumuladas_mes: acumuladasMes,
-      gestionadas_hoy: gestionadasHoy,
-      total_gestionadas_mes: totalGestionadasMes,
+      aprobadas_hoy: aprobadasHoy,
+      total_aprobadas_mes: totalAprobadasMes,
+      gestionadas_hoy: aprobadasHoy,
+      total_gestionadas_mes: totalAprobadasMes,
       total_por_aprobar: totalPorAprobar,
       alertas_2dias: alertas2Dias,
       total_por_procesar: totalPorProcesar,

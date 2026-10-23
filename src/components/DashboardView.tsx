@@ -377,7 +377,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const sortedDatesAsc = Array.from(dateSet).filter((d) => !isOpenDay(d)).sort((a, b) => a.localeCompare(b));
 
     let accumulatedNuevas = 0;
-    let accumulatedGestionadas = 0;
+    let accumulatedAprobadas = 0;
 
     const rows = sortedDatesAsc.map((dateStr) => {
       // 1. Nuevas hoy: created on this day in Colombia time
@@ -387,15 +387,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const nuevasHoy = nuevasHoyItems.length;
       accumulatedNuevas += nuevasHoy;
 
-      // 2. Gestionadas hoy: marked as 'Procesado' on this day in Colombia time
-      const gestionadasHoyItems = allItems.filter((item) => {
-        const isProc = String(item.gestionContable ?? item.gestion_contable ?? '').toLowerCase().trim() === 'procesado';
-        if (!isProc) return false;
-        const pRaw = item.fechaProcesado || item.fecha_procesado || item.updated_at;
-        return toColombiaDateString(pRaw) === dateStr;
+      // 2. Aprobadas hoy: aprobadas en esta fecha en hora Colombia
+      const aprobadasHoyItems = allItems.filter((item) => {
+        const isAprob = item.estado === 'aprobado' || item.estado === 'pagado';
+        if (!isAprob) return false;
+        const aRaw = getFechaAprobacion(item);
+        return toColombiaDateString(aRaw) === dateStr;
       });
-      const gestionadasHoy = gestionadasHoyItems.length;
-      accumulatedGestionadas += gestionadasHoy;
+      const aprobadasHoy = aprobadasHoyItems.length;
+      accumulatedAprobadas += aprobadasHoy;
 
       // 3. Total por aprobar: backlog al cierre de ese día (creadas <= día y aún sin decisión ese día)
       const porAprobarItems = allItems.filter((item) => {
@@ -430,19 +430,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         return fApr ? isOlderThan2Days(fApr) : false;
       }).length;
 
-      // 7. Total digitadas: processed on that day
-      const totalDigitadas = gestionadasHoy;
+      // 7. Total digitadas: marcadas como 'Procesado' en esta fecha
+      const procesadasHoyItems = allItems.filter((item) => {
+        const isProc = String(item.gestionContable ?? item.gestion_contable ?? '').toLowerCase().trim() === 'procesado';
+        if (!isProc) return false;
+        const pRaw = item.fechaProcesado || item.fecha_procesado || item.updated_at;
+        return toColombiaDateString(pRaw) === dateStr;
+      });
+      const totalDigitadas = procesadasHoyItems.length;
 
       // 8. Digitadas por persona
-      const digitadoJulian = gestionadasHoyItems.filter(
+      const digitadoJulian = procesadasHoyItems.filter(
         (item) => normalizeDigitador((item as any).procesadoPor || (item as any).procesado_por || (item as any).digitado_por || (item as any).observacionesAprobacion || (item as any).observaciones_aprobacion) === 'Julian'
       ).length;
 
-      const digitadoMateo = gestionadasHoyItems.filter(
+      const digitadoMateo = procesadasHoyItems.filter(
         (item) => normalizeDigitador((item as any).procesadoPor || (item as any).procesado_por || (item as any).digitado_por || (item as any).observacionesAprobacion || (item as any).observaciones_aprobacion) === 'Mateo'
       ).length;
 
-      const digitadoJesus = gestionadasHoyItems.filter(
+      const digitadoJesus = procesadasHoyItems.filter(
         (item) => normalizeDigitador((item as any).procesadoPor || (item as any).procesado_por || (item as any).digitado_por || (item as any).observacionesAprobacion || (item as any).observaciones_aprobacion) === 'Jesus'
       ).length;
 
@@ -450,8 +456,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         fecha: dateStr,
         nuevasHoy,
         acumuladasMes: accumulatedNuevas,
-        gestionadasHoy,
-        totalGestionadasMes: accumulatedGestionadas,
+        aprobadasHoy,
+        gestionadasHoy: aprobadasHoy,
+        totalAprobadasMes: accumulatedAprobadas,
+        totalGestionadasMes: accumulatedAprobadas,
         totalPorAprobar: porAprobar,
         alertasVencidas,
         totalPorProcesar: porProcesar,
@@ -828,8 +836,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="px-4 py-3">Fecha</th>
                 <th className="px-3 py-3 text-center">Nuevas (Hoy)</th>
                 <th className="px-3 py-3 text-center">Acumuladas (Mes)</th>
-                <th className="px-3 py-3 text-center">Gestionadas (Hoy)</th>
-                <th className="px-3 py-3 text-center">Total Gestionadas (Mes)</th>
+                <th className="px-3 py-3 text-center">Aprobadas (Hoy)</th>
+                <th className="px-3 py-3 text-center">Total Aprobadas (Mes)</th>
                 <th className="px-3 py-3 text-center">Total Por Aprobar</th>
                 <th className="px-3 py-3 text-center">Por Aprobar (+ 2 Días)</th>
                 <th className="px-3 py-3 text-center">Total Por Procesar</th>
@@ -865,12 +873,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                        ✓ {row.gestionadasHoy}
+                        ✓ {row.aprobadasHoy ?? row.gestionadasHoy}
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100/70 text-amber-800 border border-amber-300">
-                        Σ {row.totalGestionadasMes}
+                        Σ {row.totalAprobadasMes ?? row.totalGestionadasMes}
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-center">
