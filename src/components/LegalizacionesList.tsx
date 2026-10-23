@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
+import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus, ChevronLeft, ChevronRight, Copy, Check, Filter, X } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
 import { supabase, updateLegalizacionGestionContable } from '@/lib/supabase';
 
@@ -30,6 +30,38 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
   const [localGestion, setLocalGestion] = useState<{ [id: string]: 'Por procesar' | 'Procesado' }>({});
   const [localFechaProcesado, setLocalFechaProcesado] = useState<{ [id: string]: string | null }>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Column Filters State
+  const [showColumnFilters, setShowColumnFilters] = useState(true);
+  const [colFilters, setColFilters] = useState({
+    sapFecha: '',
+    solicitante: '',
+    motivo: '',
+    fondo: '',
+    total: '',
+    saldo: '',
+    estado: '',
+    gestion: '',
+    fechaAprobacion: '',
+    fechaProcesado: '',
+  });
+
+  const activeFilterCount = Object.values(colFilters).filter((v) => v.trim() !== '').length;
+
+  const handleClearColumnFilters = () => {
+    setColFilters({
+      sapFecha: '',
+      solicitante: '',
+      motivo: '',
+      fondo: '',
+      total: '',
+      saldo: '',
+      estado: '',
+      gestion: '',
+      fechaAprobacion: '',
+      fechaProcesado: '',
+    });
+  };
 
   const handleCopyLink = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -201,7 +233,62 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
       (l.usuarioNombre || '').toLowerCase().includes(term) ||
       (l.motivo || '').toLowerCase().includes(term) ||
       (l.centroCosto || '').toLowerCase().includes(term);
-    return matchesTab && matchesSearch;
+    if (!matchesTab || !matchesSearch) return false;
+
+    // Per-column filters
+    if (colFilters.sapFecha.trim()) {
+      const q = colFilters.sapFecha.toLowerCase();
+      const sapStr = String(l.sapDocEntry || '');
+      const fStr = formatFecha(l.fecha || l.created_at).toLowerCase();
+      const cod = (l.codigo || '').toLowerCase();
+      if (!sapStr.includes(q) && !fStr.includes(q) && !cod.includes(q)) return false;
+    }
+    if (colFilters.solicitante.trim()) {
+      const q = colFilters.solicitante.toLowerCase();
+      const match = (l.usuarioNombre || '').toLowerCase().includes(q) || (l.usuarioEmail || '').toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    if (colFilters.motivo.trim()) {
+      const q = colFilters.motivo.toLowerCase();
+      const match = (l.motivo || '').toLowerCase().includes(q) || (l.centroCosto || '').toLowerCase().includes(q);
+      if (!match) return false;
+    }
+    if (colFilters.fondo.trim()) {
+      const q = colFilters.fondo.replace(/[^0-9]/g, '');
+      const valStr = String(l.anticipoRecibido || '');
+      if (q && !valStr.includes(q)) return false;
+    }
+    if (colFilters.total.trim()) {
+      const q = colFilters.total.replace(/[^0-9]/g, '');
+      const valStr = String(l.totalGastos || '');
+      if (q && !valStr.includes(q)) return false;
+    }
+    if (colFilters.saldo.trim()) {
+      const q = colFilters.saldo.replace(/[^0-9-]/g, '');
+      const valStr = String(l.saldoDiferencia || '');
+      if (q && !valStr.includes(q)) return false;
+    }
+    if (colFilters.estado.trim()) {
+      if ((l.estado || '').toLowerCase() !== colFilters.estado.toLowerCase()) return false;
+    }
+    if (colFilters.gestion.trim()) {
+      const currentGestion = String(localGestion[l.id] ?? l.gestionContable ?? '').toLowerCase().trim() === 'procesado' ? 'Procesado' : 'Por procesar';
+      if (currentGestion.toLowerCase() !== colFilters.gestion.toLowerCase()) return false;
+    }
+    if (colFilters.fechaAprobacion.trim()) {
+      const q = colFilters.fechaAprobacion.toLowerCase();
+      const fp = l.fechaAprobacion || (l as any).fecha_aprobacion;
+      const fStr = formatFecha(fp).toLowerCase();
+      if (!fStr.includes(q) && !(fp || '').includes(q)) return false;
+    }
+    if (colFilters.fechaProcesado.trim()) {
+      const q = colFilters.fechaProcesado.toLowerCase();
+      const fp = localFechaProcesado[l.id] ?? l.fechaProcesado ?? (l as any).fecha_procesado;
+      const fStr = formatFecha(fp).toLowerCase();
+      if (!fStr.includes(q) && !(fp || '').includes(q)) return false;
+    }
+
+    return true;
   });
 
   const getStatusPill = (estado: Legalizacion['estado']) => {
@@ -294,6 +381,38 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
               className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 text-slate-900 placeholder-slate-400 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
             />
           </div>
+          {/* Botón Filtros por Columna */}
+          <button
+            type="button"
+            onClick={() => setShowColumnFilters(!showColumnFilters)}
+            className={`px-2.5 py-1.5 text-xs font-semibold rounded-xl border flex items-center gap-1.5 transition-all shrink-0 cursor-pointer ${
+              activeFilterCount > 0
+                ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-xs'
+                : showColumnFilters
+                ? 'bg-slate-100 border-slate-300 text-slate-800'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+            title="Mostrar u ocultar filtros por columna"
+          >
+            <Filter className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">Filtros</span>
+            {activeFilterCount > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-blue-600 text-white font-bold text-[10px]">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={handleClearColumnFilters}
+              className="px-2.5 py-1.5 text-xs font-bold rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-all shrink-0 cursor-pointer flex items-center gap-1"
+              title="Limpiar todos los filtros de columna"
+            >
+              <X className="w-3 h-3" />
+              <span className="hidden sm:inline">Limpiar</span>
+            </button>
+          )}
           <a
             href="https://ingreso-provedores.vercel.app/registro?tipo=contado"
             target="_blank"
@@ -320,18 +439,130 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
         <table className="w-full min-w-[1250px] text-left text-xs text-slate-700 whitespace-nowrap">
           <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500 font-bold border-b border-slate-200 sticky top-0 z-10 shadow-xs backdrop-blur-xs">
             <tr>
-              <th className="py-3.5 px-4 text-center">Acciones</th>
-              <th className="py-3.5 px-4">N° SAP / Fecha</th>
-              <th className="py-3.5 px-4">Solicitante</th>
-              <th className="py-3.5 px-4">Motivo / Centro Costo</th>
-              <th className="py-3.5 px-4 text-right">Fondo Caja</th>
-              <th className="py-3.5 px-4 text-right">Total Gastos</th>
-              <th className="py-3.5 px-4 text-right">Saldo en Caja</th>
-              <th className="py-3.5 px-4">Estado</th>
-              <th className="py-3.5 px-4">Gestión Contable</th>
-              <th className="py-3.5 px-4">Fecha de Aprobación</th>
-              <th className="py-3.5 px-4">Fecha de Procesado</th>
+              <th className="py-3 px-3 text-center">Acciones</th>
+              <th className="py-3 px-3">N° SAP / Fecha</th>
+              <th className="py-3 px-3">Solicitante</th>
+              <th className="py-3 px-3">Motivo / Centro Costo</th>
+              <th className="py-3 px-3 text-right">Fondo Caja</th>
+              <th className="py-3 px-3 text-right">Total Gastos</th>
+              <th className="py-3 px-3 text-right">Saldo en Caja</th>
+              <th className="py-3 px-3">Estado</th>
+              <th className="py-3 px-3">Gestión Contable</th>
+              <th className="py-3 px-3">Fecha de Aprobación</th>
+              <th className="py-3 px-3">Fecha de Procesado</th>
             </tr>
+            {showColumnFilters && (
+              <tr className="bg-slate-100/90 border-b border-slate-200 text-slate-700 font-normal">
+                <th className="py-1 px-2 text-center">
+                  {activeFilterCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearColumnFilters}
+                      className="text-[10px] text-rose-600 hover:text-rose-800 font-bold px-1.5 py-0.5 rounded bg-rose-50 border border-rose-200 cursor-pointer"
+                      title="Limpiar filtros"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </th>
+                <th className="py-1 px-2">
+                  <input
+                    type="text"
+                    value={colFilters.sapFecha}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, sapFecha: e.target.value }))}
+                    placeholder="SAP / Fecha..."
+                    className="w-full px-2 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal"
+                  />
+                </th>
+                <th className="py-1 px-2">
+                  <input
+                    type="text"
+                    value={colFilters.solicitante}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, solicitante: e.target.value }))}
+                    placeholder="Filtrar solicitante..."
+                    className="w-full px-2 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal"
+                  />
+                </th>
+                <th className="py-1 px-2">
+                  <input
+                    type="text"
+                    value={colFilters.motivo}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, motivo: e.target.value }))}
+                    placeholder="Motivo / Centro..."
+                    className="w-full px-2 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal"
+                  />
+                </th>
+                <th className="py-1 px-2">
+                  <input
+                    type="text"
+                    value={colFilters.fondo}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, fondo: e.target.value }))}
+                    placeholder="Fondo..."
+                    className="w-full px-2 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal text-right"
+                  />
+                </th>
+                <th className="py-1 px-2">
+                  <input
+                    type="text"
+                    value={colFilters.total}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, total: e.target.value }))}
+                    placeholder="Gastos..."
+                    className="w-full px-2 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal text-right"
+                  />
+                </th>
+                <th className="py-1 px-2">
+                  <input
+                    type="text"
+                    value={colFilters.saldo}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, saldo: e.target.value }))}
+                    placeholder="Saldo..."
+                    className="w-full px-2 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal text-right"
+                  />
+                </th>
+                <th className="py-1 px-2">
+                  <select
+                    value={colFilters.estado}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, estado: e.target.value }))}
+                    className="w-full px-1 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal"
+                  >
+                    <option value="">Todos</option>
+                    <option value="aprobado">Aprobada</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="rechazado">Rechazada</option>
+                    <option value="pagado">Liquidada</option>
+                  </select>
+                </th>
+                <th className="py-1 px-2">
+                  <select
+                    value={colFilters.gestion}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, gestion: e.target.value }))}
+                    className="w-full px-1 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal"
+                  >
+                    <option value="">Todos</option>
+                    <option value="Por procesar">Por procesar</option>
+                    <option value="Procesado">Procesado</option>
+                  </select>
+                </th>
+                <th className="py-1 px-2">
+                  <input
+                    type="text"
+                    value={colFilters.fechaAprobacion}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, fechaAprobacion: e.target.value }))}
+                    placeholder="Fecha apr..."
+                    className="w-full px-2 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal"
+                  />
+                </th>
+                <th className="py-1 px-2">
+                  <input
+                    type="text"
+                    value={colFilters.fechaProcesado}
+                    onChange={(e) => setColFilters((prev) => ({ ...prev, fechaProcesado: e.target.value }))}
+                    placeholder="Fecha proc..."
+                    className="w-full px-2 py-0.5 text-xs bg-white border border-slate-200 rounded-md focus:outline-none focus:border-blue-500 font-normal"
+                  />
+                </th>
+              </tr>
+            )}
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.length === 0 ? (
