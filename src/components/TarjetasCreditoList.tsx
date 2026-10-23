@@ -299,19 +299,19 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
     if (colFilters.fechaAprobacion.trim()) {
       const q = colFilters.fechaAprobacion.toLowerCase();
       const fStr = formatFecha(l.fechaAprobacion).toLowerCase();
-      if (!fStr.includes(q) && !(l.fechaAprobacion || '').includes(q)) return false;
+      if (!fStr.includes(q) && !String(l.fechaAprobacion ?? '').toLowerCase().includes(q)) return false;
     }
     if (colFilters.fechaProcesado.trim()) {
       const q = colFilters.fechaProcesado.toLowerCase();
       const fp = localFechaProcesado[l.id] ?? l.fechaProcesado;
       const fStr = formatFecha(fp).toLowerCase();
-      if (!fStr.includes(q) && !(fp || '').includes(q)) return false;
+      if (!fStr.includes(q) && !String(fp ?? '').toLowerCase().includes(q)) return false;
     }
     if (colFilters.creacion.trim()) {
       const q = colFilters.creacion.toLowerCase();
       const fStr = formatFecha(l.created_at || l.fecha).toLowerCase();
       const docStr = String(l.sapDocEntry || '');
-      if (!fStr.includes(q) && !docStr.includes(q) && !(l.created_at || '').includes(q) && !(l.codigo || '').toLowerCase().includes(q)) return false;
+      if (!fStr.includes(q) && !docStr.includes(q) && !String(l.created_at ?? '').toLowerCase().includes(q) && !String(l.codigo ?? '').toLowerCase().includes(q)) return false;
     }
 
     return true;

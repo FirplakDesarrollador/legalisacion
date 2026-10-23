@@ -273,22 +273,22 @@ export const GastosList: React.FC<GastosListProps> = ({
       const q = colFilters.fechaAprobacion.toLowerCase();
       const fp = l.fechaAprobacion || (l as any).fecha_aprobacion;
       const fStr = formatFecha(fp).toLowerCase();
-      if (!fStr.includes(q) && !(fp || '').toLowerCase().includes(q)) return false;
+      if (!fStr.includes(q) && !String(fp ?? '').toLowerCase().includes(q)) return false;
     }
 
     if (colFilters.fechaProcesado.trim()) {
       const q = colFilters.fechaProcesado.toLowerCase();
       const fp = l.fechaProcesado || (l as any).fecha_procesado;
       const fStr = formatFecha(fp).toLowerCase();
-      if (!fStr.includes(q) && !(fp || '').toLowerCase().includes(q)) return false;
+      if (!fStr.includes(q) && !String(fp ?? '').toLowerCase().includes(q)) return false;
     }
 
     if (colFilters.creacion.trim()) {
       const q = colFilters.creacion.toLowerCase();
       const sapStr = String(l.sapDocEntry || '').toLowerCase();
-      const cod = (l.codigo || '').toLowerCase();
+      const cod = String(l.codigo || '').toLowerCase();
       const fStr = formatFecha(l.created_at || l.fecha).toLowerCase();
-      if (!sapStr.includes(q) && !cod.includes(q) && !fStr.includes(q)) return false;
+      if (!sapStr.includes(q) && !cod.includes(q) && !fStr.includes(q) && !String(l.created_at ?? '').toLowerCase().includes(q)) return false;
     }
 
     return true;

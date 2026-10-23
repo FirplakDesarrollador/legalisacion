@@ -297,13 +297,13 @@ export const LegalizacionesList: React.FC<LegalizacionesListProps> = ({
       const q = colFilters.fechaAprobacion.toLowerCase();
       const fp = l.fechaAprobacion || (l as any).fecha_aprobacion;
       const fStr = formatFecha(fp).toLowerCase();
-      if (!fStr.includes(q) && !(fp || '').includes(q)) return false;
+      if (!fStr.includes(q) && !String(fp ?? '').toLowerCase().includes(q)) return false;
     }
     if (colFilters.fechaProcesado.trim()) {
       const q = colFilters.fechaProcesado.toLowerCase();
       const fp = localFechaProcesado[l.id] ?? l.fechaProcesado ?? (l as any).fecha_procesado;
       const fStr = formatFecha(fp).toLowerCase();
-      if (!fStr.includes(q) && !(fp || '').includes(q)) return false;
+      if (!fStr.includes(q) && !String(fp ?? '').toLowerCase().includes(q)) return false;
     }
 
     return true;

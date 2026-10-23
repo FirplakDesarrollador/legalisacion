@@ -421,16 +421,19 @@ export default function Home() {
 
   // Count matching items for sidebar badges when searchTerm is active
   const matchingLegsCount = useMemo(() => {
+    if (!Array.isArray(legalizaciones)) return 0;
     if (!searchTerm.trim()) return legalizaciones.length;
     return legalizaciones.filter((l) => matchesItemSearch(l, searchTerm)).length;
   }, [legalizaciones, searchTerm]);
 
   const matchingTCCount = useMemo(() => {
+    if (!Array.isArray(tarjetasCredito)) return 0;
     if (!searchTerm.trim()) return tarjetasCredito.length;
     return tarjetasCredito.filter((t) => matchesItemSearch(t, searchTerm)).length;
   }, [tarjetasCredito, searchTerm]);
 
   const matchingGastosCount = useMemo(() => {
+    if (!Array.isArray(gastos)) return 0;
     if (!searchTerm.trim()) return gastos.length;
     return gastos.filter((g) => matchesItemSearch(g, searchTerm)).length;
   }, [gastos, searchTerm]);
