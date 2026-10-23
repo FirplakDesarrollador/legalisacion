@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, Send, Database, Loader2, UserPlus, ChevronLeft, ChevronRight, Copy, Check, Filter, X } from 'lucide-react';
 import { TarjetaCredito } from '@/types/tarjetasCredito';
 import { supabase, updateTarjetaCreditoGestionContable, fetchTarjetasCreditoResponsablesFromSupabase } from '@/lib/supabase';
+import { matchesItemSearch } from '@/lib/searchUtils';
 
 interface TarjetasCreditoListProps {
   tarjetasCredito: TarjetaCredito[];
@@ -12,6 +13,8 @@ interface TarjetasCreditoListProps {
   onUpdateStatus: (id: string, estado: TarjetaCredito['estado']) => void;
   onUpdateGestionContable?: (id: string, nuevoValor: 'Por procesar' | 'Procesado') => void;
   defaultTab?: 'por_aprobar' | 'por_procesar' | 'historico';
+  globalSearch?: string;
+  onClearGlobalSearch?: () => void;
 }
 
 export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
@@ -21,6 +24,8 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
   onUpdateStatus,
   onUpdateGestionContable,
   defaultTab = 'por_aprobar',
+  globalSearch = '',
+  onClearGlobalSearch,
 }) => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'por_aprobar' | 'por_procesar' | 'historico'>(defaultTab);
@@ -84,6 +89,23 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
     }
     prevPendingCountRef.current = currentPending;
   }, [tarjetasCredito, activeTab]);
+
+  useEffect(() => {
+    if (globalSearch && globalSearch.trim()) {
+      const activeMatches = tarjetasCredito.filter((l) => {
+        let mTab = true;
+        if (activeTab === 'por_aprobar') mTab = l.estado === 'pendiente';
+        else if (activeTab === 'por_procesar') mTab = isItemPorProcesar(l);
+        return mTab && matchesItemSearch(l, globalSearch);
+      });
+      if (activeMatches.length === 0) {
+        const hasHistoricoMatches = tarjetasCredito.some((l) => matchesItemSearch(l, globalSearch));
+        if (hasHistoricoMatches) {
+          setActiveTab('historico');
+        }
+      }
+    }
+  }, [globalSearch, tarjetasCredito, activeTab]);
 
   const handleScroll = (direction: 'left' | 'right') => {
     if (tableContainerRef.current) {
@@ -238,13 +260,9 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
       matchesTab = true;
     }
 
-    const term = searchTerm.toLowerCase();
-    const matchesSearch =
-      (l.codigo || '').toLowerCase().includes(term) ||
-      (l.usuarioNombre || '').toLowerCase().includes(term) ||
-      (l.motivo || '').toLowerCase().includes(term) ||
-      (l.centroCosto || '').toLowerCase().includes(term);
-    if (!matchesTab || !matchesSearch) return false;
+    const matchesLocalSearch = matchesItemSearch(l, searchTerm);
+    const matchesGlobal = !globalSearch || matchesItemSearch(l, globalSearch);
+    if (!matchesTab || !matchesLocalSearch || !matchesGlobal) return false;
 
     // Per-column filters
     if (colFilters.solicitante.trim()) {
@@ -335,9 +353,9 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
         {/* Tabs */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl overflow-x-auto pb-1 sm:pb-0 shrink-0">
           {[
-            { id: 'por_aprobar', label: 'Por aprobar', count: tarjetasCredito.filter((l) => l.estado === 'pendiente').length },
-            { id: 'por_procesar', label: 'Por procesar', count: tarjetasCredito.filter((l) => isItemPorProcesar(l)).length },
-            { id: 'historico', label: 'Histórico', count: tarjetasCredito.length },
+            { id: 'por_aprobar', label: 'Por aprobar', count: tarjetasCredito.filter((l) => l.estado === 'pendiente' && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'por_procesar', label: 'Por procesar', count: tarjetasCredito.filter((l) => isItemPorProcesar(l) && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'historico', label: 'Histórico', count: tarjetasCredito.filter((l) => (!globalSearch || matchesItemSearch(l, globalSearch))).length },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -356,7 +374,6 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
           ))}
         </div>
 
-        {/* Actions & Search */}
         {/* Actions & Search */}
         <div className="flex items-center gap-2">
           {/* Botones de desplazamiento horizontal rápido */}
@@ -386,7 +403,7 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por código o solicitante..."
+              placeholder="Buscar por código, solicitante, nit, factura..."
               className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 text-slate-900 placeholder-slate-400 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
             />
           </div>
@@ -439,6 +456,28 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Global Search Active Banner */}
+      {globalSearch && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>
+              Búsqueda global activa: <strong className="font-bold text-blue-950">"{globalSearch}"</strong> &bull;{' '}
+              <span className="font-semibold text-blue-800">{filtered.length} coincidencias</span> en Tarjetas de Crédito (revisando empleado, motivo, facturas, NITs y cada línea de gasto)
+            </span>
+          </div>
+          {onClearGlobalSearch && (
+            <button
+              onClick={onClearGlobalSearch}
+              className="px-2.5 py-1 text-xs font-bold text-blue-700 hover:text-blue-900 hover:bg-blue-100 rounded-xl transition-all cursor-pointer flex items-center gap-1 border border-blue-200 bg-white"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Limpiar búsqueda</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Main Table */}
       <div 

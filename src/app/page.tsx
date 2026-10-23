@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Search } from 'lucide-react';
 import { Navbar } from '@/components/Navbar';
 import { Sidebar, TabType } from '@/components/Sidebar';
 import { DashboardView } from '@/components/DashboardView';
@@ -17,6 +18,7 @@ import { ProveedoresTable } from '@/components/ProveedoresTable';
 import { CuentasTable } from '@/components/CuentasTable';
 import { ReportesView } from '@/components/ReportesView';
 import { LoginView } from '@/components/LoginView';
+import { matchesItemSearch } from '@/lib/searchUtils';
 import {
   checkSupabaseHealth,
   fetchCuentasFromSupabase,
@@ -417,6 +419,22 @@ export default function Home() {
     return <LoginView onLoginSuccess={handleLoginSuccess} />;
   }
 
+  // Count matching items for sidebar badges when searchTerm is active
+  const matchingLegsCount = useMemo(() => {
+    if (!searchTerm.trim()) return legalizaciones.length;
+    return legalizaciones.filter((l) => matchesItemSearch(l, searchTerm)).length;
+  }, [legalizaciones, searchTerm]);
+
+  const matchingTCCount = useMemo(() => {
+    if (!searchTerm.trim()) return tarjetasCredito.length;
+    return tarjetasCredito.filter((t) => matchesItemSearch(t, searchTerm)).length;
+  }, [tarjetasCredito, searchTerm]);
+
+  const matchingGastosCount = useMemo(() => {
+    if (!searchTerm.trim()) return gastos.length;
+    return gastos.filter((g) => matchesItemSearch(g, searchTerm)).length;
+  }, [gastos, searchTerm]);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       {/* Top Navbar */}
@@ -445,9 +463,9 @@ export default function Home() {
           isOpen={isSidebarOpen}
           onToggle={() => setIsSidebarOpen((prev) => !prev)}
           counts={{
-            legalizaciones: legalizaciones.length,
-            cajasMenores: tarjetasCredito.length,
-            gastos: gastos.length,
+            legalizaciones: matchingLegsCount,
+            cajasMenores: matchingTCCount,
+            gastos: matchingGastosCount,
             cuentas: cuentas.length,
             proveedores: proveedores.length,
           }}
@@ -455,6 +473,57 @@ export default function Home() {
 
         {/* Dynamic Main Workspace */}
         <main className="flex-1 p-6 overflow-y-auto w-full min-w-0">
+          {searchTerm.trim() !== '' && activeTab === 'dashboard' && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl shadow-sm text-xs text-blue-900 animate-in fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p className="font-bold text-sm text-blue-950 flex items-center gap-2">
+                    <Search className="w-4 h-4 text-blue-600" />
+                    Búsqueda global: "{searchTerm}"
+                  </p>
+                  <p className="text-slate-600 text-xs mt-0.5">
+                    Coincidencias en cabeceras y cada línea de gasto (facturas, NITs, proveedores, conceptos):
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="px-3 py-1.5 text-xs font-bold text-rose-700 bg-white border border-rose-200 rounded-xl hover:bg-rose-50 transition-colors self-start sm:self-auto cursor-pointer"
+                >
+                  Limpiar búsqueda
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button
+                  onClick={() => setActiveTab('legalizaciones')}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-blue-800 font-semibold hover:bg-blue-100 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>Cajas Menores:</span>
+                  <span className="font-bold px-1.5 py-0.2 bg-blue-600 text-white rounded-full text-[10px]">
+                    {matchingLegsCount}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('cajas_menores')}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-blue-800 font-semibold hover:bg-blue-100 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>Tarjetas de Crédito:</span>
+                  <span className="font-bold px-1.5 py-0.2 bg-blue-600 text-white rounded-full text-[10px]">
+                    {matchingTCCount}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('gastos')}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-blue-800 font-semibold hover:bg-blue-100 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>Legalizaciones de Gastos:</span>
+                  <span className="font-bold px-1.5 py-0.2 bg-blue-600 text-white rounded-full text-[10px]">
+                    {matchingGastosCount}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'dashboard' && (
             <DashboardView
               legalizaciones={legalizaciones}
@@ -467,6 +536,8 @@ export default function Home() {
           {activeTab === 'legalizaciones' && (
             <LegalizacionesList
               legalizaciones={legalizaciones}
+              globalSearch={searchTerm}
+              onClearGlobalSearch={() => setSearchTerm('')}
               onSelectLegalizacion={setSelectedLegalizacion}
               onOpenNuevaModal={() => setIsNuevaModalOpen(true)}
               onUpdateStatus={(id, st) => handleUpdateStatus(id, st)}
@@ -477,6 +548,8 @@ export default function Home() {
           {activeTab === 'cajas_menores' && (
             <TarjetasCreditoList
               tarjetasCredito={tarjetasCredito}
+              globalSearch={searchTerm}
+              onClearGlobalSearch={() => setSearchTerm('')}
               onSelectTarjetaCredito={setSelectedTarjetaCredito}
               onOpenNuevaModal={() => window.open('/formulario-tarjetas-credito', '_blank')}
               onUpdateStatus={(id, st) => handleUpdateStatusTarjeta(id, st)}
@@ -487,6 +560,8 @@ export default function Home() {
           {activeTab === 'gastos' && (
             <GastosList
               gastos={gastos}
+              globalSearch={searchTerm}
+              onClearGlobalSearch={() => setSearchTerm('')}
               onSelectGasto={setSelectedGasto}
               onOpenNuevaModal={() => setIsNuevaGastoModalOpen(true)}
               onUpdateStatus={(id, st) => handleUpdateGastoStatus(id, st)}

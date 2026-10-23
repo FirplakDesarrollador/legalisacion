@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Eye, CheckCircle2, XCircle, Clock, PlusCircle, Search, UserPlus, Receipt, Loader2, Send, ChevronLeft, ChevronRight, FileText, Copy, Check, Filter, X } from 'lucide-react';
 import { Legalizacion } from '@/types/legalizaciones';
 import { supabase, updateLegalizacionGastoPagoCruce } from '@/lib/supabase';
+import { matchesItemSearch } from '@/lib/searchUtils';
 
 interface GastosListProps {
   gastos: Legalizacion[];
@@ -13,6 +14,8 @@ interface GastosListProps {
   onUpdateGestionContable?: (id: string, gestion: 'Por procesar' | 'Procesado') => void;
   onUpdatePagoCruce?: (id: string, gestionado: boolean) => void;
   defaultTab?: 'por_aprobar' | 'por_procesar' | 'historico';
+  globalSearch?: string;
+  onClearGlobalSearch?: () => void;
 }
 
 export const GastosList: React.FC<GastosListProps> = ({
@@ -23,6 +26,8 @@ export const GastosList: React.FC<GastosListProps> = ({
   onUpdateGestionContable,
   onUpdatePagoCruce,
   defaultTab = 'por_aprobar',
+  globalSearch = '',
+  onClearGlobalSearch,
 }) => {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'por_aprobar' | 'por_procesar' | 'historico'>(defaultTab);
@@ -98,6 +103,23 @@ export const GastosList: React.FC<GastosListProps> = ({
     }
     prevPendingCountRef.current = currentPending;
   }, [gastos, activeTab]);
+
+  useEffect(() => {
+    if (globalSearch && globalSearch.trim()) {
+      const activeMatches = gastos.filter((l) => {
+        let mTab = true;
+        if (activeTab === 'por_aprobar') mTab = l.estado === 'pendiente';
+        else if (activeTab === 'por_procesar') mTab = isItemPorProcesar(l);
+        return mTab && matchesItemSearch(l, globalSearch);
+      });
+      if (activeMatches.length === 0) {
+        const hasHistoricoMatches = gastos.some((l) => matchesItemSearch(l, globalSearch));
+        if (hasHistoricoMatches) {
+          setActiveTab('historico');
+        }
+      }
+    }
+  }, [globalSearch, gastos, activeTab]);
 
   const handleScroll = (direction: 'left' | 'right') => {
     if (tableContainerRef.current) {
@@ -191,14 +213,9 @@ export const GastosList: React.FC<GastosListProps> = ({
       matchesTab = true;
     }
 
-    const term = searchTerm.toLowerCase();
-    const matchesSearch =
-      (l.codigo || '').toLowerCase().includes(term) ||
-      (l.usuarioNombre || '').toLowerCase().includes(term) ||
-      (l.motivo || '').toLowerCase().includes(term) ||
-      (l.centroCosto || '').toLowerCase().includes(term);
-
-    if (!matchesTab || !matchesSearch) return false;
+    const matchesLocalSearch = matchesItemSearch(l, searchTerm);
+    const matchesGlobal = !globalSearch || matchesItemSearch(l, globalSearch);
+    if (!matchesTab || !matchesLocalSearch || !matchesGlobal) return false;
 
     // Per-column filters
     if (colFilters.solicitante.trim()) {
@@ -354,9 +371,9 @@ export const GastosList: React.FC<GastosListProps> = ({
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 w-full sm:w-auto overflow-x-auto shrink-0">
           {[
-            { id: 'por_aprobar', label: 'Por aprobar', count: gastos.filter((l) => l.estado === 'pendiente').length },
-            { id: 'por_procesar', label: 'Por procesar', count: gastos.filter((l) => isItemPorProcesar(l)).length },
-            { id: 'historico', label: 'Histórico', count: gastos.length },
+            { id: 'por_aprobar', label: 'Por aprobar', count: gastos.filter((l) => l.estado === 'pendiente' && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'por_procesar', label: 'Por procesar', count: gastos.filter((l) => isItemPorProcesar(l) && (!globalSearch || matchesItemSearch(l, globalSearch))).length },
+            { id: 'historico', label: 'Histórico', count: gastos.filter((l) => (!globalSearch || matchesItemSearch(l, globalSearch))).length },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -401,7 +418,7 @@ export const GastosList: React.FC<GastosListProps> = ({
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Buscar por código, solicitante, motivo..."
+              placeholder="Buscar por código, solicitante, nit, factura..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-600 shadow-xs"
@@ -442,6 +459,28 @@ export const GastosList: React.FC<GastosListProps> = ({
           )}
         </div>
       </div>
+
+      {/* Global Search Active Banner */}
+      {globalSearch && (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>
+              Búsqueda global activa: <strong className="font-bold text-blue-950">"{globalSearch}"</strong> &bull;{' '}
+              <span className="font-semibold text-blue-800">{filtered.length} coincidencias</span> en Legalizaciones de Gastos (revisando empleado, motivo, facturas, NITs y cada línea de gasto)
+            </span>
+          </div>
+          {onClearGlobalSearch && (
+            <button
+              onClick={onClearGlobalSearch}
+              className="px-2.5 py-1 text-xs font-bold text-blue-700 hover:text-blue-900 hover:bg-blue-100 rounded-xl transition-all cursor-pointer flex items-center gap-1 border border-blue-200 bg-white"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Limpiar búsqueda</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Main Table View */}
       <div 

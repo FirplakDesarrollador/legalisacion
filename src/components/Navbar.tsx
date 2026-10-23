@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, ShieldCheck, UserCheck, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, ShieldCheck, UserCheck, LogOut, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { HealthCheckResult } from '@/lib/supabase';
 
 interface NavbarProps {
@@ -68,8 +68,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Buscar por empleado, motivo, nit o factura..."
-            className="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-50 text-slate-900 placeholder-slate-400 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-600 transition-all"
+            className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50 text-slate-900 placeholder-slate-400 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-600 focus:bg-white focus:ring-1 focus:ring-blue-600 transition-all"
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => onSearchChange('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200 transition-colors cursor-pointer"
+              title="Limpiar búsqueda"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* User Badge */}
