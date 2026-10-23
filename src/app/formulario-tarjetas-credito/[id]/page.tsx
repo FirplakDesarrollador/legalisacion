@@ -302,7 +302,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
         try {
           await supabase
             .from('legalizaciones_tarjetas_credito')
-            .update({ sap_doc_entry: data.docEntry, gestion_contable: 'procesado', updated_at: new Date().toISOString() })
+            .update({ sap_doc_entry: data.docEntry, updated_at: new Date().toISOString() })
             .eq('id', legData.id);
         } catch (e) {}
       }

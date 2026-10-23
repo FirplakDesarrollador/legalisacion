@@ -239,8 +239,6 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
 
       if (createdDocEntry) {
         updatePayload.sap_doc_entry = createdDocEntry;
-        updatePayload.gestion_contable = 'procesado';
-        updatePayload.fecha_procesado = now;
       }
 
       let { error } = await supabase
