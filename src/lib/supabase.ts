@@ -1302,29 +1302,6 @@ export function updateLegalizacionGastoStatus(id: string, nuevoEstado: Legalizac
     }
   });
 
-  if (nuevoEstado === 'aprobado') {
-    const approvedGasto = current.find(item => item.id === id);
-    if (approvedGasto) {
-      fetch('/api/sap/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(approvedGasto),
-      })
-        .then(async res => {
-          if (!res.ok) throw new Error('Respuesta no válida del servidor');
-          return res.json();
-        })
-        .then(data => {
-          if (data.success && data.docEntry) {
-            supabase.from('legalizaciones_gastos').update({
-              sap_doc_entry: data.docEntry
-            }).eq('id', id).then(() => {});
-          }
-        })
-        .catch(err => console.error('Error al generar borrador SAP automáticamente:', err));
-    }
-  }
-
   return updated;
 }
 

@@ -133,6 +133,67 @@ export async function crearBorradorLegalizacionSAP(
       table: rawLeg.table,
     };
 
+    // 0. IDEMPOTENCIA: Evitar crear borradores duplicados en SAP si ya existen
+    const existingDocEntry = rawLeg.sapDocEntry || rawLeg.sap_doc_entry;
+    if (existingDocEntry) {
+      return {
+        success: true,
+        message: `La legalización ${legalizacion.codigo} ya cuenta con el borrador #${existingDocEntry} en SAP.`,
+        docEntry: Number(existingDocEntry),
+      };
+    }
+
+    // 0.1 Verificar en Supabase si ya tiene un sap_doc_entry registrado
+    if (legalizacion.id) {
+      try {
+        const codigoUpper = String(legalizacion.codigo || legalizacion.id).toUpperCase();
+        let tableName = 'legalizaciones_gastos';
+        if (codigoUpper.startsWith('TC-') || legalizacion.tarjeta_codigo) tableName = 'legalizaciones_tarjetas_credito';
+        else if (codigoUpper.startsWith('LEG-PUB-')) tableName = 'legalizaciones cajas menores';
+
+        const { data: dbItem } = await supabase
+          .from(tableName)
+          .select('sap_doc_entry')
+          .eq('id', legalizacion.id)
+          .maybeSingle();
+
+        if (dbItem?.sap_doc_entry) {
+          return {
+            success: true,
+            message: `La legalización ${legalizacion.codigo} ya tenía un borrador registrado en base de datos (#${dbItem.sap_doc_entry}).`,
+            docEntry: Number(dbItem.sap_doc_entry),
+          };
+        }
+      } catch (errDb) {
+        console.warn('Error verificando existencia previa en Supabase:', errDb);
+      }
+    }
+
+    // 0.2 Verificar en SAP Service Layer si ya existe un U_HBT_LEGENC para este código
+    if (legalizacion.codigo && legalizacion.codigo.trim().length > 3) {
+      try {
+        const filterStr = `contains(U_Comentario, '${legalizacion.codigo.trim()}')`;
+        const resCheck = await fetch(`${baseUrl}/U_HBT_LEGENC?$filter=${filterStr}&$top=1&$select=Code,U_Comentario`, {
+          headers: { Cookie: session.cookieHeader },
+        });
+        if (resCheck.ok) {
+          const dataCheck = await resCheck.json();
+          if (dataCheck.value && dataCheck.value.length > 0) {
+            const existingCode = dataCheck.value[0].Code;
+            const docEntryNum = parseInt(existingCode, 10);
+            await actualizarSupabaseConDocEntry(legalizacion, docEntryNum);
+            return {
+              success: true,
+              message: `Borrador ya existente en SAP (#${docEntryNum}) para ${legalizacion.codigo}.`,
+              docEntry: docEntryNum,
+            };
+          }
+        }
+      } catch (checkErr) {
+        console.warn('Error consultando borrador previo en SAP:', checkErr);
+      }
+    }
+
     // 1. Obtener siguiente Code para U_HBT_LEGENC
     const resMaxEnc = await fetch(`${baseUrl}/U_HBT_LEGENC?$top=1&$orderby=Code desc`, {
       headers: { Cookie: session.cookieHeader },

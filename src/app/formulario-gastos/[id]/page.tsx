@@ -342,8 +342,8 @@ export default function PublicGastoApprovalPage({ params }: { params: Promise<{ 
         console.error(e);
       }
 
-      // 3. Si es aprobado, enviar borrador a SAP con indicador en vivo y límite de tiempo
-      if (nuevoEstado === 'aprobado') {
+      // 3. Si es aprobado y no tiene borrador previo, enviar a SAP con indicador en vivo y límite de tiempo
+      if (nuevoEstado === 'aprobado' && !legalizacion.sapDocEntry) {
         setSapSyncing(true);
         setSapResult(null);
         try {

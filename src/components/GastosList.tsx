@@ -98,6 +98,10 @@ export const GastosList: React.FC<GastosListProps> = ({
     if (nuevoEstado === leg.estado) return;
     onUpdateStatus(leg.id, nuevoEstado);
 
+    if (nuevoEstado === 'aprobado' && !leg.sapDocEntry) {
+      handleEnviarSAP(leg);
+    }
+
     try {
       const link = typeof window !== 'undefined' ? `${window.location.origin}/formulario-gastos/${leg.id}` : '';
       fetch('/api/notify', {

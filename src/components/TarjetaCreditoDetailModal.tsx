@@ -152,7 +152,7 @@ export const TarjetaCreditoDetailModal: React.FC<TarjetaCreditoDetailModalProps>
       console.error('Error guardando lineas editadas:', e);
     }
 
-    if (nuevoEstado === 'aprobado') {
+    if (nuevoEstado === 'aprobado' && !tarjetaCredito.sapDocEntry) {
       await handleEnviarSAP(editableLineas);
       // wait a bit for user to see the success message before closing
       setTimeout(() => {

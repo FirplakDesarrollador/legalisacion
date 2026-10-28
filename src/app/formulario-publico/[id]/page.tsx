@@ -201,8 +201,8 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
       const now = new Date().toISOString();
       let createdDocEntry: number | undefined = undefined;
 
-      // Al aprobar, enviar automáticamente el borrador a SAP Service Layer
-      if (nuevoEstado === 'aprobado') {
+      // Al aprobar, enviar automáticamente el borrador a SAP Service Layer (si no tiene ya uno)
+      if (nuevoEstado === 'aprobado' && !legalizacion.sapDocEntry) {
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 50000);

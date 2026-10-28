@@ -266,7 +266,7 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
           console.error(e);
         }
 
-        if (nuevoEstado === 'aprobado') {
+        if (nuevoEstado === 'aprobado' && !legalizacion.sapDocEntry) {
           await handleEnviarSAP(updatedLeg);
         }
       }

@@ -107,7 +107,7 @@ export const LegalizacionDetailModal: React.FC<LegalizacionDetailModalProps> = (
       console.error(e);
     }
 
-    if (nuevoEstado === 'aprobado') {
+    if (nuevoEstado === 'aprobado' && !legalizacion.sapDocEntry) {
       await handleEnviarSAP();
       setTimeout(() => {
         onUpdateStatus(legalizacion.id, nuevoEstado, observaciones);

@@ -133,7 +133,7 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
     const gastoToSave = { ...gasto, lineas: editableLineas };
 
     // Automatic SAP draft creation when approved (non-blocking with timeout)
-    if (nuevoEstado === 'aprobado') {
+    if (nuevoEstado === 'aprobado' && !gasto.sapDocEntry) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 50000);

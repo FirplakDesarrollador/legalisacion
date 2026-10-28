@@ -4,6 +4,9 @@ import { crearBorradorLegalizacionSAP, loginSAP } from '@/lib/sapServiceLayer';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+// Mutex / Caché en vuelo para evitar llamadas simultáneas duplicadas al mismo borrador en SAP
+const inFlightDrafts = new Map<string, Promise<any>>();
+
 export async function GET() {
   try {
     const session = await loginSAP();
@@ -31,7 +34,30 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await crearBorradorLegalizacionSAP(body);
+    // Clave única para evitar peticiones concurrentes duplicadas
+    const dedupeKey = String(body.id || body.codigo || '').trim();
+
+    if (dedupeKey && inFlightDrafts.has(dedupeKey)) {
+      console.log(`[SAP Draft] Petición concurrente detectada para ${dedupeKey}. Reutilizando proceso en vuelo.`);
+      const concurrentResult = await inFlightDrafts.get(dedupeKey);
+      return NextResponse.json(concurrentResult);
+    }
+
+    const draftExecution = (async () => {
+      try {
+        return await crearBorradorLegalizacionSAP(body);
+      } finally {
+        if (dedupeKey) {
+          inFlightDrafts.delete(dedupeKey);
+        }
+      }
+    })();
+
+    if (dedupeKey) {
+      inFlightDrafts.set(dedupeKey, draftExecution);
+    }
+
+    const result = await draftExecution;
     return NextResponse.json(result);
   } catch (err: any) {
     const msg = String(err.message || '');
