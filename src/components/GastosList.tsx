@@ -778,10 +778,9 @@ export const GastosList: React.FC<GastosListProps> = ({
                           }`}
                           title="Cambiar estado manualmente"
                         >
-                          <option value="pendiente">⏳ Pendiente</option>
-                          <option value="aprobado">✅ Aprobada</option>
-                          <option value="rechazado">❌ Rechazada</option>
-                          <option value="pagado">💳 Liquidada</option>
+                          <option value="pendiente">⏳ Por aprobar</option>
+                          <option value="aprobado">✅ Aprobado</option>
+                          <option value="rechazado">❌ Rechazado</option>
                         </select>
                       </td>
 
