@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle2, XCircle, FileText, User, Calendar, AlertCircle, Receipt, Check, Clock } from 'lucide-react';
 import { Legalizacion, LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
 import { supabase, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase, updateLegalizacionGastoGestionContable } from '@/lib/supabase';
+import { filterCuentasForCentro, isAccountAllowedForCentro, validateLineasCuentas } from '@/lib/cuentasUtils';
 
 interface GastoDetailModalProps {
   gasto: Legalizacion | null;
@@ -113,6 +114,14 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
   };
 
   const handleAction = async (nuevoEstado: Legalizacion['estado']) => {
+    if (nuevoEstado === 'aprobado') {
+      const validationCuentas = validateLineasCuentas(editableLineas);
+      if (!validationCuentas.valid) {
+        alert(validationCuentas.error);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     // Update lines in DB first
@@ -375,7 +384,15 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                               value={currentVal}
                               onChange={(e) => {
                                 const val = e.target.value;
-                                setEditableLineas(prev => prev.map(line => line.id === l.id ? { ...line, concepto: val } : line));
+                                setEditableLineas(prev => prev.map(line => {
+                                  if (line.id !== l.id) return line;
+                                  const isAllowed = isAccountAllowedForCentro(line.cuentaTitulo, val);
+                                  return {
+                                    ...line,
+                                    concepto: val,
+                                    ...(isAllowed ? {} : { cuentaId: null, cuentaTitulo: '' })
+                                  };
+                                }));
                               }}
                               title={currentVal || 'Centro de Costo'}
                               className="w-full min-w-[200px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none shadow-xs font-medium"
@@ -400,10 +417,12 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                       </td>
                       <td className="py-2.5 px-3 text-blue-900 font-mono font-medium min-w-[300px]">
                         {gasto.estado === 'pendiente' ? (() => {
+                          const currentVal = editableLineas.find(el => el.id === l.id)?.concepto || l.concepto || '';
                           const currentCuentaId = getMatchedCuentaId(l.id, l.cuentaId, l.cuentaTitulo);
                           const activeCuenta = cuentas.find(c => String(c.id) === currentCuentaId);
                           return (
                             <select
+                              disabled={!currentVal}
                               value={currentCuentaId}
                               onChange={(e) => {
                                 const val = e.target.value;
@@ -411,10 +430,10 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                                 setEditableLineas(prev => prev.map(line => line.id === l.id ? { ...line, cuentaId: val ? Number(val) : null, cuentaTitulo: acc ? `${acc.Título} - ${acc.categoria}` : '' } : line));
                               }}
                               title={activeCuenta ? `${activeCuenta.Título} (${activeCuenta.categoria})` : 'Cuenta Contable'}
-                              className="w-full min-w-[280px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none shadow-xs font-mono font-normal"
+                              className="w-full min-w-[280px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none shadow-xs font-mono font-normal disabled:opacity-50 disabled:bg-slate-100"
                             >
-                              <option value="">-- Seleccione Cuenta Contable --</option>
-                              {cuentas.map(c => (
+                              <option value="">{!currentVal ? '-- Primero seleccione Centro de Costo --' : '-- Seleccione Cuenta Contable --'}</option>
+                              {filterCuentasForCentro(cuentas, currentVal).map(c => (
                                 <option key={c.id} value={c.id} title={`${c.Título} (${c.categoria})`}>
                                   {c.Título} ({c.categoria})
                                 </option>

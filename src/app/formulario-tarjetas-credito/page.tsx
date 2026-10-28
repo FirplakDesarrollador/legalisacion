@@ -28,6 +28,7 @@ import {
 } from '@/lib/supabase';
 import { CuentaContable, Proveedor, LineaGasto, TarjetaCredito, ResponsableTarjetaCredito, CentroCosto } from '@/types/legalizaciones';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { filterCuentasForCentro, isAccountAllowedForCentro, validateLineasCuentas } from '@/lib/cuentasUtils';
 
 export default function FormularioTarjetasCreditoPage() {
   const [responsables, setResponsables] = useState<ResponsableTarjetaCredito[]>([]);
@@ -321,18 +322,10 @@ export default function FormularioTarjetasCreditoPage() {
         }
 
         if (field === 'concepto') {
-          // Solo limpiar la cuenta si la cuenta actual no es compatible con el nuevo centro de costo
-          if (updated.cuentaTitulo) {
-            const cc = (String(value) || '').toUpperCase();
-            const ct = updated.cuentaTitulo;
-            const isGa = cc.startsWith('GA') && ct.startsWith('51');
-            const isGv = cc.startsWith('GV') && ct.startsWith('52');
-            const isIp = cc.startsWith('IP') && ct.startsWith('73');
-            const isMo = cc.startsWith('MO') && ct.startsWith('72');
-            if (!isGa && !isGv && !isIp && !isMo) {
-              updated.cuentaId = null;
-              updated.cuentaTitulo = '';
-            }
+          // Si el centro de costo cambia y la cuenta actual no es compatible, limpiarla
+          if (!isAccountAllowedForCentro(updated.cuentaTitulo, String(value || ''))) {
+            updated.cuentaId = null;
+            updated.cuentaTitulo = '';
           }
         }
 
@@ -341,9 +334,17 @@ export default function FormularioTarjetasCreditoPage() {
         }
 
         if (field === 'cuentaId') {
-          const selectedCuenta = cuentas.find((c) => c.id === Number(value));
-          if (selectedCuenta) {
-            updated.cuentaTitulo = selectedCuenta.Título;
+          if (!value) {
+            updated.cuentaId = null;
+            updated.cuentaTitulo = '';
+          } else {
+            const selectedCuenta = cuentas.find((c) => c.id === Number(value));
+            if (selectedCuenta) {
+              updated.cuentaTitulo = selectedCuenta.Título;
+            } else {
+              updated.cuentaId = null;
+              updated.cuentaTitulo = '';
+            }
           }
         }
 
@@ -426,9 +427,9 @@ export default function FormularioTarjetasCreditoPage() {
       return;
     }
 
-    const lineasInvalidas = lineas.some((l) => !l.concepto);
-    if (lineasInvalidas) {
-      alert('Por favor seleccione el Centro de Costos en todas las líneas de gasto.');
+    const validationCuentas = validateLineasCuentas(lineas);
+    if (!validationCuentas.valid) {
+      alert(validationCuentas.error);
       return;
     }
 
@@ -832,26 +833,22 @@ export default function FormularioTarjetasCreditoPage() {
                         <div className="sm:col-span-3">
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase)</label>
                           <SearchableSelect
-                            placeholder="-- Seleccione Cuenta --"
+                            disabled={!linea.concepto}
+                            placeholder={!linea.concepto ? '-- Primero seleccione Centro de Costos --' : '-- Seleccione Cuenta --'}
                             searchPlaceholder="Buscar código o nombre de cuenta..."
                             value={linea.cuentaId ? String(linea.cuentaId) : ''}
                             onChange={(val) => handleUpdateLinea(linea.id, 'cuentaId', val ? Number(val) : '')}
-                            options={cuentas
-                              .filter((c) => {
-                                if (!linea.concepto) return true;
-                                const cc = linea.concepto.toUpperCase();
-                                if (cc.startsWith('GA')) return c.Título.startsWith('51');
-                                if (cc.startsWith('GV')) return c.Título.startsWith('52');
-                                if (cc.startsWith('IP')) return c.Título.startsWith('73');
-                                if (cc.startsWith('MO')) return c.Título.startsWith('72');
-                                return true;
-                              })
-                              .map((c) => ({
-                                value: String(c.id),
-                                label: `${c.Título} (${c.categoria})`,
-                                sublabel: c.categoria,
-                              }))}
+                            options={filterCuentasForCentro(cuentas, linea.concepto).map((c) => ({
+                              value: String(c.id),
+                              label: `${c.Título} (${c.categoria})`,
+                              sublabel: c.categoria,
+                            }))}
                           />
+                          {!linea.concepto && (
+                            <p className="text-[10px] text-amber-600 font-semibold mt-1">
+                              ⚠️ Primero seleccione el Centro de Costos para habilitar las cuentas autorizadas.
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">

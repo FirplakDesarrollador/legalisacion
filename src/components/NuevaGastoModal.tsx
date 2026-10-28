@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, Paperclip, ExternalLink, Receipt, User, Mail, ChevronDown, Search } from 'lucide-react';
 import { Legalizacion, LineaGasto, CuentaContable, Proveedor, CentroCosto } from '@/types/legalizaciones';
 import { fetchCentrosCostoFromSupabase, fetchOrganizationUsers, OrganizationUser, supabase } from '@/lib/supabase';
+import { filterCuentasForCentro, isAccountAllowedForCentro, validateLineasCuentas } from '@/lib/cuentasUtils';
 
 interface NuevaGastoModalProps {
   isOpen: boolean;
@@ -137,14 +138,30 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
           }
         }
 
+        if (field === 'concepto') {
+          // Si el centro de costo cambia y la cuenta actual no es compatible, limpiarla
+          if (!isAccountAllowedForCentro(updated.cuentaTitulo, String(value || ''))) {
+            updated.cuentaId = null;
+            updated.cuentaTitulo = '';
+          }
+        }
+
         if (field === 'tipoDocumento' && value === 'Documento Soporte') {
           updated.facturaNumero = '';
         }
 
         if (field === 'cuentaId') {
-          const selectedCuenta = cuentas.find((c) => c.id === Number(value));
-          if (selectedCuenta) {
-            updated.cuentaTitulo = selectedCuenta.Título;
+          if (!value) {
+            updated.cuentaId = null;
+            updated.cuentaTitulo = '';
+          } else {
+            const selectedCuenta = cuentas.find((c) => c.id === Number(value));
+            if (selectedCuenta) {
+              updated.cuentaTitulo = selectedCuenta.Título;
+            } else {
+              updated.cuentaId = null;
+              updated.cuentaTitulo = '';
+            }
           }
         }
 
@@ -176,6 +193,12 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
     }
     if (!motivo.trim()) {
       alert('Por favor ingrese el motivo del gasto.');
+      return;
+    }
+
+    const validationCuentas = validateLineasCuentas(lineas);
+    if (!validationCuentas.valid) {
+      alert(validationCuentas.error);
       return;
     }
 
@@ -619,21 +642,16 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase) *</label>
                       <select
+                        disabled={!linea.concepto}
                         value={linea.cuentaId || ''}
                         onChange={(e) => handleUpdateLinea(linea.id, 'cuentaId', e.target.value)}
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-blue-900 font-mono font-semibold text-xs"
+                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-blue-900 font-mono font-semibold text-xs disabled:opacity-50 disabled:bg-slate-100"
                         required
                       >
-                        <option value="" disabled>-- Seleccione Cuenta Contable --</option>
-                        {cuentas.filter((c) => {
-                          if (!linea.concepto) return true;
-                          const cc = linea.concepto.toUpperCase();
-                          if (cc.startsWith('GA')) return c.Título.startsWith('51');
-                          if (cc.startsWith('GV')) return c.Título.startsWith('52');
-                          if (cc.startsWith('IP')) return c.Título.startsWith('73');
-                          if (cc.startsWith('MO')) return c.Título.startsWith('72');
-                          return true;
-                        }).map((c) => (
+                        <option value="" disabled>
+                          {!linea.concepto ? '-- Primero seleccione Centro de Costo --' : '-- Seleccione Cuenta Contable --'}
+                        </option>
+                        {filterCuentasForCentro(cuentas, linea.concepto).map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.Título} ({c.categoria})
                           </option>

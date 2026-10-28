@@ -6,6 +6,7 @@ import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar,
 import { supabase, fetchOrganizationUsers, OrganizationUser, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase } from '@/lib/supabase';
 import { Legalizacion, LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { filterCuentasForCentro, isAccountAllowedForCentro, validateLineasCuentas } from '@/lib/cuentasUtils';
 
 export default function PublicApprovalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
@@ -211,6 +212,13 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
 
   const handleAction = async (nuevoEstado: Legalizacion['estado']) => {
     if (!legalizacion) return;
+    if (nuevoEstado === 'aprobado') {
+      const validationCuentas = validateLineasCuentas(editableLineas);
+      if (!validationCuentas.valid) {
+        alert(validationCuentas.error);
+        return;
+      }
+    }
     setIsSubmitting(true);
     try {
       const nowIso = new Date().toISOString();
@@ -545,10 +553,12 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                         <td className="py-3 px-4 whitespace-nowrap text-slate-500">{linea.fecha}</td>
                         <td className="py-3 px-4 font-mono text-[11px] font-bold text-blue-900 min-w-[300px]">
                           {legalizacion.estado === 'pendiente' ? (() => {
+                            const rawVal = editableLineas.find(el => el.id === linea.id)?.concepto || linea.concepto || '';
                             const currentCuentaId = getMatchedCuentaId(linea.id, linea.cuentaId, linea.cuentaTitulo);
                             const activeCuenta = cuentas.find(c => String(c.id) === currentCuentaId);
                             return (
                               <select
+                                disabled={!rawVal}
                                 value={currentCuentaId}
                                 onChange={(e) => {
                                   const val = e.target.value;
@@ -556,10 +566,10 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                                   setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, cuentaId: val ? Number(val) : null, cuentaTitulo: acc ? `${acc.Título} - ${acc.categoria}` : '' } : l));
                                 }}
                                 title={activeCuenta ? `${activeCuenta.Título} (${activeCuenta.categoria})` : 'Cuenta Contable'}
-                                className="w-full min-w-[280px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 outline-none shadow-xs font-mono font-normal"
+                                className="w-full min-w-[280px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 outline-none shadow-xs font-mono font-normal disabled:opacity-50 disabled:bg-slate-100"
                               >
-                                <option value="">-- Seleccione Cuenta Contable --</option>
-                                {cuentas.map(c => (
+                                <option value="">{!rawVal ? '-- Primero seleccione Centro de Costo --' : '-- Seleccione Cuenta Contable --'}</option>
+                                {filterCuentasForCentro(cuentas, rawVal).map(c => (
                                   <option key={c.id} value={c.id} title={`${c.Título} (${c.categoria})`}>
                                     {c.Título} ({c.categoria})
                                   </option>
@@ -580,7 +590,15 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                                   value={currentVal}
                                   onChange={(e) => {
                                     const val = e.target.value;
-                                    setEditableLineas(prev => prev.map(l => l.id === linea.id ? { ...l, concepto: val } : l));
+                                    setEditableLineas(prev => prev.map(l => {
+                                      if (l.id !== linea.id) return l;
+                                      const isAllowed = isAccountAllowedForCentro(l.cuentaTitulo, val);
+                                      return {
+                                        ...l,
+                                        concepto: val,
+                                        ...(isAllowed ? {} : { cuentaId: null, cuentaTitulo: '' })
+                                      };
+                                    }));
                                   }}
                                   title={currentVal || 'Centro de Costo'}
                                   className="w-full min-w-[220px] text-xs py-1.5 px-2 border border-slate-300 rounded-lg bg-white text-slate-800 focus:border-blue-500 outline-none shadow-xs font-medium"

@@ -5,6 +5,7 @@ import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, UserCheck, Papercl
 import { Legalizacion, LineaGasto, CuentaContable, Proveedor, ResponsableCaja, CentroCosto } from '@/types/legalizaciones';
 import { fetchResponsablesFromSupabase, fetchCentrosCostoFromSupabase, supabase } from '@/lib/supabase';
 import { SearchableSelect } from '@/components/SearchableSelect';
+import { filterCuentasForCentro, isAccountAllowedForCentro, validateLineasCuentas } from '@/lib/cuentasUtils';
 
 interface NuevaLegalizacionModalProps {
   isOpen: boolean;
@@ -120,14 +121,30 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
         if (lin.id !== id) return lin;
         const updated = { ...lin, [field]: value };
 
+        if (field === 'concepto') {
+          // Si el centro de costo cambia y la cuenta actual no es compatible, limpiarla
+          if (!isAccountAllowedForCentro(updated.cuentaTitulo, String(value || ''))) {
+            updated.cuentaId = null;
+            updated.cuentaTitulo = '';
+          }
+        }
+
         if (field === 'tipoDocumento' && value === 'Documento Soporte') {
           updated.facturaNumero = '';
         }
 
         if (field === 'cuentaId') {
-          const selectedCuenta = cuentas.find((c) => c.id === Number(value));
-          if (selectedCuenta) {
-            updated.cuentaTitulo = selectedCuenta.Título;
+          if (!value) {
+            updated.cuentaId = null;
+            updated.cuentaTitulo = '';
+          } else {
+            const selectedCuenta = cuentas.find((c) => c.id === Number(value));
+            if (selectedCuenta) {
+              updated.cuentaTitulo = selectedCuenta.Título;
+            } else {
+              updated.cuentaId = null;
+              updated.cuentaTitulo = '';
+            }
           }
         }
 
@@ -157,6 +174,12 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
     e.preventDefault();
     if (!motivo.trim()) {
       alert('Por favor ingrese el motivo de la legalización.');
+      return;
+    }
+
+    const validationCuentas = validateLineasCuentas(lineas);
+    if (!validationCuentas.valid) {
+      alert(validationCuentas.error);
       return;
     }
 
@@ -379,7 +402,6 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                         value={linea.concepto}
                         onChange={(val) => {
                           handleUpdateLinea(linea.id, 'concepto', val);
-                          handleUpdateLinea(linea.id, 'cuentaId', null);
                         }}
                         options={centros.map((c) => ({
                           value: `${c.codigo} - ${c.Título}`,
@@ -392,26 +414,22 @@ export const NuevaLegalizacionModal: React.FC<NuevaLegalizacionModalProps> = ({
                       <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Cuenta Contable (Supabase) *</label>
                       <SearchableSelect
                         required
-                        placeholder="-- Seleccione Cuenta Contable --"
+                        disabled={!linea.concepto}
+                        placeholder={!linea.concepto ? '-- Primero seleccione Centro de Costo --' : '-- Seleccione Cuenta Contable --'}
                         searchPlaceholder="Buscar código o nombre de cuenta..."
                         value={linea.cuentaId ? String(linea.cuentaId) : ''}
                         onChange={(val) => handleUpdateLinea(linea.id, 'cuentaId', val ? Number(val) : '')}
-                        options={cuentas
-                          .filter((c) => {
-                            if (!linea.concepto) return true;
-                            const cc = linea.concepto.toUpperCase();
-                            if (cc.startsWith('GA')) return c.Título.startsWith('51');
-                            if (cc.startsWith('GV')) return c.Título.startsWith('52');
-                            if (cc.startsWith('IP')) return c.Título.startsWith('73');
-                            if (cc.startsWith('MO')) return c.Título.startsWith('72');
-                            return true;
-                          })
-                          .map((c) => ({
-                            value: String(c.id),
-                            label: `${c.Título} (${c.categoria})`,
-                            sublabel: c.categoria,
-                          }))}
+                        options={filterCuentasForCentro(cuentas, linea.concepto).map((c) => ({
+                          value: String(c.id),
+                          label: `${c.Título} (${c.categoria})`,
+                          sublabel: c.categoria,
+                        }))}
                       />
+                      {!linea.concepto && (
+                        <p className="text-[10px] text-amber-600 font-semibold mt-1">
+                          ⚠️ Primero seleccione el Centro de Costos para habilitar las cuentas autorizadas.
+                        </p>
+                      )}
                     </div>
                   </div>
 
