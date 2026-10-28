@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database, UserCheck, X, Home } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, XCircle, FileText, User, Building, Calendar, AlertCircle, Send, Database, UserCheck, X, Home, Clock } from 'lucide-react';
 import { supabase, fetchOrganizationUsers, OrganizationUser, fetchCuentasFromSupabase, fetchCentrosCostoFromSupabase } from '@/lib/supabase';
 import { Legalizacion, LineaGasto, CuentaContable, CentroCosto } from '@/types/legalizaciones';
 import { SearchableSelect } from '@/components/SearchableSelect';
@@ -725,6 +725,81 @@ export default function PublicApprovalPage({ params }: { params: Promise<{ id: s
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-lg shadow-blue-600/25 transition-all cursor-pointer text-xs"
                   >
                     <CheckCircle2 className="w-4 h-4 stroke-[2.5]" /> Aprobar Legalización
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Manual status change: Aprobado -> Rechazado */}
+            {legalizacion.estado === 'aprobado' && (
+              <div className="p-5 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span className="text-xs font-bold text-slate-800">Esta legalización de tarjeta se encuentra Aprobada</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/70 px-2.5 py-0.5 rounded-full border border-amber-200">
+                    Cambio manual de estado
+                  </span>
+                </div>
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Motivo del cambio a Rechazado / Observaciones:
+                </label>
+                <textarea
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  placeholder="Indique el motivo por el cual se rechaza esta legalización de tarjeta previamente aprobada..."
+                  rows={2}
+                  className="w-full p-3 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-rose-500 shadow-sm"
+                />
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    disabled={isSubmitting}
+                    onClick={() => handleAction('rechazado')}
+                    className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-rose-600/20 transition-all cursor-pointer text-xs"
+                  >
+                    <XCircle className="w-4 h-4" /> Cambiar estado a Rechazado
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Manual status change: Rechazado -> Aprobado */}
+            {legalizacion.estado === 'rechazado' && (
+              <div className="p-5 rounded-2xl bg-rose-50/70 border border-rose-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                    <span className="text-xs font-bold text-rose-900">Esta legalización de tarjeta se encuentra Rechazada</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-rose-800 bg-rose-100/70 px-2.5 py-0.5 rounded-full border border-rose-200">
+                    Cambio manual de estado
+                  </span>
+                </div>
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Observaciones del cambio de estado:
+                </label>
+                <textarea
+                  value={observaciones}
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  placeholder="Añadir observaciones de re-aprobación o reconsideración..."
+                  rows={2}
+                  className="w-full p-3 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 shadow-sm"
+                />
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    disabled={isSubmitting}
+                    onClick={() => handleAction('pendiente')}
+                    className="px-3.5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-semibold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer text-xs"
+                  >
+                    <Clock className="w-4 h-4 text-amber-600" /> Cambiar a Pendiente
+                  </button>
+                  <button
+                    disabled={isSubmitting}
+                    onClick={() => handleAction('aprobado')}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer text-xs"
+                  >
+                    <CheckCircle2 className="w-4 h-4 stroke-[2.5]" /> Cambiar estado a Aprobado
                   </button>
                 </div>
               </div>

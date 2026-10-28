@@ -246,8 +246,8 @@ export default function Home() {
           ? {
               ...l,
               estado: nuevoEstado,
-              observacionesAprobacion: observaciones || l.observacionesAprobacion,
-              fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : l.fechaAprobacion,
+              observacionesAprobacion: observaciones !== undefined ? observaciones : l.observacionesAprobacion,
+              fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : (nuevoEstado === 'rechazado' ? undefined : l.fechaAprobacion),
               updated_at: new Date().toISOString(),
             }
           : l
@@ -258,7 +258,12 @@ export default function Home() {
       return next;
     });
     if (selectedLegalizacion && selectedLegalizacion.id === id) {
-      setSelectedLegalizacion((prev) => (prev ? { ...prev, estado: nuevoEstado, observacionesAprobacion: observaciones } : null));
+      setSelectedLegalizacion((prev) => (prev ? {
+        ...prev,
+        estado: nuevoEstado,
+        observacionesAprobacion: observaciones !== undefined ? observaciones : prev.observacionesAprobacion,
+        fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : (nuevoEstado === 'rechazado' ? undefined : prev.fechaAprobacion),
+      } : null));
     }
   };
 
@@ -276,8 +281,8 @@ export default function Home() {
           ? {
               ...t,
               estado: nuevoEstado,
-              observacionesAprobacion: observaciones || t.observacionesAprobacion,
-              fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : t.fechaAprobacion,
+              observacionesAprobacion: observaciones !== undefined ? observaciones : t.observacionesAprobacion,
+              fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : (nuevoEstado === 'rechazado' ? undefined : t.fechaAprobacion),
               updated_at: new Date().toISOString(),
             }
           : t
@@ -288,7 +293,12 @@ export default function Home() {
       return next;
     });
     if (selectedTarjetaCredito && selectedTarjetaCredito.id === id) {
-      setSelectedTarjetaCredito((prev) => (prev ? { ...prev, estado: nuevoEstado, observacionesAprobacion: observaciones } : null));
+      setSelectedTarjetaCredito((prev) => (prev ? {
+        ...prev,
+        estado: nuevoEstado,
+        observacionesAprobacion: observaciones !== undefined ? observaciones : prev.observacionesAprobacion,
+        fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : (nuevoEstado === 'rechazado' ? undefined : prev.fechaAprobacion),
+      } : null));
     }
   };
 
@@ -306,8 +316,8 @@ export default function Home() {
           ? {
               ...g,
               estado: nuevoEstado,
-              observacionesAprobacion: observaciones || g.observacionesAprobacion,
-              fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : g.fechaAprobacion,
+              observacionesAprobacion: observaciones !== undefined ? observaciones : g.observacionesAprobacion,
+              fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : (nuevoEstado === 'rechazado' ? undefined : g.fechaAprobacion),
               updated_at: new Date().toISOString(),
             }
           : g
@@ -318,7 +328,12 @@ export default function Home() {
       return next;
     });
     if (selectedGasto && selectedGasto.id === id) {
-      setSelectedGasto((prev) => (prev ? { ...prev, estado: nuevoEstado, observacionesAprobacion: observaciones } : null));
+      setSelectedGasto((prev) => (prev ? {
+        ...prev,
+        estado: nuevoEstado,
+        observacionesAprobacion: observaciones !== undefined ? observaciones : prev.observacionesAprobacion,
+        fechaAprobacion: nuevoEstado === 'aprobado' ? new Date().toISOString() : (nuevoEstado === 'rechazado' ? undefined : prev.fechaAprobacion),
+      } : null));
     }
   };
 

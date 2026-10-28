@@ -166,6 +166,27 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
     }
   };
 
+  const handleStatusChange = async (leg: TarjetaCredito, nuevoEstado: TarjetaCredito['estado']) => {
+    if (nuevoEstado === leg.estado) return;
+    onUpdateStatus(leg.id, nuevoEstado);
+
+    try {
+      const link = typeof window !== 'undefined' ? `${window.location.origin}/formulario-tarjetas-credito/${leg.id}` : '';
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          correo: leg.usuarioEmail,
+          titulo: `Legalización TC ${leg.codigo} - ${nuevoEstado === 'aprobado' ? 'Aprobada' : nuevoEstado === 'rechazado' ? 'Rechazada' : 'Actualizada'}`,
+          contenido: `El estado de tu legalización de tarjeta de crédito ${leg.codigo} ha sido actualizado a ${nuevoEstado}.`,
+          link: link,
+        }),
+      }).catch((e) => console.error('Error enviando notificación de estado:', e));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleEnviarSAP = async (leg: TarjetaCredito) => {
     setSyncingId(leg.id);
     try {
@@ -698,7 +719,27 @@ export const TarjetasCreditoList: React.FC<TarjetasCreditoListProps> = ({
                   <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">
                     {formatCOP(leg.totalGastos)}
                   </td>
-                  <td className="py-3.5 px-4">{getStatusPill(leg.estado)}</td>
+                  <td className="py-3.5 px-4">
+                    <select
+                      value={leg.estado}
+                      onChange={(e) => handleStatusChange(leg, e.target.value as TarjetaCredito['estado'])}
+                      className={`text-[11px] font-bold rounded-lg px-2 py-1 border transition-all cursor-pointer shadow-xs focus:outline-none focus:ring-2 ${
+                        leg.estado === 'aprobado'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-emerald-500 hover:bg-emerald-100'
+                          : leg.estado === 'rechazado'
+                          ? 'bg-rose-50 text-rose-800 border-rose-300 focus:ring-rose-500 hover:bg-rose-100'
+                          : leg.estado === 'pagado'
+                          ? 'bg-blue-50 text-blue-800 border-blue-300 focus:ring-blue-500 hover:bg-blue-100'
+                          : 'bg-amber-50 text-amber-800 border-amber-300 focus:ring-amber-500 hover:bg-amber-100'
+                      }`}
+                      title="Cambiar estado manualmente"
+                    >
+                      <option value="pendiente">⏳ Pendiente</option>
+                      <option value="aprobado">✅ Aprobada</option>
+                      <option value="rechazado">❌ Rechazada</option>
+                      <option value="pagado">💳 Liquidada</option>
+                    </select>
+                  </td>
                   <td className="py-3.5 px-4">
                     {(() => {
                       const currentGestion = String(localGestion[leg.id] ?? leg.gestionContable ?? '').toLowerCase().trim() === 'procesado' ? 'Procesado' : 'Por procesar';

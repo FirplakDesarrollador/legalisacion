@@ -471,6 +471,56 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
               />
             </div>
           )}
+
+          {/* Manual status change: Aprobado -> Rechazado */}
+          {gasto.estado === 'aprobado' && (
+            <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <span className="text-xs font-bold text-slate-800">Esta legalización de gastos se encuentra Aprobada</span>
+                </div>
+                <span className="text-[11px] font-semibold text-amber-800 bg-amber-100/70 px-2.5 py-0.5 rounded-full border border-amber-200">
+                  Cambio manual de estado
+                </span>
+              </div>
+              <label className="block font-bold text-slate-700 text-xs">
+                Motivo del cambio a Rechazado / Observaciones:
+              </label>
+              <textarea
+                rows={2}
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                placeholder="Indica el motivo por el cual se rechaza esta legalización de gastos previamente aprobada..."
+                className="w-full p-2.5 bg-white border border-rose-200 rounded-xl text-slate-900 focus:outline-none focus:border-rose-500 text-xs"
+              />
+            </div>
+          )}
+
+          {/* Manual status change: Rechazado -> Aprobado */}
+          {gasto.estado === 'rechazado' && (
+            <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                  <span className="text-xs font-bold text-rose-900">Esta legalización de gastos se encuentra Rechazada</span>
+                </div>
+                <span className="text-[11px] font-semibold text-rose-800 bg-rose-100/70 px-2.5 py-0.5 rounded-full border border-rose-200">
+                  Cambio manual de estado
+                </span>
+              </div>
+              <label className="block font-bold text-slate-700 text-xs">
+                Observaciones del cambio de estado:
+              </label>
+              <textarea
+                rows={2}
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                placeholder="Añadir observaciones de re-aprobación o reconsideración..."
+                className="w-full p-2.5 bg-white border border-emerald-200 rounded-xl text-slate-900 focus:outline-none focus:border-emerald-500 text-xs"
+              />
+            </div>
+          )}
         </div>
 
         {/* Footer Actions */}
@@ -533,6 +583,41 @@ export const GastoDetailModal: React.FC<GastoDetailModalProps> = ({
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Aprobar Legalización</span>
+                </button>
+              </>
+            )}
+
+            {gasto.estado === 'aprobado' && (
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleAction('rechazado')}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold shadow-md shadow-rose-600/20 transition-all flex items-center gap-1.5 text-xs disabled:opacity-50 cursor-pointer"
+              >
+                <XCircle className="w-4 h-4" />
+                <span>Cambiar estado a Rechazado</span>
+              </button>
+            )}
+
+            {gasto.estado === 'rechazado' && (
+              <>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleAction('pendiente')}
+                  className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl font-semibold transition-all flex items-center gap-1.5 text-xs disabled:opacity-50 cursor-pointer"
+                >
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  <span>Cambiar a Pendiente</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleAction('aprobado')}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 text-xs disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Cambiar estado a Aprobado</span>
                 </button>
               </>
             )}

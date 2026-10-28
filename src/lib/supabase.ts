@@ -822,8 +822,8 @@ export function updateLegalizacionStatus(id: string, nuevoEstado: Legalizacion['
       return {
         ...item,
         estado: nuevoEstado,
-        observacionesAprobacion: observaciones || item.observacionesAprobacion,
-        fechaAprobacion: nuevoEstado === 'aprobado' ? now : item.fechaAprobacion,
+        observacionesAprobacion: observaciones !== undefined ? observaciones : item.observacionesAprobacion,
+        fechaAprobacion: nuevoEstado === 'aprobado' ? now : (nuevoEstado === 'rechazado' ? undefined : item.fechaAprobacion),
         updated_at: now
       };
     }
@@ -836,8 +836,8 @@ export function updateLegalizacionStatus(id: string, nuevoEstado: Legalizacion['
 
   supabase.from('legalizaciones cajas menores').update({
     estado: nuevoEstado,
-    observacionesAprobacion: observaciones,
-    fecha_aprobacion: nuevoEstado === 'aprobado' ? now : undefined,
+    observacionesAprobacion: observaciones !== undefined ? observaciones : undefined,
+    fecha_aprobacion: nuevoEstado === 'aprobado' ? now : (nuevoEstado === 'rechazado' ? null : undefined),
     updated_at: now
   }).eq('id', id).then(({ error }) => {
     if (error) console.error('Error al actualizar estado en Supabase:', error);
@@ -888,8 +888,8 @@ export function updateTarjetaCreditoStatus(id: string, nuevoEstado: Legalizacion
       return {
         ...item,
         estado: nuevoEstado,
-        observacionesAprobacion: observaciones || item.observacionesAprobacion,
-        fechaAprobacion: nuevoEstado === 'aprobado' ? now : item.fechaAprobacion,
+        observacionesAprobacion: observaciones !== undefined ? observaciones : item.observacionesAprobacion,
+        fechaAprobacion: nuevoEstado === 'aprobado' ? now : (nuevoEstado === 'rechazado' ? undefined : item.fechaAprobacion),
         updated_at: now
       };
     }
@@ -904,7 +904,7 @@ export function updateTarjetaCreditoStatus(id: string, nuevoEstado: Legalizacion
   supabase.from('legalizaciones_tarjetas_credito').update({
     estado: nuevoEstado,
     observaciones_aprobacion: observaciones || null,
-    fecha_aprobacion: nuevoEstado === 'aprobado' ? now : undefined,
+    fecha_aprobacion: nuevoEstado === 'aprobado' ? now : (nuevoEstado === 'rechazado' ? null : undefined),
     updated_at: now
   }).eq('id', id).then(({ error }) => {
     if (error) {
@@ -1273,8 +1273,8 @@ export function updateLegalizacionGastoStatus(id: string, nuevoEstado: Legalizac
       return {
         ...item,
         estado: nuevoEstado,
-        observacionesAprobacion: observaciones || item.observacionesAprobacion,
-        fechaAprobacion: nuevoEstado === 'aprobado' ? now : item.fechaAprobacion,
+        observacionesAprobacion: observaciones !== undefined ? observaciones : item.observacionesAprobacion,
+        fechaAprobacion: nuevoEstado === 'aprobado' ? now : (nuevoEstado === 'rechazado' ? undefined : item.fechaAprobacion),
         updated_at: now
       };
     }
@@ -1289,14 +1289,14 @@ export function updateLegalizacionGastoStatus(id: string, nuevoEstado: Legalizac
   supabase.from('legalizaciones_gastos').update({
     estado: nuevoEstado,
     observaciones_aprobacion: observaciones || null,
-    fecha_aprobacion: nuevoEstado === 'aprobado' ? now : undefined,
+    fecha_aprobacion: nuevoEstado === 'aprobado' ? now : (nuevoEstado === 'rechazado' ? null : undefined),
     updated_at: now
   }).eq('id', id).then(({ error }) => {
     if (error) {
       supabase.from('legalizaciones gastos').update({
         estado: nuevoEstado,
         observaciones_aprobacion: observaciones || null,
-        fecha_aprobacion: nuevoEstado === 'aprobado' ? now : undefined,
+        fecha_aprobacion: nuevoEstado === 'aprobado' ? now : (nuevoEstado === 'rechazado' ? null : undefined),
         updated_at: now
       }).eq('id', id).then(() => {});
     }
