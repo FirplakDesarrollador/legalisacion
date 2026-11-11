@@ -3,6 +3,7 @@ import { X, Plus, Trash2, CheckCircle2, FileText, Calculator, Paperclip, Externa
 import { Legalizacion, LineaGasto, CuentaContable, Proveedor, CentroCosto } from '@/types/legalizaciones';
 import { fetchCentrosCostoFromSupabase, fetchOrganizationUsers, OrganizationUser, supabase } from '@/lib/supabase';
 import { filterCuentasForCentro, isAccountAllowedForCentro, validateLineasCuentas } from '@/lib/cuentasUtils';
+import { normalizarNitProveedor, handleNitKeyDown } from '@/lib/nitUtils';
 
 interface NuevaGastoModalProps {
   isOpen: boolean;
@@ -125,13 +126,8 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
         const updated = { ...lin, [field]: value };
 
         if (field === 'proveedorNit') {
-          const clean = String(value || '').replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
+          const { nit: clean, proveedor: matchProv } = normalizarNitProveedor(String(value || ''), proveedores);
           updated.proveedorNit = clean;
-          const matchProv = proveedores.find((p) => {
-            const pId = (p.numero_identificacion || '').trim().toLowerCase();
-            const pIdClean = pId.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
-            return pIdClean === clean || pId === clean;
-          });
           if (matchProv) {
             updated.proveedorNombre = matchProv.razon_social || '';
             updated.proveedorId = matchProv.id;
@@ -579,19 +575,9 @@ export const NuevaGastoModal: React.FC<NuevaGastoModalProps> = ({
                         list={`prov-nit-list-${linea.id}`}
                         placeholder="Ej. 900123456"
                         value={linea.proveedorNit || ''}
-                        onKeyDown={(e) => {
-                              if (
-                                !e.ctrlKey &&
-                                !e.metaKey &&
-                                !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key) &&
-                                !/^\d$/.test(e.key)
-                              ) {
-                                e.preventDefault();
-                              }
-                            }}
+                        onKeyDown={handleNitKeyDown}
                         onChange={(e) => {
-                          const cleaned = e.target.value.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
-                          handleUpdateLinea(linea.id, 'proveedorNit', cleaned);
+                          handleUpdateLinea(linea.id, 'proveedorNit', e.target.value);
                         }}
                         className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono font-semibold focus:outline-none focus:border-blue-600 text-xs"
                       />

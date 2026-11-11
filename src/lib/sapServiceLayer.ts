@@ -1,6 +1,7 @@
 import { Legalizacion } from '@/types/legalizaciones';
 import { supabase } from './supabase';
 import { convertUSDToCOP } from './trm';
+import { calcularDigitoVerificacionDIAN } from './nitUtils';
 
 // Ensure TLS certificate verification is bypassed for self-signed SAP SSL in development/internal network
 if (typeof process !== 'undefined') {
@@ -438,22 +439,58 @@ export async function crearBorradorLegalizacionSAP(
       const detCode = currentDetNum.toString().padStart(10, '0');
       
       // 3.1 Buscar Proveedor en SAP por NIT para obtener CardCode real y Nombre (Priorizando AC y EM)
-      let realCardCode = (linea.proveedorNit || '').trim();
-      let realCardName = (linea.proveedorNit || '').trim();
+      const rawProvNit = String(linea.proveedorNit || '').trim();
+      const nitClean = (rawProvNit.includes('-') ? rawProvNit.split('-')[0] : rawProvNit).replace(/\D/g, '').slice(0, 10) || rawProvNit;
+      let realCardCode = nitClean;
+      let realCardName = nitClean;
       
-      if (linea.proveedorNit) {
+      if (nitClean) {
         try {
-          const nitClean = linea.proveedorNit.trim();
+          // Paso 1: Búsqueda directa con el documento completo (protege cédulas de 10 dígitos existentes en SAP)
           const filterStr = `FederalTaxID eq '${nitClean}' or startswith(FederalTaxID, '${nitClean}')`;
           const resBP = await fetch(`${baseUrl}/BusinessPartners?$filter=${filterStr}&$select=CardCode,CardName,FederalTaxID`, {
             headers: { Cookie: session.cookieHeader },
           });
+          let foundInSap = false;
           if (resBP.ok) {
             const dataBP = await resBP.json();
             if (dataBP.value && dataBP.value.length > 0) {
               const matched = dataBP.value.find((b: any) => b.CardCode && (b.CardCode.startsWith('AC') || b.CardCode.startsWith('EM'))) || dataBP.value[0];
               realCardCode = matched.CardCode;
               realCardName = matched.CardName;
+              foundInSap = true;
+            }
+          }
+
+          // Paso 2 (Fallback): Si no apareció con los 10 dígitos y el último dígito corresponde a un Dígito de Verificación
+          // (ej. NIT de empresa 8909006089 -> base 890900608 + DV 9), buscar con los primeros 9 dígitos sin afectar cédulas de 10 dígitos (que inician en 1)
+          if (!foundInSap && nitClean.length >= 9) {
+            const nitSinDv = nitClean.slice(0, -1);
+            const dvChar = nitClean.slice(-1);
+            const isNitEmpresa10Digitos = nitClean.length === 10 && /^[89]\d{9}$/.test(nitClean);
+            const isDvValidoNoCedula10 =
+              !(nitClean.length === 10 && nitClean.startsWith('1')) &&
+              calcularDigitoVerificacionDIAN(nitSinDv) === parseInt(dvChar, 10);
+
+            if (isNitEmpresa10Digitos || isDvValidoNoCedula10) {
+              if (isNitEmpresa10Digitos) {
+                realCardCode = nitSinDv;
+                realCardName = nitSinDv;
+              }
+              const filterFallback = `FederalTaxID eq '${nitSinDv}' or startswith(FederalTaxID, '${nitSinDv}-') or startswith(FederalTaxID, '${nitSinDv}')`;
+              const resBPFallback = await fetch(`${baseUrl}/BusinessPartners?$filter=${filterFallback}&$select=CardCode,CardName,FederalTaxID`, {
+                headers: { Cookie: session.cookieHeader },
+              });
+              if (resBPFallback.ok) {
+                const dataBPFallback = await resBPFallback.json();
+                if (dataBPFallback.value && dataBPFallback.value.length > 0) {
+                  const matchedFallback =
+                    dataBPFallback.value.find((b: any) => b.CardCode && (b.CardCode.startsWith('AC') || b.CardCode.startsWith('EM'))) ||
+                    dataBPFallback.value[0];
+                  realCardCode = matchedFallback.CardCode;
+                  realCardName = matchedFallback.CardName;
+                }
+              }
             }
           }
         } catch (e) {

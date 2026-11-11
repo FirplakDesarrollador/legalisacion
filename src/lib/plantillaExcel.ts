@@ -329,13 +329,28 @@ export async function leerPlantilla(
 
     const facturaNumero = tipoDocumento === 'Documento Soporte' ? '' : celdaTexto(g(3));
 
-    const nit = celdaTexto(g(4)).replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
+    const rawNitTexto = celdaTexto(g(4));
+    const beforeHyphen = rawNitTexto.includes('-') ? rawNitTexto.split('-')[0] : rawNitTexto.replace(/-\d$/, '');
+    let nit = beforeHyphen.replace(/\D/g, '').slice(0, 10);
     if (!nit) E('NIT/Cédula del proveedor es obligatorio (máx. 10 dígitos numéricos sin guion).');
-    const prov = ctx.proveedores.find((p) => {
-      const pId = (p.numero_identificacion || '').trim().toLowerCase();
-      const pIdClean = pId.replace(/-\d$/, '').replace(/\D/g, '').slice(0, 10);
-      return pIdClean === nit.toLowerCase() || pId === nit.toLowerCase();
-    });
+
+    const getProvBaseId = (p: { numero_identificacion: string | null }) => {
+      const rawId = (p.numero_identificacion || '').trim();
+      const sinGuion = rawId.includes('-') ? rawId.split('-')[0] : rawId.replace(/-\d$/, '');
+      return sinGuion.replace(/\D/g, '').slice(0, 10);
+    };
+
+    let prov = ctx.proveedores.find((p) => getProvBaseId(p) === nit);
+    if (nit.length === 10 && !prov) {
+      const nit9 = nit.slice(0, 9);
+      const match9 = ctx.proveedores.find((p) => getProvBaseId(p) === nit9);
+      if (match9) {
+        nit = nit9;
+        prov = match9;
+      } else if (/^[89]\d{9}$/.test(nit)) {
+        nit = nit9;
+      }
+    }
 
     const codCentro = codigoDe(celdaTexto(g(5)));
     const centro = ctx.centros.find((c) => c.codigo.trim().toUpperCase() === codCentro.toUpperCase());
