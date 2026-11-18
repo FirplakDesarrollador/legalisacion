@@ -8,6 +8,8 @@ export interface SyncPendingResult {
   failedCount: number;
   synced: Array<{ id: string; codigo: string; docEntry: number; modulo: string }>;
   errors: Array<{ id: string; codigo: string; error: string; modulo: string }>;
+  /** Borradores creados con SN genérico que requieren corregir el Código SN en SAP */
+  revisiones: Array<{ id: string; codigo: string; docEntry: number; motivo: string; modulo: string }>;
   message: string;
 }
 
@@ -23,6 +25,7 @@ export async function syncPendingSAPRecords(): Promise<SyncPendingResult> {
     failedCount: 0,
     synced: [],
     errors: [],
+    revisiones: [],
     message: '',
   };
 
@@ -81,12 +84,22 @@ export async function syncPendingSAPRecords(): Promise<SyncPendingResult> {
         const draftRes = await crearBorradorLegalizacionSAP(item, session);
         if (draftRes.success && draftRes.docEntry) {
           result.syncedCount++;
+          const docEntryNum = typeof draftRes.docEntry === 'number' ? draftRes.docEntry : parseInt(String(draftRes.docEntry), 10) || 0;
           result.synced.push({
             id: item.id,
             codigo,
-            docEntry: typeof draftRes.docEntry === 'number' ? draftRes.docEntry : parseInt(String(draftRes.docEntry), 10) || 0,
+            docEntry: docEntryNum,
             modulo: item.modulo,
           });
+          if (draftRes.requiereRevision) {
+            result.revisiones.push({
+              id: item.id,
+              codigo,
+              docEntry: docEntryNum,
+              motivo: draftRes.revisionMotivo || 'Solicitante no encontrado en SAP',
+              modulo: item.modulo,
+            });
+          }
         } else {
           result.failedCount++;
           result.errors.push({
@@ -107,7 +120,8 @@ export async function syncPendingSAPRecords(): Promise<SyncPendingResult> {
       }
     }
 
-    result.message = `Sincronizados ${result.syncedCount} de ${result.pendingCount} registros con SAP`;
+    result.message = `Sincronizados ${result.syncedCount} de ${result.pendingCount} registros con SAP` +
+      (result.revisiones.length > 0 ? ` (${result.revisiones.length} con SN genérico pendientes de revisión: ${result.revisiones.map((r) => r.codigo).join(', ')})` : '');
     return result;
   } catch (globalErr: any) {
     result.success = false;

@@ -72,6 +72,112 @@ export interface SAPDraftResult {
   docNum?: number;
   message?: string;
   sapResponse?: any;
+  /** true cuando no se encontró al solicitante en SAP y se usó el SN genérico */
+  requiereRevision?: boolean;
+  revisionMotivo?: string;
+}
+
+// SN genérico a usar cuando no se encuentra al solicitante en SAP (configurable por variable de entorno).
+// Si no está configurado se usa el SN histórico, pero el borrador queda igualmente marcado para revisión.
+const SAP_SN_GENERICO = (process.env.SAP_SN_GENERICO || 'EM1007813694-01').trim();
+const REVISION_TAG = '[REVISAR SN]';
+
+// Conectores que no aportan a la búsqueda por nombre
+const NAME_STOPWORDS = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'Y', 'SAN', 'SANTA']);
+
+const quitarTildes = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const escOData = (s: string) => s.replace(/'/g, "''");
+
+interface EmpleadoSAP {
+  CardCode: string;
+  CardName: string;
+}
+
+async function consultarBP(baseUrl: string, cookie: string, filter: string): Promise<EmpleadoSAP[]> {
+  try {
+    const url = `${baseUrl}/BusinessPartners?$filter=${encodeURIComponent(filter)}&$select=CardCode,CardName&$top=20`;
+    const res = await fetch(url, { headers: { Cookie: cookie } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.value) ? data.value : [];
+  } catch (e) {
+    console.warn('Error consultando BusinessPartners:', e);
+    return [];
+  }
+}
+
+/** Prioriza empleados (EM) sobre acreedores (AC) */
+function elegirEmpleado(lista: EmpleadoSAP[], exigirUnico: boolean): EmpleadoSAP | null {
+  const em = lista.filter((b) => b.CardCode?.startsWith('EM'));
+  const ac = lista.filter((b) => b.CardCode?.startsWith('AC'));
+  if (exigirUnico) {
+    if (em.length === 1) return em[0];
+    if (em.length === 0 && ac.length === 1) return ac[0];
+    return null;
+  }
+  return em[0] || ac[0] || null;
+}
+
+/**
+ * Busca el Socio de Negocio (empleado) del solicitante en SAP:
+ * 1. Por correo electrónico (exacto).
+ * 2. Por nombre completo (sin tildes y con tildes), ignorando conectores.
+ * 3. Por combinaciones de dos palabras del nombre, aceptando solo si hay un único empleado.
+ */
+async function buscarEmpleadoSAP(
+  baseUrl: string,
+  cookie: string,
+  nombre: string,
+  email: string
+): Promise<EmpleadoSAP | null> {
+  const prefijo = `(startswith(CardCode, 'EM') or startswith(CardCode, 'AC'))`;
+
+  // 1. Por correo
+  const mail = (email || '').trim();
+  if (mail) {
+    const variantes = Array.from(new Set([mail, mail.toLowerCase(), mail.toUpperCase()]));
+    const mailFilter = variantes.map((m) => `EmailAddress eq '${escOData(m)}'`).join(' or ');
+    const porCorreo = elegirEmpleado(await consultarBP(baseUrl, cookie, `(${mailFilter}) and ${prefijo}`), false);
+    if (porCorreo) return porCorreo;
+  }
+
+  // 2. Por nombre
+  const nombreUpper = (nombre || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  if (!nombreUpper) return null;
+
+  const tokensOrig = nombreUpper
+    .split(' ')
+    .map((t) => t.replace(/[^A-ZÁÉÍÓÚÜÑ]/g, ''))
+    .filter((t) => t.length > 1 && !NAME_STOPWORDS.has(quitarTildes(t)));
+  if (tokensOrig.length === 0) return null;
+  const tokensNorm = tokensOrig.map(quitarTildes);
+
+  const filtroTokens = (tokens: string[]) =>
+    `(${tokens.map((t) => `contains(CardName, '${escOData(t)}')`).join(' and ')}) and ${prefijo}`;
+
+  const intentosCompletos: string[][] = [tokensNorm];
+  if (tokensOrig.join(' ') !== tokensNorm.join(' ')) intentosCompletos.push(tokensOrig);
+
+  for (const tokens of intentosCompletos) {
+    const encontrado = elegirEmpleado(await consultarBP(baseUrl, cookie, filtroTokens(tokens)), false);
+    if (encontrado) return encontrado;
+  }
+
+  // 3. Búsqueda relajada: pares de palabras (primer nombre con cada apellido/otro nombre)
+  if (tokensNorm.length > 2) {
+    const pares: string[][] = [];
+    for (let i = 0; i < tokensNorm.length; i++) {
+      for (let j = i + 1; j < tokensNorm.length; j++) {
+        pares.push([tokensNorm[i], tokensNorm[j]]);
+      }
+    }
+    for (const par of pares.slice(0, 6)) {
+      const encontrado = elegirEmpleado(await consultarBP(baseUrl, cookie, filtroTokens(par)), true);
+      if (encontrado) return encontrado;
+    }
+  }
+
+  return null;
 }
 
 export async function actualizarSupabaseConDocEntry(leg: any, docEntry: number | string) {
@@ -216,7 +322,7 @@ export async function crearBorradorLegalizacionSAP(
       if (resPC.ok) {
         const dataPC = await resPC.json();
         const searchName = (legalizacion.centroCosto || '').toLowerCase().trim();
-        
+
         // Mapeo manual de las áreas de Supabase a los CenterCodes reales de SAP Firplak
         const knownMappings: Record<string, string> = {
           'emergencias sst': 'GA-SISTG', // Sist de Gestion
@@ -233,7 +339,7 @@ export async function crearBorradorLegalizacionSAP(
         realProfitCode = knownMappings[searchName] || null;
 
         if (!realProfitCode) {
-          const found = dataPC.value.find((p: any) => 
+          const found = dataPC.value.find((p: any) =>
             p.CenterName && (p.CenterName.toLowerCase().includes(searchName) || searchName.includes(p.CenterName.toLowerCase()))
           );
           if (found) {
@@ -244,7 +350,7 @@ export async function crearBorradorLegalizacionSAP(
           }
         }
       }
-    } catch(e) {
+    } catch (e) {
       console.error('Error buscando ProfitCenters:', e);
       realProfitCode = (legalizacion.centroCosto && legalizacion.centroCosto.length <= 8) ? legalizacion.centroCosto : null;
     }
@@ -259,6 +365,7 @@ export async function crearBorradorLegalizacionSAP(
 
     let headerCardCode = '';
     let headerCardName = legalizacion.usuarioNombre;
+    let requiereRevision = false;
 
     if (isTarjetaCredito) {
       // Para Tarjetas de Crédito: El Código SN DEBE SER OBLIGATORIAMENTE el tc_en_sap de la tarjeta
@@ -300,60 +407,35 @@ export async function crearBorradorLegalizacionSAP(
       }
 
       if (!headerCardCode) {
-        // Fallback: Buscar en BusinessPartners de SAP por nombre del responsable o tarjeta
-        try {
-          if (legalizacion.usuarioNombre) {
-            const parts = legalizacion.usuarioNombre.toUpperCase().split(' ').filter((p: string) => p.length > 2);
-            let nameFilter = parts.map((p: string) => `contains(CardName, '${p}')`).join(' and ');
-            if (!nameFilter) nameFilter = `contains(CardName, '${legalizacion.usuarioNombre.toUpperCase()}')`;
-            
-            const filterStr = `(${nameFilter}) and (startswith(CardCode, 'EM') or startswith(CardCode, 'AC'))`;
-            const resBP = await fetch(`${baseUrl}/BusinessPartners?$filter=${filterStr}`, {
-              headers: { Cookie: session.cookieHeader },
-            });
-            if (resBP.ok) {
-              const dataBP = await resBP.json();
-              if (dataBP.value && dataBP.value.length > 0) {
-                const emp = dataBP.value.find((b: any) => b.CardCode.startsWith('EM') || b.CardCode.startsWith('AC'));
-                headerCardCode = emp ? emp.CardCode : dataBP.value[0].CardCode;
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Error buscando BP del Responsable TC en SAP:', e);
-        }
-
-        if (!headerCardCode) {
-          headerCardCode = 'EM1007813694-01'; // Fallback por defecto a Responsable Firplak
+        // Fallback: Buscar en BusinessPartners de SAP por correo o nombre del responsable
+        const emp = await buscarEmpleadoSAP(baseUrl, session.cookieHeader, legalizacion.usuarioNombre, legalizacion.usuarioEmail);
+        if (emp) {
+          headerCardCode = emp.CardCode;
+        } else {
+          headerCardCode = SAP_SN_GENERICO;
+          requiereRevision = true;
         }
       }
     } else {
-      // Para Cajas Menores: Buscar CardCode del Empleado o Proveedor
-      headerCardCode = (legalizacion as any).usuarioNit || '';
+      // Para Gastos y Cajas Menores: Buscar CardCode del Empleado solicitante
+      headerCardCode = ((legalizacion as any).usuarioNit || '').trim();
       if (!headerCardCode) {
-        headerCardCode = 'EM1007813694-01'; // Fallback a Renata
-        try {
-          if (legalizacion.usuarioNombre) {
-            const parts = legalizacion.usuarioNombre.toUpperCase().split(' ').filter((p: string) => p.length > 2);
-            let nameFilter = parts.map((p: string) => `contains(CardName, '${p}')`).join(' and ');
-            if (!nameFilter) nameFilter = `contains(CardName, '${legalizacion.usuarioNombre.toUpperCase()}')`;
-            
-            const filterStr = `(${nameFilter}) and (startswith(CardCode, 'EM') or startswith(CardCode, 'AC'))`;
-            const resBP = await fetch(`${baseUrl}/BusinessPartners?$filter=${filterStr}`, {
-              headers: { Cookie: session.cookieHeader },
-            });
-            if (resBP.ok) {
-              const dataBP = await resBP.json();
-              if (dataBP.value && dataBP.value.length > 0) {
-                const emp = dataBP.value.find((b: any) => b.CardCode.startsWith('EM'));
-                headerCardCode = emp ? emp.CardCode : dataBP.value[0].CardCode;
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Error buscando BP del Solicitante:', e);
+        const emp = await buscarEmpleadoSAP(baseUrl, session.cookieHeader, legalizacion.usuarioNombre, legalizacion.usuarioEmail);
+        if (emp) {
+          headerCardCode = emp.CardCode;
+          headerCardName = emp.CardName || headerCardName;
+        } else {
+          headerCardCode = SAP_SN_GENERICO;
+          requiereRevision = true;
         }
       }
+    }
+
+    const revisionMotivo = requiereRevision
+      ? `No se encontró en SAP el socio de negocio del solicitante "${legalizacion.usuarioNombre}"${legalizacion.usuarioEmail ? ` (${legalizacion.usuarioEmail})` : ''}. Se asignó el SN genérico ${headerCardCode}; corrija el Código SN antes de contabilizar.`
+      : undefined;
+    if (requiereRevision) {
+      console.warn(`[SAP Draft] ${legalizacion.codigo}: ${revisionMotivo}`);
     }
 
     // 1.9 Pre-calcular totales convertidos a COP con TRM si vienen en USD
@@ -391,10 +473,12 @@ export async function crearBorradorLegalizacionSAP(
       U_Currency: '$',
       U_Fecha: headerDate,
       U_Estado: 1, // 1 = Borrador
-      U_CardCode: headerCardCode, 
-      U_CardName: headerCardName,
+      U_CardCode: headerCardCode,
+      U_CardName: requiereRevision ? `${REVISION_TAG} ${legalizacion.usuarioNombre}`.slice(0, 100) : headerCardName,
       U_ProfitCode: undefined, // No asignar Dimensión 1 en el encabezado
-      U_Comentario: `Borrador Legalización ${legalizacion.codigo} - ${legalizacion.motivo}`,
+      U_Comentario: requiereRevision
+        ? `${REVISION_TAG} Solicitante no encontrado en SAP: ${legalizacion.usuarioNombre}${legalizacion.usuarioEmail ? ` (${legalizacion.usuarioEmail})` : ''} - Borrador Legalización ${legalizacion.codigo} - ${legalizacion.motivo}`
+        : `Borrador Legalización ${legalizacion.codigo} - ${legalizacion.motivo}`,
       U_TipoContabi: 'Comun',
       U_DocRate: 1,
       U_VlrAntesIva: totalGastosCOP,
@@ -437,13 +521,13 @@ export async function crearBorradorLegalizacionSAP(
 
     for (const linea of lineasConvertidas) {
       const detCode = currentDetNum.toString().padStart(10, '0');
-      
+
       // 3.1 Buscar Proveedor en SAP por NIT para obtener CardCode real y Nombre (Priorizando AC y EM)
       const rawProvNit = String(linea.proveedorNit || '').trim();
       const nitClean = (rawProvNit.includes('-') ? rawProvNit.split('-')[0] : rawProvNit).replace(/\D/g, '').slice(0, 10) || rawProvNit;
       let realCardCode = nitClean;
       let realCardName = nitClean;
-      
+
       if (nitClean) {
         try {
           // Paso 1: Búsqueda directa con el documento completo (protege cédulas de 10 dígitos existentes en SAP)
@@ -532,7 +616,7 @@ export async function crearBorradorLegalizacionSAP(
         headers: { 'Content-Type': 'application/json', Cookie: session.cookieHeader },
         body: JSON.stringify(detPayload),
       });
-      
+
       if (!resDet.ok) {
         const errDet = await resDet.json().catch(() => ({}));
         console.error('Error al crear linea de detalle:', errDet);
@@ -568,10 +652,10 @@ export async function crearBorradorLegalizacionSAP(
           const rawCode = (l.cuentaTitulo || '').split(' - ')[0].trim();
           const codeNum = parseInt(rawCode, 10);
           const lineProfitCode = (l.concepto || '').split(' - ')[0].trim();
-          
+
           let itemCode = 'ZZCC01-0005-000-0000'; // Default / Fallback Item Code
           let taxCode = 'I_LEG_T0'; // Default / Fallback Tax Code
-          
+
           if (!isNaN(codeNum)) {
             try {
               const { data, error } = await supabase
@@ -640,11 +724,13 @@ export async function crearBorradorLegalizacionSAP(
       success: true,
       docEntry: finalDocEntry,
       docNum: udoData.DocNum,
-      message: draftsErrors.length > 0 
+      requiereRevision,
+      revisionMotivo,
+      message: (requiereRevision ? `⚠️ ${revisionMotivo} ` : '') + (draftsErrors.length > 0
         ? `Legalización creada (DocEntry: ${udoData.DocEntry}), pero hubieron errores en Facturas Preliminares: ${draftsErrors.join(' | ')}`
         : lineasSoporte.length > 0
           ? `Legalización (DocEntry: ${udoData.DocEntry}) y Facturas Preliminares (DocEntries: ${draftsResults.join(', ')}) creadas en SAP.`
-          : `Borrador de Legalización creado exitosamente en SAP OK1_LEG (DocEntry: ${udoData.DocEntry}). Sin Documentos Soporte.`,
+          : `Borrador de Legalización creado exitosamente en SAP OK1_LEG (DocEntry: ${udoData.DocEntry}). Sin Documentos Soporte.`),
       sapResponse: {
         udo: udoData,
         draftsCreated: draftsResults,
